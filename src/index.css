@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Default to steampunk theme */
+  --color-background: #1a1208;
+  --color-surface: #2d2010;
+  --color-surfaceAlt: #3d2e18;
+  --color-border: #7a5c2e;
+  --color-accent: #c8860a;
+  --color-accentHover: #e8a820;
+  --color-text: #e8d5a0;
+  --color-textMuted: #8a7050;
+  --color-canvasBg: #241a0c;
+  --font-family: 'Special Elite', serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-family);
+  height: 100vh;
+  width: 100vw;
+}
+
+#root {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent);
+}
+
+/* Gear rotation animation */
+@keyframes gear-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes gear-spin-reverse {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+.gear-spin { animation: gear-spin 20s linear infinite; }
+.gear-spin-slow { animation: gear-spin 40s linear infinite; }
+.gear-spin-reverse { animation: gear-spin-reverse 25s linear infinite; }
+
+/* Steam puff animation */
+@keyframes steam-puff {
+  0% { opacity: 0; transform: translateY(0) scale(0.5); }
+  30% { opacity: 0.4; }
+  100% { opacity: 0; transform: translateY(-30px) scale(1.5); }
+}
+.steam-puff { animation: steam-puff 3s ease-out infinite; }
+.steam-puff-delay { animation: steam-puff 3s ease-out 1.5s infinite; }
+
+/* Canvas checkerboard background */
+.canvas-checkerboard {
+  background-image:
+    linear-gradient(45deg, #1a1208 25%, transparent 25%),
+    linear-gradient(-45deg, #1a1208 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #1a1208 75%),
+    linear-gradient(-45deg, transparent 75%, #1a1208 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+  background-color: #241a0c;
+}
+
+/* Marching ants selection */
+@keyframes march {
+  to { stroke-dashoffset: -16; }
+}
+.marching-ants {
+  stroke-dasharray: 8 8;
+  animation: march 0.4s linear infinite;
+}
+
+/* Brass button style */
+.btn-brass {
+  @apply px-3 py-1.5 rounded text-sm font-theme transition-all duration-150;
+  background: linear-gradient(180deg, #b87a10 0%, #8a5c08 100%);
+  border: 1px solid #c8860a;
+  color: #f0d080;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,220,80,0.2);
+}
+.btn-brass:hover {
+  background: linear-gradient(180deg, #d09a20 0%, #a07010 100%);
+  box-shadow: 0 0 8px rgba(200,134,10,0.5), inset 0 1px 0 rgba(255,220,80,0.3);
+}
+.btn-brass:active {
+  background: linear-gradient(180deg, #7a5008 0%, #9a6810 100%);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+}
+
+/* Riveted panel style */
+.panel-riveted {
+  position: relative;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+.panel-riveted::before,
+.panel-riveted::after {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #c8860a, #4a3010);
+  border: 1px solid #8a5c08;
+}
+.panel-riveted::before { top: 4px; left: 4px; }
+.panel-riveted::after { bottom: 4px; right: 4px; }
