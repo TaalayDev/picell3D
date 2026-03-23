@@ -2,10 +2,12 @@ import { useState } from 'react'
 import {
   Pencil, Eraser, PaintBucket,
   Cog, Grid3X3, Square, Columns2, Box,
-  Undo2, Redo2, Trash2, Download, Frame,
+  Undo2, Redo2, Trash2, Download, Frame, ImagePlus, Settings2,
 } from 'lucide-react'
 import { useStore } from '../../store/index.js'
 import CanvasSizeDialog from './CanvasSizeDialog.jsx'
+import ImportDialog from '../canvas/ImportDialog.jsx'
+import SettingsDialog from './SettingsDialog.jsx'
 
 const TOOLS = [
   { id: 'pencil', Icon: Pencil,      label: 'Pencil (P)', key: 'P' },
@@ -27,18 +29,28 @@ export default function Toolbar({ onExport }) {
     clearCanvas, undo, redo,
     viewMode, setViewMode,
   } = useStore()
-  const [showSizeDialog, setShowSizeDialog] = useState(false)
+  const [showSizeDialog,     setShowSizeDialog]     = useState(false)
+  const [showImportDialog,   setShowImportDialog]   = useState(false)
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false)
 
   return (
     <>
-    {showSizeDialog && <CanvasSizeDialog onClose={() => setShowSizeDialog(false)} />}
+    {showSizeDialog     && <CanvasSizeDialog onClose={() => setShowSizeDialog(false)} />}
+    {showImportDialog   && <ImportDialog     onClose={() => setShowImportDialog(false)} />}
+    {showSettingsDialog && <SettingsDialog   onClose={() => setShowSettingsDialog(false)} />}
     <div className="flex items-center gap-1 px-2 py-1 border-b border-border"
       style={{ background: 'var(--color-surfaceAlt)' }}>
 
-      {/* Logo */}
+      {/* Logo + Settings */}
       <div className="flex items-center gap-2 mr-3 pr-3 border-r border-border">
-        <Cog size={16} className="text-accent" />
         <span className="font-theme text-text text-sm tracking-wider">Picell3D</span>
+        <button
+          onClick={() => setShowSettingsDialog(true)}
+          title="Settings"
+          className="flex items-center justify-center w-6 h-6 rounded border border-transparent text-text-muted hover:text-accent hover:border-accent/50 transition-colors"
+        >
+          <Settings2 size={13} />
+        </button>
       </div>
 
       {/* Drawing tools */}
@@ -108,6 +120,16 @@ export default function Toolbar({ onExport }) {
       >
         <Frame size={12} />
         <span>Size</span>
+      </button>
+
+      {/* Import image */}
+      <button
+        className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent transition-colors mr-2"
+        onClick={() => setShowImportDialog(true)}
+        title="Import image"
+      >
+        <ImagePlus size={12} />
+        <span>Import</span>
       </button>
 
       {/* Actions */}

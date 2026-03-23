@@ -81,7 +81,7 @@ export default function VoxelOptionsPanel() {
           <input
             type="range"
             min={1}
-            max={isFrontBack ? Math.floor(depthDimension / 2) : depthDimension}
+            max={isFrontBack ? Math.ceil(depthDimension / 2) : depthDimension}
             value={paintDepth}
             onChange={e => setPaintDepth(parseInt(e.target.value))}
             className="w-full cursor-pointer"
@@ -89,7 +89,7 @@ export default function VoxelOptionsPanel() {
           />
           <div className="flex justify-between text-xs text-text-muted mt-0.5">
             <span>1</span>
-            <span>{isFrontBack ? Math.floor(depthDimension / 2) : depthDimension}</span>
+            <span>{isFrontBack ? Math.ceil(depthDimension / 2) : depthDimension}</span>
           </div>
         </div>
 

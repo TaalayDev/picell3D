@@ -1,6 +1,7 @@
 import { useRef, useEffect, useMemo } from 'react'
 import { useStore, renderView2D, renderDepthMap2D, getViewSize, getCompositedVoxels } from '../../store/index.js'
 import { useCanvasInput } from '../../hooks/useCanvasInput.js'
+import ReferenceOverlay from './ReferenceOverlay.jsx'
 
 function getCSSVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -21,7 +22,7 @@ export default function PixelCanvas() {
 
   const {
     layers, pixelSize, canvasWidth, canvasHeight, depthDimension,
-    showGrid, activeTool, activeView,
+    showGrid, showDepthText, activeTool, activeView,
   } = useStore()
 
   const D = depthDimension
@@ -128,7 +129,7 @@ export default function PixelCanvas() {
     }
 
     // Depth numbers — only when pixels are large enough to be readable
-    if (pixelSize >= 10 && depthMap.length) {
+    if (showDepthText && pixelSize >= 10 && depthMap.length) {
       const fontSize = Math.max(7, Math.floor(pixelSize * 0.38))
       ctx.font = `bold ${fontSize}px monospace`
       ctx.textAlign = 'center'
@@ -139,11 +140,12 @@ export default function PixelCanvas() {
           if (d === null || d === undefined) continue
           const cx = col * pixelSize + pixelSize / 2
           const cy = row * pixelSize + pixelSize / 2
+          const label = d > 0 ? `+${d}` : String(d)
           // shadow for readability
           ctx.fillStyle = 'rgba(0,0,0,0.55)'
-          ctx.fillText(d, cx + 0.5, cy + 0.5)
+          ctx.fillText(label, cx + 0.5, cy + 0.5)
           ctx.fillStyle = 'rgba(255,255,255,0.85)'
-          ctx.fillText(d, cx, cy)
+          ctx.fillText(label, cx, cy)
         }
       }
     }
@@ -156,7 +158,7 @@ export default function PixelCanvas() {
       ctx.textBaseline = 'top'
       ctx.fillText(label, 4, 4)
     }
-  }, [view2d, depthMap, viewW, viewH, pixelSize, showGrid, activeView])
+  }, [view2d, depthMap, viewW, viewH, pixelSize, showGrid, showDepthText, activeView])
 
   return (
     <div className="flex items-center justify-center w-full h-full overflow-auto p-4">
@@ -181,6 +183,7 @@ export default function PixelCanvas() {
             display:        'block',
           }}
         />
+        <ReferenceOverlay pixelSize={pixelSize} />
       </div>
     </div>
   )

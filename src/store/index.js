@@ -145,14 +145,15 @@ export function renderView2D(voxels, view, W, H, D) {
 /**
  * Returns a 2D grid of depth-axis values (number | null) for the frontmost
  * visible voxel in each canvas cell. null = transparent (no voxel).
- * "Depth" = the coordinate along the view's look-at axis.
+ * Front/back: signed offset from center (Math.floor(D/2)). Side views: axis coordinate.
  */
 export function renderDepthMap2D(voxels, view, W, H, D) {
+  const center = Math.floor(D / 2)
   switch (view) {
     case 'front':
       return Array.from({ length: H }, (_, y) =>
         Array.from({ length: W }, (_, x) => {
-          for (let z = 0; z < D; z++) if (voxels[y]?.[x]?.[z] && voxels[y][x][z] !== 'transparent') return z
+          for (let z = 0; z < D; z++) if (voxels[y]?.[x]?.[z] && voxels[y][x][z] !== 'transparent') return z - center
           return null
         })
       )
@@ -160,7 +161,7 @@ export function renderDepthMap2D(voxels, view, W, H, D) {
       return Array.from({ length: H }, (_, y) =>
         Array.from({ length: W }, (_, col) => {
           const x = W - 1 - col
-          for (let z = D - 1; z >= 0; z--) if (voxels[y]?.[x]?.[z] && voxels[y][x][z] !== 'transparent') return D - 1 - z
+          for (let z = D - 1; z >= 0; z--) if (voxels[y]?.[x]?.[z] && voxels[y][x][z] !== 'transparent') return z - center
           return null
         })
       )
@@ -209,17 +210,18 @@ export function getVoxelTargets(col, row, view, paintDepth, W, H, D, paintDirect
   switch (view) {
     case 'front': {
       const center = Math.floor(D / 2)
-      const zStart = paintDirection === 'back'  ? center : center - paintDepth
-      const zEnd   = paintDirection === 'front' ? center : center + paintDepth
+      const ext    = paintDepth - 1
+      const zStart = paintDirection === 'back'  ? center       : center - ext
+      const zEnd   = paintDirection === 'front' ? center       : center + ext
       for (let z = Math.max(0, zStart); z <= Math.min(D - 1, zEnd); z++)
         targets.push({ x: col, y: row, z })
       break
     }
     case 'back': {
       const center = Math.floor(D / 2)
-      // back view: z=D-1 is nearest; "front" direction for back = toward z=D-1
-      const zStart = paintDirection === 'front' ? center : center - paintDepth
-      const zEnd   = paintDirection === 'back'  ? center : center + paintDepth
+      const ext    = paintDepth - 1
+      const zStart = paintDirection === 'front' ? center       : center - ext
+      const zEnd   = paintDirection === 'back'  ? center       : center + ext
       for (let z = Math.max(0, zStart); z <= Math.min(D - 1, zEnd); z++)
         targets.push({ x: W - 1 - col, y: row, z })
       break
@@ -543,10 +545,18 @@ export const useStore = create((set, get) => ({
   })),
   setPaintDirection: (dir)  => set({ paintDirection: dir }),
 
-  // ── UI ───────────────────────────────────────────────────────────────────────
-  viewMode:    'split',
-  activeTheme: 'synthwave',
+  // ── Reference image overlay ──────────────────────────────────────────────────
+  referenceImage: null, // { src, x, y, width, height, opacity }
 
-  setViewMode:    (mode)  => set({ viewMode: mode }),
-  setActiveTheme: (theme) => set({ activeTheme: theme }),
+  setReferenceImage:  (data) => set({ referenceImage: data }),
+  clearReferenceImage: ()    => set({ referenceImage: null }),
+
+  // ── UI ───────────────────────────────────────────────────────────────────────
+  viewMode:      'split',
+  activeTheme:   'synthwave',
+  showDepthText: true,
+
+  setViewMode:      (mode)  => set({ viewMode: mode }),
+  setActiveTheme:   (theme) => set({ activeTheme: theme }),
+  setShowDepthText: (v)     => set({ showDepthText: v }),
 }))

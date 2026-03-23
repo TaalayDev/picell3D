@@ -42,14 +42,16 @@ export function buildVoxelMesh(voxels, W, H, D) {
             [cx-h, cy+h, cz-h], [cx+h, cy+h, cz-h], shadeRgb(rgb, 0.82))
         }
         if (!occ(x, y - 1, z)) {
+          // top face — winding reversed so normal points UP (+Y)
           pushQuad(verts, colors,
-            [cx-h, cy+h, cz-h], [cx+h, cy+h, cz-h],
-            [cx+h, cy+h, cz+h], [cx-h, cy+h, cz+h], shadeRgb(rgb, 1.15))
+            [cx-h, cy+h, cz+h], [cx+h, cy+h, cz+h],
+            [cx+h, cy+h, cz-h], [cx-h, cy+h, cz-h], shadeRgb(rgb, 1.15))
         }
         if (!occ(x, y + 1, z)) {
+          // bottom face — winding reversed so normal points DOWN (-Y)
           pushQuad(verts, colors,
-            [cx-h, cy-h, cz+h], [cx+h, cy-h, cz+h],
-            [cx+h, cy-h, cz-h], [cx-h, cy-h, cz-h], shadeRgb(rgb, 0.70))
+            [cx+h, cy-h, cz+h], [cx-h, cy-h, cz+h],
+            [cx-h, cy-h, cz-h], [cx+h, cy-h, cz-h], shadeRgb(rgb, 0.70))
         }
         if (!occ(x + 1, y, z)) {
           pushQuad(verts, colors,

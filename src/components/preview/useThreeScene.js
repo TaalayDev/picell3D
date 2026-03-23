@@ -141,7 +141,11 @@ export function useThreeScene(containerRef) {
     }
 
     function syncControls() {
-      controls.enabled = !isEditMode() || spaceHeld
+      // Zoom and pan always work; rotation requires Space in edit mode
+      controls.enabled      = true
+      controls.enableRotate = !isEditMode() || spaceHeld
+      controls.enableZoom   = true
+      controls.enablePan    = true
     }
 
     function setCursor(cur) {
@@ -241,6 +245,7 @@ export function useThreeScene(containerRef) {
     const onPointerDown = (e) => {
       if (!isEditMode() || spaceHeld) return
       if (e.button !== 0) return
+      // Disable all controls during active paint stroke to avoid interference
       controls.enabled = false
       isPainting = true
       lastPaintKey = null
