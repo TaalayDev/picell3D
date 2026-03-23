@@ -3,17 +3,17 @@
 @tailwind utilities;
 
 :root {
-  /* Default to steampunk theme */
-  --color-background: #1a1208;
-  --color-surface: #2d2010;
-  --color-surfaceAlt: #3d2e18;
-  --color-border: #7a5c2e;
-  --color-accent: #c8860a;
-  --color-accentHover: #e8a820;
-  --color-text: #e8d5a0;
-  --color-textMuted: #8a7050;
-  --color-canvasBg: #241a0c;
-  --font-family: 'Special Elite', serif;
+  /* Default: SynthWave theme */
+  --color-background:  #0d0221;
+  --color-surface:     #150a2d;
+  --color-surfaceAlt:  #1e0f3c;
+  --color-border:      #5a1a9a;
+  --color-accent:      #ff2d78;
+  --color-accentHover: #ff5590;
+  --color-text:        #f4d0ff;
+  --color-textMuted:   #6a40a0;
+  --color-canvasBg:    #0a0118;
+  --font-family: 'Audiowide', sans-serif;
 }
 
 * {
@@ -76,16 +76,16 @@ body {
 .steam-puff { animation: steam-puff 3s ease-out infinite; }
 .steam-puff-delay { animation: steam-puff 3s ease-out 1.5s infinite; }
 
-/* Canvas checkerboard background */
+/* Canvas checkerboard background — uses theme vars */
 .canvas-checkerboard {
   background-image:
-    linear-gradient(45deg, #1a1208 25%, transparent 25%),
-    linear-gradient(-45deg, #1a1208 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #1a1208 75%),
-    linear-gradient(-45deg, transparent 75%, #1a1208 75%);
+    linear-gradient(45deg, var(--color-surface) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--color-surface) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--color-surface) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--color-surface) 75%);
   background-size: 16px 16px;
   background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
-  background-color: #241a0c;
+  background-color: var(--color-canvasBg);
 }
 
 /* Marching ants selection */
@@ -97,22 +97,30 @@ body {
   animation: march 0.4s linear infinite;
 }
 
-/* Brass button style */
+/* Accent button — adapts to active theme via CSS vars */
 .btn-brass {
   @apply px-3 py-1.5 rounded text-sm font-theme transition-all duration-150;
-  background: linear-gradient(180deg, #b87a10 0%, #8a5c08 100%);
-  border: 1px solid #c8860a;
-  color: #f0d080;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,220,80,0.2);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--color-accent) 75%, #000) 0%,
+    color-mix(in srgb, var(--color-accent) 55%, #000) 100%);
+  border: 1px solid var(--color-accent);
+  color: var(--color-text);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 .btn-brass:hover {
-  background: linear-gradient(180deg, #d09a20 0%, #a07010 100%);
-  box-shadow: 0 0 8px rgba(200,134,10,0.5), inset 0 1px 0 rgba(255,220,80,0.3);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--color-accent) 88%, #fff) 0%,
+    color-mix(in srgb, var(--color-accent) 68%, #000) 100%);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-accent) 55%, transparent),
+              inset 0 1px 0 rgba(255,255,255,0.12);
 }
 .btn-brass:active {
-  background: linear-gradient(180deg, #7a5008 0%, #9a6810 100%);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--color-accent) 45%, #000) 0%,
+    color-mix(in srgb, var(--color-accent) 58%, #000) 100%);
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
 }
+.btn-brass:disabled { opacity: 0.4; cursor: default; }
 
 /* Riveted panel style */
 .panel-riveted {
@@ -127,8 +135,60 @@ body {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #c8860a, #4a3010);
-  border: 1px solid #8a5c08;
+  background: radial-gradient(circle at 35% 35%, var(--color-accent), var(--color-surface));
+  border: 1px solid var(--color-border);
 }
 .panel-riveted::before { top: 4px; left: 4px; }
 .panel-riveted::after { bottom: 4px; right: 4px; }
+
+/* ── SynthWave animations ─────────────────────────────────────────────────── */
+
+/* CRT scan lines */
+.sw-scanlines {
+  background: repeating-linear-gradient(
+    0deg,
+    transparent, transparent 2px,
+    rgba(0,0,0,0.06) 2px, rgba(0,0,0,0.06) 4px
+  );
+  pointer-events: none;
+}
+
+/* Scan sweep line moving top→bottom */
+@keyframes sw-scan {
+  from { top: -2px; }
+  to   { top: 100%; }
+}
+.sw-scan-sweep {
+  position: absolute;
+  animation: sw-scan 9s linear infinite;
+}
+
+/* Sun / element glow pulse */
+@keyframes sw-glow-pulse {
+  0%, 100% { opacity: 0.85; }
+  50%       { opacity: 1.0;  }
+}
+.sw-glow-pulse { animation: sw-glow-pulse 5s ease-in-out infinite; }
+
+/* Logo flicker */
+@keyframes sw-flicker {
+  0%, 92%, 100% { opacity: 0.22; }
+  94%            { opacity: 0.10; }
+  96%            { opacity: 0.26; }
+  98%            { opacity: 0.14; }
+}
+.sw-flicker { animation: sw-flicker 8s ease-in-out infinite; }
+
+/* Star twinkle variants */
+@keyframes sw-star-a {
+  0%, 100% { opacity: 0.55; } 50% { opacity: 0.95; }
+}
+@keyframes sw-star-b {
+  0%, 100% { opacity: 0.30; } 50% { opacity: 0.65; }
+}
+@keyframes sw-star-c {
+  0%, 100% { opacity: 0.45; } 60% { opacity: 0.80; }
+}
+.sw-star-a { animation: sw-star-a 3.2s ease-in-out infinite; }
+.sw-star-b { animation: sw-star-b 5.1s ease-in-out infinite; }
+.sw-star-c { animation: sw-star-c 4.4s ease-in-out infinite; }

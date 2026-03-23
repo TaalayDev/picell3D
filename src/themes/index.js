@@ -1,6 +1,26 @@
 import SteampunkBackground from './steampunk/PainterBackground'
+import SynthwaveBackground from './synthwave/PainterBackground'
 
 export const THEMES = {
+  synthwave: {
+    id: 'synthwave',
+    name: 'SynthWave',
+    colors: {
+      background:  '#0d0221',
+      surface:     '#150a2d',
+      surfaceAlt:  '#1e0f3c',
+      border:      '#5a1a9a',
+      accent:      '#ff2d78',
+      accentHover: '#ff5590',
+      text:        '#f4d0ff',
+      textMuted:   '#6a40a0',
+      canvasBg:    '#0a0118',
+    },
+    fontFamily: "'Audiowide', sans-serif",
+    sceneBackground: '#080015',
+    PainterBackground: SynthwaveBackground,
+  },
+
   steampunk: {
     id: 'steampunk',
     name: 'Steampunk',
@@ -79,7 +99,7 @@ export const THEMES = {
 }
 
 export function getTheme(id) {
-  return THEMES[id] ?? THEMES.steampunk
+  return THEMES[id] ?? THEMES.synthwave
 }
 
 export function applyTheme(theme) {
@@ -191,7 +211,7 @@ function WatercolorBackground() {
       ))}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs opacity-20"
         style={{ fontFamily: "'Caveat', cursive", color: '#b05030', fontSize: '16px' }}>
-        Picell3D ✏️
+        Picell3D
       </div>
     </div>
   )

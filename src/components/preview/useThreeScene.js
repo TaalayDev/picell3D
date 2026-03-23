@@ -1,17 +1,17 @@
 import { useEffect, useRef, useCallback } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { buildMeshGroup } from '../../lib/meshBuilder.js'
+import { buildVoxelMesh } from '../../lib/meshBuilder.js'
 import { useStore } from '../../store/index.js'
 
 export function useThreeScene(containerRef) {
-  const rendererRef = useRef(null)
-  const sceneRef = useRef(null)
-  const cameraRef = useRef(null)
-  const controlsRef = useRef(null)
-  const meshGroupRef = useRef(null)
+  const rendererRef     = useRef(null)
+  const sceneRef        = useRef(null)
+  const cameraRef       = useRef(null)
+  const controlsRef     = useRef(null)
+  const meshGroupRef    = useRef(null)
   const disposeGroupRef = useRef(null)
-  const frameRef = useRef(null)
+  const frameRef        = useRef(null)
   const rebuildTimerRef = useRef(null)
 
   useEffect(() => {
@@ -36,11 +36,9 @@ export function useThreeScene(containerRef) {
     sceneRef.current = scene
 
     // ── Lighting ──────────────────────────────────────────────────────
-    // Warm ambient
     const ambient = new THREE.AmbientLight(0xffe8c0, 0.45)
     scene.add(ambient)
 
-    // Key light — warm directional (top-left-front)
     const keyLight = new THREE.DirectionalLight(0xffd090, 1.4)
     keyLight.position.set(4, 6, 4)
     keyLight.castShadow = true
@@ -53,29 +51,24 @@ export function useThreeScene(containerRef) {
     keyLight.shadow.camera.bottom = -5
     scene.add(keyLight)
 
-    // Fill light — cool blue from below-right
     const fillLight = new THREE.DirectionalLight(0x8090d0, 0.35)
     fillLight.position.set(-3, -1, -2)
     scene.add(fillLight)
 
-    // Rim light — subtle amber back-light
     const rimLight = new THREE.DirectionalLight(0xff8820, 0.2)
     rimLight.position.set(0, -3, -5)
     scene.add(rimLight)
 
-    // ── Ground plane (subtle grid) ────────────────────────────────────
+    // ── Ground ────────────────────────────────────────────────────────
     const gridHelper = new THREE.GridHelper(8, 16, 0x3a2a10, 0x241808)
     gridHelper.position.y = -0.8
     gridHelper.material.transparent = true
     gridHelper.material.opacity = 0.5
     scene.add(gridHelper)
 
-    // Subtle ground disc
     const groundGeo = new THREE.CircleGeometry(4, 32)
     const groundMat = new THREE.MeshLambertMaterial({
-      color: 0x1a1006,
-      transparent: true,
-      opacity: 0.6,
+      color: 0x1a1006, transparent: true, opacity: 0.6,
     })
     const ground = new THREE.Mesh(groundGeo, groundMat)
     ground.rotation.x = -Math.PI / 2
@@ -85,9 +78,7 @@ export function useThreeScene(containerRef) {
 
     // ── Camera ────────────────────────────────────────────────────────
     const camera = new THREE.PerspectiveCamera(
-      45,
-      container.clientWidth / container.clientHeight,
-      0.01, 50
+      45, container.clientWidth / container.clientHeight, 0.01, 50
     )
     camera.position.set(2.5, 1.8, 2.5)
     camera.lookAt(0, 0, 0)
@@ -151,13 +142,12 @@ export function useThreeScene(containerRef) {
     return unsub
   }, [])
 
-  // ── Mesh rebuild ─────────────────────────────────────────────────────
+  // ── Mesh rebuild ──────────────────────────────────────────────────────
   const rebuild = useCallback(() => {
     if (!sceneRef.current) return
-    const { pixels, selections, canvasWidth, canvasHeight } = useStore.getState()
-    const { group, dispose } = buildMeshGroup(pixels, selections, canvasWidth, canvasHeight)
+    const { voxels, canvasWidth, canvasHeight, depthDimension } = useStore.getState()
+    const { group, dispose } = buildVoxelMesh(voxels, canvasWidth, canvasHeight, depthDimension)
 
-    // Enable shadow casting on all meshes
     group.traverse(obj => {
       if (obj.isMesh) {
         obj.castShadow = true
@@ -177,7 +167,7 @@ export function useThreeScene(containerRef) {
   useEffect(() => {
     rebuild()
     const unsub = useStore.subscribe((state, prevState) => {
-      if (state.pixels !== prevState.pixels || state.selections !== prevState.selections) {
+      if (state.voxels !== prevState.voxels || state.depthDimension !== prevState.depthDimension) {
         clearTimeout(rebuildTimerRef.current)
         rebuildTimerRef.current = setTimeout(rebuild, 80)
       }
@@ -192,12 +182,13 @@ export function useThreeScene(containerRef) {
   const exportPng = useCallback(() => {
     const renderer = rendererRef.current
     const scene = sceneRef.current
-    const { canvasWidth, canvasHeight } = useStore.getState()
+    const { canvasWidth, canvasHeight, depthDimension } = useStore.getState()
     if (!renderer || !scene) return
 
     const size = 1024
     const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 50)
-    const dist = Math.max(canvasWidth, canvasHeight) * 0.1 * 2.8
+    const maxDim = Math.max(canvasWidth, canvasHeight, depthDimension)
+    const dist = maxDim * 0.1 * 2.8
     camera.position.set(dist, dist * 0.75, dist)
     camera.lookAt(0, 0, 0)
 
@@ -205,7 +196,6 @@ export function useThreeScene(containerRef) {
     renderer.render(scene, camera)
     const dataUrl = renderer.domElement.toDataURL('image/png')
 
-    // Restore
     const container = containerRef.current
     if (container) {
       renderer.setSize(container.clientWidth, container.clientHeight)

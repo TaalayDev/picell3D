@@ -1,20 +1,29 @@
 import { useEffect, useRef } from 'react'
+import { Monitor, RotateCw, PanelLeft, PanelRight, PanelTop, PanelBottom, Square, Columns2, Box } from 'lucide-react'
 import { useStore } from './store/index.js'
 import { getTheme, applyTheme } from './themes/index.js'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js'
 
-import Toolbar from './components/layout/Toolbar.jsx'
-import StatusBar from './components/layout/StatusBar.jsx'
-import PixelCanvas from './components/canvas/PixelCanvas.jsx'
-import Preview3D from './components/preview/Preview3D.jsx'
-import ColorPalette from './components/panels/ColorPalette.jsx'
-import DepthLayersPanel from './components/panels/DepthLayersPanel.jsx'
-import PropertiesPanel from './components/panels/PropertiesPanel.jsx'
+import Toolbar          from './components/layout/Toolbar.jsx'
+import StatusBar        from './components/layout/StatusBar.jsx'
+import PixelCanvas      from './components/canvas/PixelCanvas.jsx'
+import Preview3D        from './components/preview/Preview3D.jsx'
+import ColorPalette     from './components/panels/ColorPalette.jsx'
+import VoxelOptionsPanel from './components/panels/VoxelOptionsPanel.jsx'
+
+const VIEWS = [
+  { id: 'front',  Icon: Monitor,     label: 'Front'  },
+  { id: 'back',   Icon: RotateCw,    label: 'Back'   },
+  { id: 'left',   Icon: PanelLeft,   label: 'Left'   },
+  { id: 'right',  Icon: PanelRight,  label: 'Right'  },
+  { id: 'top',    Icon: PanelTop,    label: 'Top'    },
+  { id: 'bottom', Icon: PanelBottom, label: 'Bottom' },
+]
 
 export default function App() {
   const activeTheme = useStore(s => s.activeTheme)
-  const viewMode = useStore(s => s.viewMode)
-  const exportFn = useRef(null)
+  const viewMode    = useStore(s => s.viewMode)
+  const exportFn    = useRef(null)
 
   useKeyboardShortcuts()
 
@@ -22,10 +31,10 @@ export default function App() {
     applyTheme(getTheme(activeTheme))
   }, [activeTheme])
 
-  const theme = getTheme(activeTheme)
+  const theme     = getTheme(activeTheme)
   const PainterBg = theme.PainterBackground
 
-  const showCanvas = viewMode !== 'preview-only'
+  const showCanvas  = viewMode !== 'preview-only'
   const showPreview = viewMode !== 'canvas-only'
 
   return (
@@ -53,12 +62,13 @@ export default function App() {
 
           {/* 2D Canvas pane */}
           {showCanvas && (
-            <div className="flex-1 min-w-0 overflow-hidden relative"
-              style={{
-                background: 'color-mix(in srgb, var(--color-background) 80%, transparent)',
-                borderRight: showPreview ? '1px solid var(--color-border)' : 'none',
-              }}>
-              <PixelCanvas />
+            <div className="flex flex-col flex-1 min-w-0 overflow-hidden"
+              style={{ borderRight: showPreview ? '1px solid var(--color-border)' : 'none' }}>
+              <ViewTabs />
+              <div className="flex-1 min-h-0 overflow-hidden relative"
+                style={{ background: 'color-mix(in srgb, var(--color-background) 80%, transparent)' }}>
+                <PixelCanvas />
+              </div>
             </div>
           )}
 
@@ -73,23 +83,42 @@ export default function App() {
             </div>
           )}
 
-          {/* Right sidebar — depth layers + properties */}
+          {/* Right sidebar — voxel options */}
           <div className="flex flex-col w-52 border-l border-border flex-shrink-0"
             style={{ background: 'color-mix(in srgb, var(--color-surface) 95%, transparent)' }}>
-            <div className="flex-1 min-h-0 overflow-hidden border-b border-border" style={{ maxHeight: '55%' }}>
-              <DepthLayersPanel />
-            </div>
-            <div className="flex-shrink-0">
-              <div className="px-2 py-1 border-b border-border text-xs uppercase tracking-wide text-text-muted">
-                Properties
-              </div>
-              <PropertiesPanel />
-            </div>
+            <VoxelOptionsPanel />
           </div>
+
         </div>
 
         <StatusBar />
       </div>
+    </div>
+  )
+}
+
+// ── View tab bar ──────────────────────────────────────────────────────────────
+
+function ViewTabs() {
+  const { activeView, setActiveView } = useStore()
+
+  return (
+    <div className="flex items-center gap-1 px-2 py-1 border-b border-border flex-shrink-0 flex-wrap"
+      style={{ background: 'color-mix(in srgb, var(--color-surfaceAlt) 95%, transparent)', minHeight: 32 }}>
+      {VIEWS.map(({ id, Icon, label }) => (
+        <button
+          key={id}
+          onClick={() => setActiveView(id)}
+          className={`flex items-center gap-1 px-2 py-0.5 rounded border text-xs transition-colors ${
+            activeView === id
+              ? 'border-accent bg-accent/20 text-accent'
+              : 'border-border text-text-muted hover:text-text hover:border-accent/40'
+          }`}
+        >
+          <Icon size={11} />
+          {label}
+        </button>
+      ))}
     </div>
   )
 }

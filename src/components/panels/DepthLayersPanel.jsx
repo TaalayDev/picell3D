@@ -8,7 +8,23 @@ export default function DepthLayersPanel() {
     removeSelection, addSelection, updateSelection,
     clearSelectionPixels,
     showDepthOverlay, toggleDepthOverlay,
+    sidePixels, topPixels,
   } = useStore()
+
+  const isMultiView = !!(sidePixels || topPixels)
+
+  if (isMultiView) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="px-2 py-1.5 border-b border-border text-xs uppercase tracking-wide text-text-muted">
+          Depth Layers
+        </div>
+        <div className="p-3 text-xs text-text-muted italic leading-relaxed">
+          Multi-view mode active. 3D shape is generated from view intersections — depth layers are not used.
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full">

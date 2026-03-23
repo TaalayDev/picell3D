@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { nanoid } from 'nanoid'
 
 const DEFAULT_PALETTE = [
   '#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff', '#ffff00',
@@ -8,223 +7,322 @@ const DEFAULT_PALETTE = [
   '#444444', '#cccccc', '#662200', '#002266',
 ]
 
-const OVERLAY_COLORS = [
-  '#ff4444', '#ff8844', '#ffcc44', '#88ff44', '#44ffcc',
-  '#44aaff', '#8844ff', '#ff44cc', '#ff6644', '#44ff88',
-]
-
-function makeEmptyGrid(w, h) {
-  return Array.from({ length: h }, () => Array(w).fill('transparent'))
-}
-
 const CANVAS_W = 32
 const CANVAS_H = 32
+const DEPTH_D  = 16
+
+// voxels[y][x][z]
+function makeEmptyVoxels(W, H, D) {
+  return Array.from({ length: H }, () =>
+    Array.from({ length: W }, () => Array(D).fill('transparent'))
+  )
+}
+
+// ── View helpers (exported for canvas rendering) ───────────────────────────────
+
+/**
+ * Canvas pixel dimensions for each of the 6 views.
+ * Front/Back: W×H  |  Left/Right: D×H  |  Top/Bottom: W×D
+ */
+export function getViewSize(view, W, H, D) {
+  if (view === 'top'   || view === 'bottom') return { w: W, h: D }
+  if (view === 'left'  || view === 'right')  return { w: D, h: H }
+  return { w: W, h: H } // front, back
+}
+
+/** Compute 2D projection for any of the 6 views. Returns grid[row][col] of colors. */
+export function renderView2D(voxels, view, W, H, D) {
+  switch (view) {
+    case 'front':
+      return Array.from({ length: H }, (_, y) =>
+        Array.from({ length: W }, (_, x) => {
+          for (let z = 0; z < D; z++) {
+            const c = voxels[y]?.[x]?.[z]
+            if (c && c !== 'transparent') return c
+          }
+          return 'transparent'
+        })
+      )
+
+    case 'back':
+      // Looking from behind — x is mirrored. col = W-1-x
+      return Array.from({ length: H }, (_, y) =>
+        Array.from({ length: W }, (_, col) => {
+          const x = W - 1 - col
+          for (let z = D - 1; z >= 0; z--) {
+            const c = voxels[y]?.[x]?.[z]
+            if (c && c !== 'transparent') return c
+          }
+          return 'transparent'
+        })
+      )
+
+    case 'left':
+      // Looking from -X inward. col = z (front at col 0).
+      return Array.from({ length: H }, (_, y) =>
+        Array.from({ length: D }, (_, z) => {
+          for (let x = 0; x < W; x++) {
+            const c = voxels[y]?.[x]?.[z]
+            if (c && c !== 'transparent') return c
+          }
+          return 'transparent'
+        })
+      )
+
+    case 'right':
+      // Looking from +X inward. col = D-1-z (back at col 0, front at col D-1).
+      return Array.from({ length: H }, (_, y) =>
+        Array.from({ length: D }, (_, col) => {
+          const z = D - 1 - col
+          for (let x = W - 1; x >= 0; x--) {
+            const c = voxels[y]?.[x]?.[z]
+            if (c && c !== 'transparent') return c
+          }
+          return 'transparent'
+        })
+      )
+
+    case 'top':
+      // Looking from above (-Y). col = x, row = z.
+      return Array.from({ length: D }, (_, z) =>
+        Array.from({ length: W }, (_, x) => {
+          for (let y = 0; y < H; y++) {
+            const c = voxels[y]?.[x]?.[z]
+            if (c && c !== 'transparent') return c
+          }
+          return 'transparent'
+        })
+      )
+
+    case 'bottom':
+      // Looking from below (+Y). col = x, row = z.
+      return Array.from({ length: D }, (_, z) =>
+        Array.from({ length: W }, (_, x) => {
+          for (let y = H - 1; y >= 0; y--) {
+            const c = voxels[y]?.[x]?.[z]
+            if (c && c !== 'transparent') return c
+          }
+          return 'transparent'
+        })
+      )
+
+    default:
+      return []
+  }
+}
+
+/**
+ * Returns voxel coords {x,y,z}[] to paint when the user clicks
+ * canvas pixel (col, row) in the given view.
+ */
+export function getVoxelTargets(col, row, view, paintDepth, W, H, D) {
+  const targets = []
+
+  switch (view) {
+    case 'front':
+      for (let i = 0; i < paintDepth; i++) targets.push({ x: col, y: row, z: i })
+      break
+    case 'back':
+      for (let i = 0; i < paintDepth; i++) targets.push({ x: W - 1 - col, y: row, z: D - 1 - i })
+      break
+    case 'left':
+      for (let i = 0; i < paintDepth; i++) targets.push({ x: i, y: row, z: col })
+      break
+    case 'right':
+      for (let i = 0; i < paintDepth; i++) targets.push({ x: W - 1 - i, y: row, z: D - 1 - col })
+      break
+    case 'top':
+      for (let i = 0; i < paintDepth; i++) targets.push({ x: col, y: i, z: row })
+      break
+    case 'bottom':
+      for (let i = 0; i < paintDepth; i++) targets.push({ x: col, y: H - 1 - i, z: row })
+      break
+  }
+
+  return targets.filter(({ x, y, z }) =>
+    x >= 0 && x < W && y >= 0 && y < H && z >= 0 && z < D
+  )
+}
+
+// ── Store ──────────────────────────────────────────────────────────────────────
 
 export const useStore = create((set, get) => ({
-  // ── Canvas ──────────────────────────────────────────────────────────────
-  canvasWidth: CANVAS_W,
-  canvasHeight: CANVAS_H,
-  pixels: makeEmptyGrid(CANVAS_W, CANVAS_H),
-  pixelSize: 14,
-  showGrid: true,
-  currentColor: '#c8860a',
-  activeTool: 'pencil',
-  palette: DEFAULT_PALETTE,
-  undoStack: [],
-  redoStack: [],
+  // ── Canvas / Voxels ──────────────────────────────────────────────────────────
+  canvasWidth:    CANVAS_W,
+  canvasHeight:   CANVAS_H,
+  depthDimension: DEPTH_D,
+  voxels:         makeEmptyVoxels(CANVAS_W, CANVAS_H, DEPTH_D),
+  pixelSize:      14,
+  showGrid:       true,
+  currentColor:   '#c8860a',
+  activeTool:     'pencil',
+  palette:        DEFAULT_PALETTE,
+  undoStack:      [],
+  redoStack:      [],
 
   pushUndo() {
-    const { pixels, undoStack } = get()
-    set({
-      undoStack: [...undoStack.slice(-49), pixels.map(r => [...r])],
-      redoStack: [],
-    })
+    const { voxels, undoStack } = get()
+    const snapshot = voxels.map(plane => plane.map(row => [...row]))
+    set({ undoStack: [...undoStack.slice(-49), snapshot], redoStack: [] })
   },
 
-  setPixel(col, row, color) {
-    const { pixels, canvasWidth, canvasHeight } = get()
-    if (col < 0 || row < 0 || col >= canvasWidth || row >= canvasHeight) return
-    const next = pixels.map(r => [...r])
-    next[row][col] = color
-    set({ pixels: next })
+  /** Paint (or erase) voxels at a canvas click position. Does NOT push undo. */
+  paintAt(col, row, color) {
+    const { voxels, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView, paintDepth } = get()
+    const targets = getVoxelTargets(col, row, activeView, paintDepth, W, H, D)
+    if (!targets.length) return
+
+    const affectedY = new Set(targets.map(t => t.y))
+    const next = [...voxels]
+    for (const y of affectedY) {
+      next[y] = voxels[y].map(xRow => [...xRow])
+    }
+    for (const { x, y, z } of targets) {
+      next[y][x][z] = color
+    }
+    set({ voxels: next })
   },
 
-  floodFill(col, row, newColor) {
-    const { pixels, canvasWidth, canvasHeight } = get()
-    const target = pixels[row][col]
-    if (target === newColor) return
+  floodFillVoxel(col, row, newColor) {
+    const { voxels, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView, paintDepth } = get()
+    const view2d = renderView2D(voxels, activeView, W, H, D)
+    const { w, h } = getViewSize(activeView, W, H, D)
+    const target = view2d[row]?.[col]
+    if (!target || target === newColor) return
+
     get().pushUndo()
-    const next = pixels.map(r => [...r])
+
+    const visited = new Set()
     const stack = [[col, row]]
+    const matching = []
     while (stack.length) {
       const [c, r] = stack.pop()
-      if (c < 0 || r < 0 || c >= canvasWidth || r >= canvasHeight) continue
-      if (next[r][c] !== target) continue
-      next[r][c] = newColor
-      stack.push([c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1])
+      if (c < 0 || r < 0 || c >= w || r >= h) continue
+      const key = `${c},${r}`
+      if (visited.has(key)) continue
+      visited.add(key)
+      if (view2d[r]?.[c] !== target) continue
+      matching.push([c, r])
+      stack.push([c+1,r],[c-1,r],[c,r+1],[c,r-1])
     }
-    set({ pixels: next })
+
+    const allTargets = matching.flatMap(([c, r]) =>
+      getVoxelTargets(c, r, activeView, paintDepth, W, H, D)
+    )
+    if (!allTargets.length) return
+
+    const affectedY = new Set(allTargets.map(t => t.y))
+    const next = voxels.map((plane, y) =>
+      affectedY.has(y) ? plane.map(xRow => [...xRow]) : plane
+    )
+    for (const { x, y, z } of allTargets) {
+      next[y][x][z] = newColor
+    }
+    set({ voxels: next })
   },
 
   setCurrentColor: (color) => set({ currentColor: color }),
-  setActiveTool: (tool) => set({ activeTool: tool }),
-  setPixelSize: (size) => set({ pixelSize: Math.max(4, Math.min(32, size)) }),
-  toggleGrid: () => set(s => ({ showGrid: !s.showGrid })),
+  setActiveTool:   (tool)  => set({ activeTool: tool }),
+  setPixelSize:    (size)  => set({ pixelSize: Math.max(4, Math.min(32, size)) }),
+  toggleGrid:      ()      => set(s => ({ showGrid: !s.showGrid })),
 
   clearCanvas() {
-    const { canvasWidth, canvasHeight } = get()
+    const { canvasWidth: W, canvasHeight: H, depthDimension: D } = get()
     get().pushUndo()
-    set({ pixels: makeEmptyGrid(canvasWidth, canvasHeight) })
+    set({ voxels: makeEmptyVoxels(W, H, D) })
+  },
+
+  resizeCanvas(newW, newH) {
+    newW = Math.max(4, Math.min(256, Math.round(newW)))
+    newH = Math.max(4, Math.min(256, Math.round(newH)))
+    const { voxels, canvasWidth: W, canvasHeight: H, depthDimension: D } = get()
+    get().pushUndo()
+
+    const offX = newW > W ? Math.floor((newW - W) / 2) : 0
+    const offY = newH > H ? Math.floor((newH - H) / 2) : 0
+
+    const next = makeEmptyVoxels(newW, newH, D)
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        for (let z = 0; z < D; z++) {
+          const ny = y + offY, nx = x + offX
+          if (ny >= 0 && ny < newH && nx >= 0 && nx < newW) {
+            next[ny][nx][z] = voxels[y][x][z]
+          }
+        }
+      }
+    }
+
+    set({ canvasWidth: newW, canvasHeight: newH, voxels: next })
+  },
+
+  setDepthDimension(newD) {
+    newD = Math.max(4, Math.min(256, Math.round(newD)))
+    const { voxels, canvasWidth: W, canvasHeight: H, depthDimension: D, paintDepth } = get()
+    get().pushUndo()
+
+    const offZ = newD > D ? Math.floor((newD - D) / 2) : 0
+    const next = makeEmptyVoxels(W, H, newD)
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        for (let z = 0; z < D; z++) {
+          const nz = z + offZ
+          if (nz >= 0 && nz < newD) {
+            next[y][x][nz] = voxels[y][x][z]
+          }
+        }
+      }
+    }
+
+    set({
+      depthDimension: newD,
+      voxels: next,
+      paintDepth: Math.min(paintDepth, newD),
+    })
   },
 
   undo() {
-    const { undoStack, pixels, redoStack } = get()
+    const { undoStack, voxels, redoStack } = get()
     if (!undoStack.length) return
     const prev = undoStack[undoStack.length - 1]
+    const current = voxels.map(plane => plane.map(row => [...row]))
     set({
-      pixels: prev,
+      voxels:    prev,
       undoStack: undoStack.slice(0, -1),
-      redoStack: [...redoStack.slice(-49), pixels.map(r => [...r])],
+      redoStack: [...redoStack.slice(-49), current],
     })
   },
 
   redo() {
-    const { redoStack, pixels, undoStack } = get()
+    const { redoStack, voxels, undoStack } = get()
     if (!redoStack.length) return
     const next = redoStack[redoStack.length - 1]
+    const current = voxels.map(plane => plane.map(row => [...row]))
     set({
-      pixels: next,
+      voxels:    next,
       redoStack: redoStack.slice(0, -1),
-      undoStack: [...undoStack.slice(-49), pixels.map(r => [...r])],
+      undoStack: [...undoStack.slice(-49), current],
     })
   },
 
   addToPalette(color) {
     const { palette } = get()
-    if (!palette.includes(color)) {
-      set({ palette: [...palette, color] })
-    }
+    if (!palette.includes(color)) set({ palette: [...palette, color] })
   },
 
-  // ── Depth ────────────────────────────────────────────────────────────────
-  selections: [],
-  activeSelectionId: null,
-  showDepthOverlay: false,
-  addSelection(pixels) {
-    const id = nanoid()
-    const idx = get().selections.length
-    const color = OVERLAY_COLORS[idx % OVERLAY_COLORS.length]
-    const sel = {
-      id,
-      name: `Layer ${idx + 1}`,
-      pixels: pixels.map(([c, r]) => `${c},${r}`),
-      depth: 2,
-      direction: 'front',
-      profile: 'flat',
-      active: true,
-      color,
-    }
-    set(s => ({ selections: [...s.selections, sel], activeSelectionId: id }))
-    return id
-  },
+  // ── Voxel view ───────────────────────────────────────────────────────────────
+  activeView:  'front',
+  paintDepth:  1,
 
-  removeSelection(id) {
-    set(s => ({
-      selections: s.selections.filter(sel => sel.id !== id),
-      activeSelectionId: s.activeSelectionId === id ? null : s.activeSelectionId,
-    }))
-  },
+  setActiveView:  (view) => set({ activeView: view }),
+  setPaintDepth:  (d)    => set(s => ({
+    paintDepth: Math.max(1, Math.min(s.depthDimension, Math.round(d)))
+  })),
 
-  updateSelection(id, patch) {
-    set(s => ({
-      selections: s.selections.map(sel => sel.id === id ? { ...sel, ...patch } : sel),
-    }))
-  },
+  // ── UI ───────────────────────────────────────────────────────────────────────
+  viewMode:    'split',
+  activeTheme: 'synthwave',
 
-  addPixelsToSelection(id, pixels) {
-    const keys = pixels.map(([c, r]) => `${c},${r}`)
-    set(s => ({
-      selections: s.selections.map(sel => {
-        if (sel.id !== id) return sel
-        const existing = new Set(sel.pixels)
-        keys.forEach(k => existing.add(k))
-        return { ...sel, pixels: [...existing] }
-      }),
-    }))
-  },
-
-  removePixelsFromSelection(id, pixels) {
-    const keys = new Set(pixels.map(([c, r]) => `${c},${r}`))
-    set(s => ({
-      selections: s.selections.map(sel =>
-        sel.id !== id ? sel : { ...sel, pixels: sel.pixels.filter(k => !keys.has(k)) }
-      ),
-    }))
-  },
-
-  clearSelectionPixels(id) {
-    set(s => ({
-      selections: s.selections.map(sel =>
-        sel.id === id ? { ...sel, pixels: [] } : sel
-      ),
-    }))
-  },
-
-  setActiveSelection: (id) => set({ activeSelectionId: id }),
-  toggleSelectionActive: (id) => {
-    set(s => ({
-      selections: s.selections.map(sel =>
-        sel.id === id ? { ...sel, active: !sel.active } : sel
-      ),
-    }))
-  },
-  toggleDepthOverlay: () => set(s => ({ showDepthOverlay: !s.showDepthOverlay })),
-
-  magicSelectFloodFill(col, row, selectionId) {
-    const { pixels, canvasWidth, canvasHeight, selections } = get()
-    const target = pixels[row][col]
-    const visited = new Set()
-    const result = []
-    // Collect all pixels already in any selection
-    const allTaken = new Set(selections.flatMap(s => s.pixels))
-    const stack = [[col, row]]
-    while (stack.length) {
-      const [c, r] = stack.pop()
-      if (c < 0 || r < 0 || c >= canvasWidth || r >= canvasHeight) continue
-      const key = `${c},${r}`
-      if (visited.has(key)) continue
-      visited.add(key)
-      if (pixels[r][c] !== target) continue
-      result.push([c, r])
-      stack.push([c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1])
-    }
-    if (selectionId) {
-      get().addPixelsToSelection(selectionId, result)
-    } else {
-      get().addSelection(result)
-    }
-  },
-
-  // ── UI ───────────────────────────────────────────────────────────────────
-  viewMode: 'split', // 'split' | 'canvas-only' | 'preview-only'
-  activeTheme: 'steampunk',
-  showDepthPanel: true,
-  depthBrushMode: 'add', // 'add' | 'remove'
-
-  setViewMode: (mode) => set({ viewMode: mode }),
+  setViewMode:    (mode)  => set({ viewMode: mode }),
   setActiveTheme: (theme) => set({ activeTheme: theme }),
-  toggleDepthPanel: () => set(s => ({ showDepthPanel: !s.showDepthPanel })),
-  setDepthBrushMode: (mode) => set({ depthBrushMode: mode }),
 }))
-
-// Derived: pixel → depth lookup map (used by mesh builder)
-export function buildPixelDepthMap(selections) {
-  const map = new Map()
-  for (const sel of selections) {
-    if (!sel.active) continue
-    for (const key of sel.pixels) {
-      map.set(key, { depth: sel.depth, direction: sel.direction, selectionId: sel.id, color: sel.color })
-    }
-  }
-  return map
-}

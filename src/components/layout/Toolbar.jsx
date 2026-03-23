@@ -1,17 +1,16 @@
+import { useState } from 'react'
 import {
-  Pencil, Eraser, PaintBucket, Layers, Wand2,
+  Pencil, Eraser, PaintBucket,
   Cog, Grid3X3, Square, Columns2, Box,
-  Undo2, Redo2, Trash2, Download,
-  PlusCircle, MinusCircle,
+  Undo2, Redo2, Trash2, Download, Frame,
 } from 'lucide-react'
 import { useStore } from '../../store/index.js'
+import CanvasSizeDialog from './CanvasSizeDialog.jsx'
 
 const TOOLS = [
-  { id: 'pencil',      Icon: Pencil,      label: 'Pencil',       key: 'P' },
-  { id: 'eraser',      Icon: Eraser,      label: 'Eraser',       key: 'E' },
-  { id: 'fill',        Icon: PaintBucket, label: 'Fill',         key: 'F' },
-  { id: 'depth',       Icon: Layers,      label: 'Depth Brush',  key: 'D' },
-  { id: 'magic-depth', Icon: Wand2,       label: 'Magic Depth',  key: 'M' },
+  { id: 'pencil', Icon: Pencil,      label: 'Pencil (P)', key: 'P' },
+  { id: 'eraser', Icon: Eraser,      label: 'Eraser (E)', key: 'E' },
+  { id: 'fill',   Icon: PaintBucket, label: 'Fill (F)',   key: 'F' },
 ]
 
 const VIEW_MODES = [
@@ -27,10 +26,12 @@ export default function Toolbar({ onExport }) {
     toggleGrid, showGrid,
     clearCanvas, undo, redo,
     viewMode, setViewMode,
-    depthBrushMode, setDepthBrushMode,
   } = useStore()
+  const [showSizeDialog, setShowSizeDialog] = useState(false)
 
   return (
+    <>
+    {showSizeDialog && <CanvasSizeDialog onClose={() => setShowSizeDialog(false)} />}
     <div className="flex items-center gap-1 px-2 py-1 border-b border-border"
       style={{ background: 'var(--color-surfaceAlt)' }}>
 
@@ -46,40 +47,12 @@ export default function Toolbar({ onExport }) {
           <ToolButton
             key={tool.id}
             Icon={tool.Icon}
-            label={`${tool.label} (${tool.key})`}
+            label={tool.label}
             active={activeTool === tool.id}
             onClick={() => setActiveTool(tool.id)}
           />
         ))}
       </div>
-
-      {/* Depth brush mode (only when depth tool active) */}
-      {activeTool === 'depth' && (
-        <div className="flex items-center gap-0.5 mr-2 pr-2 border-r border-border">
-          <button
-            className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors ${
-              depthBrushMode === 'add'
-                ? 'border-accent bg-accent/20 text-accent'
-                : 'border-border text-text-muted hover:text-text'
-            }`}
-            onClick={() => setDepthBrushMode('add')}
-            title="Add pixels to depth layer"
-          >
-            <PlusCircle size={12} /> Add
-          </button>
-          <button
-            className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors ${
-              depthBrushMode === 'remove'
-                ? 'border-accent bg-accent/20 text-accent'
-                : 'border-border text-text-muted hover:text-text'
-            }`}
-            onClick={() => setDepthBrushMode('remove')}
-            title="Remove pixels from depth layer"
-          >
-            <MinusCircle size={12} /> Remove
-          </button>
-        </div>
-      )}
 
       {/* Zoom */}
       <div className="flex items-center gap-1 mr-2 pr-2 border-r border-border">
@@ -127,6 +100,16 @@ export default function Toolbar({ onExport }) {
         ))}
       </div>
 
+      {/* Canvas size */}
+      <button
+        className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent transition-colors mr-2"
+        onClick={() => setShowSizeDialog(true)}
+        title="Canvas size"
+      >
+        <Frame size={12} />
+        <span>Size</span>
+      </button>
+
       {/* Actions */}
       <div className="flex items-center gap-0.5 mr-auto">
         <ActionButton Icon={Undo2}  label="Undo (Ctrl+Z)" onClick={undo} />
@@ -138,12 +121,13 @@ export default function Toolbar({ onExport }) {
       <button
         className="btn-brass ml-auto flex items-center gap-1.5"
         onClick={onExport}
-        title="Export as PNG (isometric view)"
+        title="Export as PNG"
       >
         <Download size={14} />
         <span>Export PNG</span>
       </button>
     </div>
+    </>
   )
 }
 
