@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Monitor, RotateCw, PanelLeft, PanelRight, PanelTop, PanelBottom, Square, Columns2, Box } from 'lucide-react'
+import { Monitor, RotateCw, PanelLeft, PanelRight, PanelTop, PanelBottom, X } from 'lucide-react'
 import { useStore } from './store/index.js'
 import { getTheme, applyTheme } from './themes/index.js'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js'
@@ -24,6 +24,7 @@ const VIEWS = [
 export default function App() {
   const activeTheme = useStore(s => s.activeTheme)
   const viewMode    = useStore(s => s.viewMode)
+  const setViewMode = useStore(s => s.setViewMode)
   const exportFn    = useRef(null)
 
   useKeyboardShortcuts()
@@ -37,6 +38,12 @@ export default function App() {
 
   const showCanvas  = viewMode !== 'preview-only'
   const showPreview = viewMode !== 'canvas-only'
+  const closeCanvas = () => {
+    if (showPreview) setViewMode('preview-only')
+  }
+  const closePreview = () => {
+    if (showCanvas) setViewMode('canvas-only')
+  }
 
   return (
     <div className="relative flex flex-col w-full h-screen overflow-hidden font-theme"
@@ -65,7 +72,7 @@ export default function App() {
           {showCanvas && (
             <div className="flex flex-col flex-1 min-w-0 overflow-hidden"
               style={{ borderRight: showPreview ? '1px solid var(--color-border)' : 'none' }}>
-              <ViewTabs />
+              <ViewTabs closable={showPreview} onClose={closeCanvas} />
               <div className="flex-1 min-h-0 overflow-hidden relative"
                 style={{ background: 'color-mix(in srgb, var(--color-background) 80%, transparent)' }}>
                 <PixelCanvas />
@@ -75,12 +82,20 @@ export default function App() {
 
           {/* 3D Preview pane */}
           {showPreview && (
-            <div className="flex-1 min-w-0 relative overflow-hidden"
+            <div className="flex flex-col flex-1 min-w-0 overflow-hidden"
               style={{ background: 'color-mix(in srgb, var(--color-background) 95%, transparent)' }}>
-              <div className="absolute top-2 left-3 text-xs text-text-muted opacity-40 pointer-events-none z-10 uppercase tracking-widest">
-                3D Preview
+              <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-border flex-shrink-0"
+                style={{ background: 'color-mix(in srgb, var(--color-surfaceAlt) 95%, transparent)', minHeight: 32 }}>
+                <div className="text-xs text-text-muted opacity-60 uppercase tracking-widest">
+                  3D Preview
+                </div>
+                {showCanvas && (
+                  <ClosePaneButton label="Close 3D preview" onClick={closePreview} />
+                )}
               </div>
-              <Preview3D onExport={exportFn} />
+              <div className="flex-1 min-h-0 relative overflow-hidden">
+                <Preview3D onExport={exportFn} />
+              </div>
             </div>
           )}
 
@@ -102,7 +117,7 @@ export default function App() {
 
 // ── View tab bar ──────────────────────────────────────────────────────────────
 
-function ViewTabs() {
+function ViewTabs({ closable, onClose }) {
   const { activeView, setActiveView } = useStore()
 
   return (
@@ -122,6 +137,25 @@ function ViewTabs() {
           {label}
         </button>
       ))}
+      {closable && (
+        <div className="ml-auto">
+          <ClosePaneButton label="Close 2D canvas" onClick={onClose} />
+        </div>
+      )}
     </div>
+  )
+}
+
+function ClosePaneButton({ label, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-7 h-7 rounded flex items-center justify-center border border-border text-text-muted hover:text-text hover:border-accent/50 hover:bg-surface transition-colors"
+      title={label}
+      aria-label={label}
+    >
+      <X size={14} />
+    </button>
   )
 }

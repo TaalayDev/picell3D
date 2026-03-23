@@ -62,6 +62,54 @@ export default function PixelCanvas() {
       }
     }
 
+    // Depth shadow pass — inner shadows on edges where adjacent pixels are shallower (protrude in front)
+    if (depthMap.length) {
+      const maxAlpha  = 0.65
+      const shadowReach = 0.6 // fraction of pixelSize the shadow reaches inward
+
+      for (let row = 0; row < viewH; row++) {
+        for (let col = 0; col < viewW; col++) {
+          const d = depthMap[row]?.[col]
+          if (d === null || d === undefined) continue
+
+          const px = col * pixelSize
+          const py = row * pixelSize
+
+          const dL = depthMap[row]?.[col - 1]
+          const dR = depthMap[row]?.[col + 1]
+          const dT = depthMap[row - 1]?.[col]
+          const dB = depthMap[row + 1]?.[col]
+
+          const drawEdgeShadow = (x0, y0, x1, y1, alpha) => {
+            const g = ctx.createLinearGradient(x0, y0, x1, y1)
+            g.addColorStop(0, `rgba(0,0,0,${alpha.toFixed(3)})`)
+            g.addColorStop(1, 'rgba(0,0,0,0)')
+            ctx.fillStyle = g
+            ctx.fillRect(px, py, pixelSize, pixelSize)
+          }
+
+          const reach = pixelSize * shadowReach
+
+          if (dL !== null && dL !== undefined && dL < d) {
+            const a = Math.min((d - dL) / D, 1) * maxAlpha
+            drawEdgeShadow(px, py, px + reach, py, a)
+          }
+          if (dT !== null && dT !== undefined && dT < d) {
+            const a = Math.min((d - dT) / D, 1) * maxAlpha
+            drawEdgeShadow(px, py, px, py + reach, a)
+          }
+          if (dR !== null && dR !== undefined && dR < d) {
+            const a = Math.min((d - dR) / D, 1) * maxAlpha
+            drawEdgeShadow(px + pixelSize, py, px + pixelSize - reach, py, a)
+          }
+          if (dB !== null && dB !== undefined && dB < d) {
+            const a = Math.min((d - dB) / D, 1) * maxAlpha
+            drawEdgeShadow(px, py + pixelSize, px, py + pixelSize - reach, a)
+          }
+        }
+      }
+    }
+
     if (showGrid && pixelSize >= 5) {
       ctx.strokeStyle = gridColor + '44'
       ctx.lineWidth   = 0.5
