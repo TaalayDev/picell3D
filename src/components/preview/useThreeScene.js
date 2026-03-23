@@ -132,6 +132,21 @@ export function useThreeScene(containerRef) {
 
     // ── Edit: 3D interaction (active when viewMode === 'preview-only') ──
     const raycaster = new THREE.Raycaster()
+    let spaceHeld    = false
+    let isPainting   = false
+    let lastPaintKey = null  // deduplicate voxels during drag
+
+    function isEditMode() {
+      return useStore.getState().viewMode === 'preview-only'
+    }
+
+    function syncControls() {
+      controls.enabled = !isEditMode() || spaceHeld
+    }
+
+    function setCursor(cur) {
+      renderer.domElement.style.cursor = cur
+    }
 
     function getRaycastHit(clientX, clientY) {
       const rect = renderer.domElement.getBoundingClientRect()
@@ -169,7 +184,8 @@ export function useThreeScene(containerRef) {
       ghost.children[0].material.color.setHex(col)
     }
 
-    function handlePaint(clientX, clientY) {
+    // Paint one voxel, deduplicating by voxel key during a drag stroke.
+    function paintAtIfNew(clientX, clientY) {
       const { activeTool, currentColor, canvasWidth: W, canvasHeight: H, depthDimension: D } = useStore.getState()
       const hit = getRaycastHit(clientX, clientY)
       if (!hit) return
@@ -186,39 +202,89 @@ export function useThreeScene(containerRef) {
       if (activeTool === 'eraser') {
         if (isFloor) return
         const vox = getEditVoxel(hit, W, H, D, false)
+        const key = `${vox.x},${vox.y},${vox.z}`
+        if (key === lastPaintKey) return
+        lastPaintKey = key
         const col = getCompositedVoxels(useStore.getState().layers, W, H, D)[vox.y]?.[vox.x]?.[vox.z]
         if (!col || col === 'transparent') return
-        useStore.getState().pushUndo()
         useStore.getState().paintVoxelDirect(vox.x, vox.y, vox.z, 'transparent')
         return
       }
 
-      // pencil / fill → place or recolor at adjacent voxel
+      // pencil / fill → place adjacent voxel
       const vox = getEditVoxel(hit, W, H, D, true)
-      useStore.getState().pushUndo()
+      const key = `${vox.x},${vox.y},${vox.z}`
+      if (key === lastPaintKey) return
+      lastPaintKey = key
       useStore.getState().paintVoxelDirect(vox.x, vox.y, vox.z, currentColor)
     }
 
-    const onPointerClick = (e) => {
-      if (useStore.getState().viewMode !== 'preview-only') return
+    // ── Keyboard: Space toggles between paint-drag and orbit-drag ─────
+    const onKeyDown = (e) => {
+      if (e.code !== 'Space' || !isEditMode()) return
+      e.preventDefault()
+      if (spaceHeld) return
+      spaceHeld = true
+      syncControls()
+      if (ghostRef.current) ghostRef.current.visible = false
+      setCursor('grab')
+    }
+
+    const onKeyUp = (e) => {
+      if (e.code !== 'Space') return
+      spaceHeld = false
+      syncControls()
+      if (isEditMode()) setCursor('crosshair')
+    }
+
+    // ── Pointer events ────────────────────────────────────────────────
+    const onPointerDown = (e) => {
+      if (!isEditMode() || spaceHeld) return
       if (e.button !== 0) return
-      handlePaint(e.clientX, e.clientY)
+      controls.enabled = false
+      isPainting = true
+      lastPaintKey = null
+      renderer.domElement.setPointerCapture(e.pointerId)
+      setCursor('crosshair')
+      useStore.getState().pushUndo()
+      paintAtIfNew(e.clientX, e.clientY)
     }
 
     const onPointerMove = (e) => {
-      if (useStore.getState().viewMode !== 'preview-only') {
+      if (!isEditMode()) {
         if (ghostRef.current) ghostRef.current.visible = false
         return
       }
-      updateGhost(e.clientX, e.clientY)
+      if (isPainting && !spaceHeld) {
+        if (ghostRef.current) ghostRef.current.visible = false
+        paintAtIfNew(e.clientX, e.clientY)
+      } else {
+        updateGhost(e.clientX, e.clientY)
+      }
+    }
+
+    const onPointerUp = (e) => {
+      if (!isPainting) return
+      isPainting = false
+      lastPaintKey = null
+      syncControls()
+      try { renderer.domElement.releasePointerCapture(e.pointerId) } catch (_) {}
+      setCursor(spaceHeld ? 'grab' : isEditMode() ? 'crosshair' : 'default')
     }
 
     const onPointerLeave = () => {
       if (ghostRef.current) ghostRef.current.visible = false
     }
 
-    renderer.domElement.addEventListener('click', onPointerClick)
+    // Set initial cursor when entering edit mode
+    syncControls()
+    if (isEditMode()) setCursor('crosshair')
+
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    renderer.domElement.addEventListener('pointerdown', onPointerDown)
     renderer.domElement.addEventListener('pointermove', onPointerMove)
+    renderer.domElement.addEventListener('pointerup', onPointerUp)
     renderer.domElement.addEventListener('pointerleave', onPointerLeave)
 
     // ── Render loop ───────────────────────────────────────────────────
@@ -246,8 +312,11 @@ export function useThreeScene(containerRef) {
       running = false
       cancelAnimationFrame(frameRef.current)
       ro.disconnect()
-      renderer.domElement.removeEventListener('click', onPointerClick)
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+      renderer.domElement.removeEventListener('pointerdown', onPointerDown)
       renderer.domElement.removeEventListener('pointermove', onPointerMove)
+      renderer.domElement.removeEventListener('pointerup', onPointerUp)
       renderer.domElement.removeEventListener('pointerleave', onPointerLeave)
       controls.dispose()
       groundMat.dispose()

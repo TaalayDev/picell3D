@@ -50,7 +50,7 @@ export default function Preview3D({ onExport }) {
           </div>
           {/* Short instruction */}
           <span className="text-xs opacity-40" style={{ color: '#fff', textShadow: '0 1px 3px #000' }}>
-            Click · drag to orbit · scroll to zoom
+            Drag to paint · Hold <kbd style={{ fontFamily: 'monospace', opacity: 0.7 }}>Space</kbd> to orbit · Scroll to zoom
           </span>
         </div>
       ) : (
