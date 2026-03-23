@@ -36,8 +36,10 @@ export default function App() {
   const theme     = getTheme(activeTheme)
   const PainterBg = theme.PainterBackground
 
-  const showCanvas  = viewMode !== 'preview-only'
-  const showPreview = viewMode !== 'canvas-only'
+  const showCanvas   = viewMode !== 'preview-only'
+  const showPreview  = viewMode !== 'canvas-only'
+  const showPalette  = viewMode !== 'canvas-only'  // show palette in split AND 3D-only
+  const is3DEditMode = viewMode === 'preview-only'
   const closeCanvas = () => {
     if (showPreview) setViewMode('preview-only')
   }
@@ -58,7 +60,7 @@ export default function App() {
         <div className="flex flex-1 min-h-0">
 
           {/* Left sidebar — color palette */}
-          {showCanvas && (
+          {showPalette && (
             <div className="flex flex-col w-28 border-r border-border flex-shrink-0 overflow-y-auto"
               style={{ background: 'color-mix(in srgb, var(--color-surface) 90%, transparent)' }}>
               <div className="px-2 pt-2 pb-1 text-xs uppercase tracking-wide text-text-muted border-b border-border">
@@ -87,7 +89,7 @@ export default function App() {
               <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-border flex-shrink-0"
                 style={{ background: 'color-mix(in srgb, var(--color-surfaceAlt) 95%, transparent)', minHeight: 32 }}>
                 <div className="text-xs text-text-muted opacity-60 uppercase tracking-widest">
-                  3D Preview
+                  {is3DEditMode ? '3D Edit Mode' : '3D Preview'}
                 </div>
                 {showCanvas && (
                   <ClosePaneButton label="Close 3D preview" onClick={closePreview} />

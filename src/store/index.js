@@ -463,6 +463,27 @@ export const useStore = create((set, get) => ({
     if (!palette.includes(color)) set({ palette: [...palette, color] })
   },
 
+  /** Directly set a single voxel in the active layer (used by 3D editor). Does NOT push undo. */
+  paintVoxelDirect(x, y, z, color) {
+    const { layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D } = get()
+    if (x < 0 || x >= W || y < 0 || y >= H || z < 0 || z >= D) return
+    const layerIdx = layers.findIndex(l => l.id === activeLayerId)
+    if (layerIdx < 0) return
+    const layer = layers[layerIdx]
+    const newVoxels = layer.voxels.map((plane, iy) => {
+      if (iy !== y) return plane
+      return plane.map((xRow, ix) => {
+        if (ix !== x) return xRow
+        const row = [...xRow]
+        row[z] = color
+        return row
+      })
+    })
+    const newLayers = [...layers]
+    newLayers[layerIdx] = { ...layer, voxels: newVoxels }
+    set({ layers: newLayers })
+  },
+
   // ── Layer actions ─────────────────────────────────────────────────────────────
 
   addLayer() {
