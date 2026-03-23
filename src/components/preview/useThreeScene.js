@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { buildVoxelMesh } from '../../lib/meshBuilder.js'
-import { useStore } from '../../store/index.js'
+import { useStore, getCompositedVoxels } from '../../store/index.js'
 
 export function useThreeScene(containerRef) {
   const rendererRef     = useRef(null)
@@ -22,10 +22,7 @@ export function useThreeScene(containerRef) {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(container.clientWidth, container.clientHeight)
-    renderer.shadowMap.enabled = true
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap
-    renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.1
+    renderer.toneMapping = THREE.NoToneMapping
     renderer.setClearColor(0x0c0804, 1)
     container.appendChild(renderer.domElement)
     rendererRef.current = renderer
@@ -39,16 +36,8 @@ export function useThreeScene(containerRef) {
     const ambient = new THREE.AmbientLight(0xffe8c0, 0.45)
     scene.add(ambient)
 
-    const keyLight = new THREE.DirectionalLight(0xffd090, 1.4)
+    const keyLight = new THREE.DirectionalLight(0xffffff, 0.6)
     keyLight.position.set(4, 6, 4)
-    keyLight.castShadow = true
-    keyLight.shadow.mapSize.set(1024, 1024)
-    keyLight.shadow.camera.near = 0.1
-    keyLight.shadow.camera.far = 30
-    keyLight.shadow.camera.left = -5
-    keyLight.shadow.camera.right = 5
-    keyLight.shadow.camera.top = 5
-    keyLight.shadow.camera.bottom = -5
     scene.add(keyLight)
 
     const fillLight = new THREE.DirectionalLight(0x8090d0, 0.35)
@@ -61,7 +50,7 @@ export function useThreeScene(containerRef) {
 
     // ── Ground ────────────────────────────────────────────────────────
     const gridHelper = new THREE.GridHelper(8, 16, 0x3a2a10, 0x241808)
-    gridHelper.position.y = -0.8
+    gridHelper.position.y = -0.05
     gridHelper.material.transparent = true
     gridHelper.material.opacity = 0.5
     scene.add(gridHelper)
@@ -72,16 +61,15 @@ export function useThreeScene(containerRef) {
     })
     const ground = new THREE.Mesh(groundGeo, groundMat)
     ground.rotation.x = -Math.PI / 2
-    ground.position.y = -0.801
-    ground.receiveShadow = true
+    ground.position.y = -0.051
     scene.add(ground)
 
     // ── Camera ────────────────────────────────────────────────────────
     const camera = new THREE.PerspectiveCamera(
       45, container.clientWidth / container.clientHeight, 0.01, 50
     )
-    camera.position.set(2.5, 1.8, 2.5)
-    camera.lookAt(0, 0, 0)
+    camera.position.set(2.5, 2.8, 2.5)
+    camera.lookAt(0, 1.6, 0)
     cameraRef.current = camera
 
     // ── Controls ──────────────────────────────────────────────────────
@@ -90,7 +78,7 @@ export function useThreeScene(containerRef) {
     controls.dampingFactor = 0.06
     controls.minDistance = 0.3
     controls.maxDistance = 15
-    controls.target.set(0, 0, 0)
+    controls.target.set(0, 1.6, 0)
     controlsRef.current = controls
 
     // ── Render loop ───────────────────────────────────────────────────
@@ -145,15 +133,10 @@ export function useThreeScene(containerRef) {
   // ── Mesh rebuild ──────────────────────────────────────────────────────
   const rebuild = useCallback(() => {
     if (!sceneRef.current) return
-    const { voxels, canvasWidth, canvasHeight, depthDimension } = useStore.getState()
-    const { group, dispose } = buildVoxelMesh(voxels, canvasWidth, canvasHeight, depthDimension)
+    const { layers, canvasWidth, canvasHeight, depthDimension } = useStore.getState()
+    const composited = getCompositedVoxels(layers, canvasWidth, canvasHeight, depthDimension)
+    const { group, dispose } = buildVoxelMesh(composited, canvasWidth, canvasHeight, depthDimension)
 
-    group.traverse(obj => {
-      if (obj.isMesh) {
-        obj.castShadow = true
-        obj.receiveShadow = true
-      }
-    })
 
     if (meshGroupRef.current) {
       sceneRef.current.remove(meshGroupRef.current)
@@ -167,7 +150,7 @@ export function useThreeScene(containerRef) {
   useEffect(() => {
     rebuild()
     const unsub = useStore.subscribe((state, prevState) => {
-      if (state.voxels !== prevState.voxels || state.depthDimension !== prevState.depthDimension) {
+      if (state.layers !== prevState.layers || state.depthDimension !== prevState.depthDimension) {
         clearTimeout(rebuildTimerRef.current)
         rebuildTimerRef.current = setTimeout(rebuild, 80)
       }

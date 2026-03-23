@@ -10,6 +10,7 @@ import PixelCanvas      from './components/canvas/PixelCanvas.jsx'
 import Preview3D        from './components/preview/Preview3D.jsx'
 import ColorPalette     from './components/panels/ColorPalette.jsx'
 import VoxelOptionsPanel from './components/panels/VoxelOptionsPanel.jsx'
+import LayersPanel       from './components/panels/LayersPanel.jsx'
 
 const VIEWS = [
   { id: 'front',  Icon: Monitor,     label: 'Front'  },
@@ -83,9 +84,11 @@ export default function App() {
             </div>
           )}
 
-          {/* Right sidebar — voxel options */}
-          <div className="flex flex-col w-52 border-l border-border flex-shrink-0"
+          {/* Right sidebar — layers + voxel options */}
+          <div className="flex flex-col w-52 border-l border-border flex-shrink-0 overflow-y-auto"
             style={{ background: 'color-mix(in srgb, var(--color-surface) 95%, transparent)' }}>
+            <LayersPanel />
+            <div className="border-t border-border" />
             <VoxelOptionsPanel />
           </div>
 

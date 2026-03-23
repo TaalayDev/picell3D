@@ -1,26 +1,30 @@
 import { useMemo } from 'react'
 import { Box } from 'lucide-react'
-import { useStore } from '../../store/index.js'
+import { useStore, getCompositedVoxels } from '../../store/index.js'
 
 const DEPTH_PRESETS = [4, 8, 16, 24, 32, 48, 64]
+
+const DIRECTIONS = [
+  { id: 'front', label: '← Front' },
+  { id: 'both',  label: '↔ Both'  },
+  { id: 'back',  label: 'Back →'  },
+]
 
 export default function VoxelOptionsPanel() {
   const {
     canvasWidth, canvasHeight, depthDimension, setDepthDimension,
-    paintDepth, setPaintDepth, voxels, activeView,
+    paintDepth, setPaintDepth, paintDirection, setPaintDirection, layers, activeView,
   } = useStore()
 
   const voxelCount = useMemo(() => {
+    const composited = getCompositedVoxels(layers, canvasWidth, canvasHeight, depthDimension)
     let count = 0
-    for (const plane of voxels) {
-      for (const row of plane) {
-        for (const v of row) {
+    for (const plane of composited)
+      for (const row of plane)
+        for (const v of row)
           if (v !== 'transparent') count++
-        }
-      }
-    }
     return count
-  }, [voxels])
+  }, [layers, canvasWidth, canvasHeight, depthDimension])
 
   const isFrontBack = activeView === 'front' || activeView === 'back'
 
@@ -77,7 +81,7 @@ export default function VoxelOptionsPanel() {
           <input
             type="range"
             min={1}
-            max={isFrontBack ? canvasWidth : depthDimension}
+            max={isFrontBack ? Math.floor(depthDimension / 2) : depthDimension}
             value={paintDepth}
             onChange={e => setPaintDepth(parseInt(e.target.value))}
             className="w-full cursor-pointer"
@@ -85,9 +89,33 @@ export default function VoxelOptionsPanel() {
           />
           <div className="flex justify-between text-xs text-text-muted mt-0.5">
             <span>1</span>
-            <span>{isFrontBack ? canvasWidth : depthDimension}</span>
+            <span>{isFrontBack ? Math.floor(depthDimension / 2) : depthDimension}</span>
           </div>
         </div>
+
+        {/* Paint direction — front/back views only */}
+        {isFrontBack && (
+          <div>
+            <div className="mb-1.5">
+              <label className="text-xs text-text-muted uppercase tracking-wide">Direction</label>
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              {DIRECTIONS.map(({ id, label }) => (
+                <button
+                  key={id}
+                  onClick={() => setPaintDirection(id)}
+                  className={`text-xs py-0.5 rounded border transition-colors ${
+                    paintDirection === id
+                      ? 'border-accent bg-accent/20 text-accent'
+                      : 'border-border text-text-muted hover:text-text hover:border-accent/50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="flex flex-col gap-1.5 text-xs">

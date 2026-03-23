@@ -28,7 +28,7 @@ export function buildVoxelMesh(voxels, W, H, D) {
 
         const rgb = hexToRgb(color)
         const cx = (x - W / 2 + 0.5) * UNIT
-        const cy = (H / 2 - y - 0.5) * UNIT
+        const cy = (H - 1 - y) * UNIT + h   // bottom of canvas = world y ≈ 0
         const cz = (z - D / 2 + 0.5) * UNIT
 
         if (!occ(x, y, z + 1)) {
@@ -91,7 +91,7 @@ function buildMesh(verts, colors) {
   geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
   geo.computeVertexNormals()
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: true })
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true })
   return new THREE.Mesh(geo, mat)
 }
 

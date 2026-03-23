@@ -1,6 +1,5 @@
 import { useRef, useEffect, useMemo } from 'react'
-import { useStore } from '../../store/index.js'
-import { renderView2D, getViewSize } from '../../store/index.js'
+import { useStore, renderView2D, renderDepthMap2D, getViewSize, getCompositedVoxels } from '../../store/index.js'
 import { useCanvasInput } from '../../hooks/useCanvasInput.js'
 
 function getCSSVar(name) {
@@ -21,16 +20,19 @@ export default function PixelCanvas() {
   const containerRef = useRef(null)
 
   const {
-    voxels, pixelSize, canvasWidth, canvasHeight, depthDimension,
+    layers, pixelSize, canvasWidth, canvasHeight, depthDimension,
     showGrid, activeTool, activeView,
   } = useStore()
 
   const D = depthDimension
 
-  const view2d = useMemo(
-    () => renderView2D(voxels, activeView, canvasWidth, canvasHeight, D),
-    [voxels, activeView, canvasWidth, canvasHeight, D]
-  )
+  const { view2d, depthMap } = useMemo(() => {
+    const composited = getCompositedVoxels(layers, canvasWidth, canvasHeight, D)
+    return {
+      view2d:   renderView2D(composited, activeView, canvasWidth, canvasHeight, D),
+      depthMap: renderDepthMap2D(composited, activeView, canvasWidth, canvasHeight, D),
+    }
+  }, [layers, activeView, canvasWidth, canvasHeight, D])
   const { w: viewW, h: viewH } = getViewSize(activeView, canvasWidth, canvasHeight, D)
 
   const { onPointerDown, onPointerMove, onPointerUp } = useCanvasInput(containerRef)
@@ -77,14 +79,36 @@ export default function PixelCanvas() {
       }
     }
 
+    // Depth numbers — only when pixels are large enough to be readable
+    if (pixelSize >= 10 && depthMap.length) {
+      const fontSize = Math.max(7, Math.floor(pixelSize * 0.38))
+      ctx.font = `bold ${fontSize}px monospace`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      for (let row = 0; row < viewH; row++) {
+        for (let col = 0; col < viewW; col++) {
+          const d = depthMap[row]?.[col]
+          if (d === null || d === undefined) continue
+          const cx = col * pixelSize + pixelSize / 2
+          const cy = row * pixelSize + pixelSize / 2
+          // shadow for readability
+          ctx.fillStyle = 'rgba(0,0,0,0.55)'
+          ctx.fillText(d, cx + 0.5, cy + 0.5)
+          ctx.fillStyle = 'rgba(255,255,255,0.85)'
+          ctx.fillText(d, cx, cy)
+        }
+      }
+    }
+
     const label = VIEW_LABELS[activeView]
     if (label && pw > 60) {
       ctx.font = `${Math.max(8, pixelSize * 0.55)}px monospace`
       ctx.fillStyle = gridColor + 'aa'
       ctx.textAlign = 'left'
-      ctx.fillText(label, 4, 12)
+      ctx.textBaseline = 'top'
+      ctx.fillText(label, 4, 4)
     }
-  }, [view2d, viewW, viewH, pixelSize, showGrid, activeView])
+  }, [view2d, depthMap, viewW, viewH, pixelSize, showGrid, activeView])
 
   return (
     <div className="flex items-center justify-center w-full h-full overflow-auto p-4">
