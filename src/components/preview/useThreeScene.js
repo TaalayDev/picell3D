@@ -1,8 +1,11 @@
 import { useEffect, useRef, useCallback } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { buildVoxelMesh } from '../../lib/meshBuilder.js'
-import { useStore, getCompositedVoxels } from '../../store/index.js'
+import { useStore, getCompositedVoxels, getCompositedMaterials } from '../../store/index.js'
 
 // ── 3D Edit helpers ────────────────────────────────────────────────────────────
 const EDIT_UNIT = 0.1           // must match meshBuilder.js UNIT
@@ -39,6 +42,7 @@ export function useThreeScene(containerRef) {
   const rebuildTimerRef = useRef(null)
   const floorRef        = useRef(null)
   const ghostRef        = useRef(null)
+  const composerRef     = useRef(null)
 
   useEffect(() => {
     const container = containerRef.current
@@ -49,7 +53,13 @@ export function useThreeScene(containerRef) {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(container.clientWidth, container.clientHeight)
     renderer.toneMapping = THREE.NoToneMapping
-    renderer.setClearColor(0x0c0804, 1)
+    // Apply the current theme's background immediately (not hardcoded)
+    const initThemeName = useStore.getState().activeTheme
+    import('../../themes/index.js').then(({ getTheme }) => {
+      const bg = getTheme(initThemeName).sceneBackground.replace('#', '')
+      if (rendererRef.current) rendererRef.current.setClearColor(parseInt(bg, 16), 1)
+    })
+    renderer.setClearColor(0x080015, 1) // synthwave fallback until async resolves
     container.appendChild(renderer.domElement)
     rendererRef.current = renderer
 
@@ -129,6 +139,18 @@ export function useThreeScene(containerRef) {
     controls.maxDistance = 15
     controls.target.set(0, 1.6, 0)
     controlsRef.current = controls
+
+    // ── Bloom / Post-processing ────────────────────────────────────────────
+    const composer = new EffectComposer(renderer)
+    composer.addPass(new RenderPass(scene, camera))
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(container.clientWidth, container.clientHeight),
+      0.55,  // strength
+      0.40,  // radius
+      0.42,  // threshold — neon (~0.85 lum) and emissive (~0.6 lum) exceed this
+    )
+    composer.addPass(bloomPass)
+    composerRef.current = composer
 
     // ── Edit: 3D interaction (active when viewMode === 'preview-only') ──
     const raycaster = new THREE.Raycaster()
@@ -298,7 +320,7 @@ export function useThreeScene(containerRef) {
       if (!running) return
       frameRef.current = requestAnimationFrame(animate)
       controls.update()
-      renderer.render(scene, camera)
+      composerRef.current ? composerRef.current.render() : renderer.render(scene, camera)
     }
     animate()
 
@@ -308,6 +330,7 @@ export function useThreeScene(containerRef) {
       const h = container.clientHeight
       if (!w || !h) return
       renderer.setSize(w, h)
+      composer.setSize(w, h)   // keep composer in sync with renderer
       camera.aspect = w / h
       camera.updateProjectionMatrix()
     })
@@ -357,9 +380,9 @@ export function useThreeScene(containerRef) {
   const rebuild = useCallback(() => {
     if (!sceneRef.current) return
     const { layers, canvasWidth, canvasHeight, depthDimension } = useStore.getState()
-    const composited = getCompositedVoxels(layers, canvasWidth, canvasHeight, depthDimension)
-    const { group, dispose } = buildVoxelMesh(composited, canvasWidth, canvasHeight, depthDimension)
-
+    const composited  = getCompositedVoxels(layers, canvasWidth, canvasHeight, depthDimension)
+    const voxelMats   = getCompositedMaterials(layers)
+    const { group, dispose } = buildVoxelMesh(composited, canvasWidth, canvasHeight, depthDimension, {}, voxelMats)
 
     if (meshGroupRef.current) {
       sceneRef.current.remove(meshGroupRef.current)

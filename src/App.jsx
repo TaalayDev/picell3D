@@ -9,6 +9,7 @@ import StatusBar        from './components/layout/StatusBar.jsx'
 import PixelCanvas      from './components/canvas/PixelCanvas.jsx'
 import Preview3D        from './components/preview/Preview3D.jsx'
 import ColorPalette     from './components/panels/ColorPalette.jsx'
+import MaterialPanel   from './components/panels/MaterialPanel.jsx'
 import VoxelOptionsPanel from './components/panels/VoxelOptionsPanel.jsx'
 import LayersPanel       from './components/panels/LayersPanel.jsx'
 import RenderPage        from './components/render/RenderPage.jsx'
@@ -26,6 +27,7 @@ export default function App() {
   const activeTheme = useStore(s => s.activeTheme)
   const viewMode    = useStore(s => s.viewMode)
   const setViewMode = useStore(s => s.setViewMode)
+  const activeTool  = useStore(s => s.activeTool)
   const exportFn    = useRef(null)
   const [renderOpen, setRenderOpen] = useState(false)
 
@@ -63,12 +65,27 @@ export default function App() {
 
           {/* Left sidebar — color palette */}
           {showPalette && (
-            <div className="flex flex-col w-28 border-r border-border flex-shrink-0 overflow-y-auto"
-              style={{ background: 'color-mix(in srgb, var(--color-surface) 90%, transparent)' }}>
-              <div className="px-2 pt-2 pb-1 text-xs uppercase tracking-wide text-text-muted border-b border-border">
-                Palette
-              </div>
-              <ColorPalette />
+            <div className="flex flex-col border-r border-border flex-shrink-0 overflow-y-auto"
+              style={{
+                width: activeTool === 'material' ? '10rem' : '7rem',
+                background: 'color-mix(in srgb, var(--color-surface) 90%, transparent)',
+                transition: 'width 0.15s ease',
+              }}>
+              {activeTool === 'material' ? (
+                <>
+                  <div className="px-2 pt-2 pb-1 text-xs uppercase tracking-wide text-text-muted border-b border-border">
+                    Materials
+                  </div>
+                  <MaterialPanel />
+                </>
+              ) : (
+                <>
+                  <div className="px-2 pt-2 pb-1 text-xs uppercase tracking-wide text-text-muted border-b border-border">
+                    Palette
+                  </div>
+                  <ColorPalette />
+                </>
+              )}
             </div>
           )}
 

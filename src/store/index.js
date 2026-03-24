@@ -78,6 +78,7 @@ function makeLayer(W, H, D, name) {
     name: name ?? `Layer ${_layerSeq}`,
     visible: true,
     voxels: makeEmptyVoxels(W, H, D),
+    voxelMaterials: {},  // 'y,x,z' → 'solid'|'emissive'|'neon'|'metal'|'glass'
   }
 }
 
@@ -85,6 +86,7 @@ function snapshotLayers(layers) {
   return layers.map(l => ({
     ...l,
     voxels: l.voxels.map(plane => plane.map(row => [...row])),
+    voxelMaterials: { ...l.voxelMaterials },
   }))
 }
 
@@ -104,6 +106,22 @@ export function getCompositedVoxels(layers, W, H, D) {
           const c = layer.voxels[y]?.[x]?.[z]
           if (c && c !== 'transparent') result[y][x][z] = c
         }
+  }
+  return result
+}
+
+/**
+ * Composite voxelMaterials from all visible layers into a flat map { 'y,x,z': matType }.
+ * Only non-solid entries are stored. Upper layers override lower.
+ */
+export function getCompositedMaterials(layers) {
+  const result = {}
+  for (const layer of layers) {
+    if (!layer.visible) continue
+    for (const [key, mat] of Object.entries(layer.voxelMaterials || {})) {
+      if (mat && mat !== 'solid') result[key] = mat
+      else if (mat === 'solid') delete result[key]
+    }
   }
   return result
 }
@@ -604,6 +622,36 @@ export const useStore = create((set, get) => ({
     paintDepth: Math.max(1, Math.min(s.depthDimension, Math.round(d)))
   })),
   setPaintDirection: (dir)  => set({ paintDirection: dir }),
+
+  activeMaterial:    'solid',
+  setActiveMaterial: (mat) => set({ activeMaterial: mat }),
+
+  paintMaterialAt(col, row) {
+    const {
+      layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D,
+      activeView, paintDepth, paintDirection, activeMaterial,
+    } = get()
+    const layerIdx = layers.findIndex(l => l.id === activeLayerId)
+    if (layerIdx < 0) return
+    const layer = layers[layerIdx]
+    const composited = getCompositedVoxels(layers, W, H, D)
+    const targets = getVoxelTargets(col, row, activeView, paintDepth, W, H, D, paintDirection)
+    const newMaterials = { ...(layer.voxelMaterials || {}) }
+    let changed = false
+    for (const { x, y, z } of targets) {
+      if (!composited[y]?.[x]?.[z] || composited[y][x][z] === 'transparent') continue
+      const key = `${y},${x},${z}`
+      if (activeMaterial === 'solid') {
+        if (key in newMaterials) { delete newMaterials[key]; changed = true }
+      } else if (newMaterials[key] !== activeMaterial) {
+        newMaterials[key] = activeMaterial; changed = true
+      }
+    }
+    if (!changed) return
+    const newLayers = [...layers]
+    newLayers[layerIdx] = { ...layer, voxelMaterials: newMaterials }
+    set({ layers: newLayers })
+  },
 
   // ── Reference image overlay ──────────────────────────────────────────────────
   referenceImage: null, // { src, x, y, width, height, opacity }

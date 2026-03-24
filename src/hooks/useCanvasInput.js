@@ -42,6 +42,9 @@ export function useCanvasInput(containerRef) {
       case 'eraser':
         s.paintAt(col, row, 'transparent')
         break
+      case 'material':
+        s.paintMaterialAt(col, row)
+        break
     }
   }, [])
 
@@ -60,7 +63,7 @@ export function useCanvasInput(containerRef) {
     isDrawing.current = true
     lastPixel.current = coords
 
-    if (s.activeTool === 'pencil' || s.activeTool === 'eraser') {
+    if (s.activeTool === 'pencil' || s.activeTool === 'eraser' || s.activeTool === 'material') {
       s.pushUndo()
     }
 

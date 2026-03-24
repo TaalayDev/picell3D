@@ -16,9 +16,10 @@ export function useKeyboardShortcuts() {
       }
 
       switch (e.key.toLowerCase()) {
-        case 'p': setActiveTool('pencil'); break
-        case 'e': setActiveTool('eraser'); break
-        case 'f': setActiveTool('fill');   break
+        case 'p': setActiveTool('pencil');   break
+        case 'e': setActiveTool('eraser');   break
+        case 'f': setActiveTool('fill');     break
+        case 'm': setActiveTool('material'); break
         case 'g': toggleGrid(); break
       }
     }

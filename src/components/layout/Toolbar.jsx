@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  Pencil, Eraser, PaintBucket,
+  Pencil, Eraser, PaintBucket, Sparkles,
   Cog, Grid3X3, Square, Columns2, Box,
   Undo2, Redo2, Trash2, Download, Frame, ImagePlus, Settings2, Aperture,
 } from 'lucide-react'
@@ -11,9 +11,10 @@ import SettingsDialog from './SettingsDialog.jsx'
 import ExportDialog from '../canvas/ExportDialog.jsx'
 
 const TOOLS = [
-  { id: 'pencil', Icon: Pencil,      label: 'Pencil (P)', key: 'P' },
-  { id: 'eraser', Icon: Eraser,      label: 'Eraser (E)', key: 'E' },
-  { id: 'fill',   Icon: PaintBucket, label: 'Fill (F)',   key: 'F' },
+  { id: 'pencil',   Icon: Pencil,      label: 'Pencil (P)',   key: 'P' },
+  { id: 'eraser',   Icon: Eraser,      label: 'Eraser (E)',   key: 'E' },
+  { id: 'fill',     Icon: PaintBucket, label: 'Fill (F)',     key: 'F' },
+  { id: 'material', Icon: Sparkles,    label: 'Material (M)', key: 'M' },
 ]
 
 const VIEW_MODES = [
