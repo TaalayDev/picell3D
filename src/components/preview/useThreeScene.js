@@ -55,7 +55,7 @@ export function useThreeScene(containerRef) {
 
     // ── Scene ─────────────────────────────────────────────────────────
     const scene = new THREE.Scene()
-    scene.fog = new THREE.FogExp2(0x0c0804, 0.18)
+    // No fog — prevents objects darkening as camera moves away
     sceneRef.current = scene
 
     // ── Lighting ──────────────────────────────────────────────────────

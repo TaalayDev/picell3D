@@ -2,12 +2,13 @@ import { useState } from 'react'
 import {
   Pencil, Eraser, PaintBucket,
   Cog, Grid3X3, Square, Columns2, Box,
-  Undo2, Redo2, Trash2, Download, Frame, ImagePlus, Settings2,
+  Undo2, Redo2, Trash2, Download, Frame, ImagePlus, Settings2, Aperture,
 } from 'lucide-react'
 import { useStore } from '../../store/index.js'
 import CanvasSizeDialog from './CanvasSizeDialog.jsx'
 import ImportDialog from '../canvas/ImportDialog.jsx'
 import SettingsDialog from './SettingsDialog.jsx'
+import ExportDialog from '../canvas/ExportDialog.jsx'
 
 const TOOLS = [
   { id: 'pencil', Icon: Pencil,      label: 'Pencil (P)', key: 'P' },
@@ -21,7 +22,7 @@ const VIEW_MODES = [
   { id: 'preview-only', Icon: Box,      label: '3D only' },
 ]
 
-export default function Toolbar({ onExport }) {
+export default function Toolbar({ onExport, onRender }) {
   const {
     activeTool, setActiveTool,
     pixelSize, setPixelSize,
@@ -32,12 +33,14 @@ export default function Toolbar({ onExport }) {
   const [showSizeDialog,     setShowSizeDialog]     = useState(false)
   const [showImportDialog,   setShowImportDialog]   = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
+  const [showExportDialog,   setShowExportDialog]   = useState(false)
 
   return (
     <>
     {showSizeDialog     && <CanvasSizeDialog onClose={() => setShowSizeDialog(false)} />}
     {showImportDialog   && <ImportDialog     onClose={() => setShowImportDialog(false)} />}
     {showSettingsDialog && <SettingsDialog   onClose={() => setShowSettingsDialog(false)} />}
+    {showExportDialog   && <ExportDialog     onClose={() => setShowExportDialog(false)} />}
     <div className="flex items-center gap-1 px-2 py-1 border-b border-border"
       style={{ background: 'var(--color-surfaceAlt)' }}>
 
@@ -139,15 +142,30 @@ export default function Toolbar({ onExport }) {
         <ActionButton Icon={Trash2} label="Clear canvas"  onClick={clearCanvas} danger />
       </div>
 
-      {/* Export */}
-      <button
-        className="btn-brass ml-auto flex items-center gap-1.5"
-        onClick={onExport}
-        title="Export as PNG"
-      >
-        <Download size={14} />
-        <span>Export PNG</span>
-      </button>
+      {/* Export + Render */}
+      <div className="flex items-center gap-1.5 ml-auto">
+        <button
+          className="btn-brass flex items-center gap-1.5"
+          onClick={() => setShowExportDialog(true)}
+          title="Export as PNG"
+        >
+          <Download size={14} />
+          <span>Export PNG</span>
+        </button>
+        <button
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition-all"
+          style={{
+            borderColor: 'var(--color-accent)',
+            color:       'var(--color-accent)',
+            background:  'color-mix(in srgb, var(--color-accent) 12%, transparent)',
+          }}
+          onClick={onRender}
+          title="Open Render Studio"
+        >
+          <Aperture size={14} />
+          <span>Render</span>
+        </button>
+      </div>
     </div>
     </>
   )

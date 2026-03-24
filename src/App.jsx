@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Monitor, RotateCw, PanelLeft, PanelRight, PanelTop, PanelBottom, X } from 'lucide-react'
 import { useStore } from './store/index.js'
 import { getTheme, applyTheme } from './themes/index.js'
@@ -11,6 +11,7 @@ import Preview3D        from './components/preview/Preview3D.jsx'
 import ColorPalette     from './components/panels/ColorPalette.jsx'
 import VoxelOptionsPanel from './components/panels/VoxelOptionsPanel.jsx'
 import LayersPanel       from './components/panels/LayersPanel.jsx'
+import RenderPage        from './components/render/RenderPage.jsx'
 
 const VIEWS = [
   { id: 'front',  Icon: Monitor,     label: 'Front'  },
@@ -26,6 +27,7 @@ export default function App() {
   const viewMode    = useStore(s => s.viewMode)
   const setViewMode = useStore(s => s.setViewMode)
   const exportFn    = useRef(null)
+  const [renderOpen, setRenderOpen] = useState(false)
 
   useKeyboardShortcuts()
 
@@ -55,7 +57,7 @@ export default function App() {
 
       <div className="relative flex flex-col w-full h-full" style={{ zIndex: 10 }}>
 
-        <Toolbar onExport={() => exportFn.current?.()} />
+        <Toolbar onExport={() => exportFn.current?.()} onRender={() => setRenderOpen(true)} />
 
         <div className="flex flex-1 min-h-0">
 
@@ -113,6 +115,8 @@ export default function App() {
 
         <StatusBar />
       </div>
+
+      {renderOpen && <RenderPage onClose={() => setRenderOpen(false)} />}
     </div>
   )
 }
