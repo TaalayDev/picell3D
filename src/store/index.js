@@ -122,9 +122,10 @@ export function getViewSize(view, W, H, D) {
 export function renderView2D(voxels, view, W, H, D) {
   switch (view) {
     case 'front':
+      // Camera is at +Z. High z = closest to camera = rendered first.
       return Array.from({ length: H }, (_, y) =>
         Array.from({ length: W }, (_, x) => {
-          for (let z = 0; z < D; z++) {
+          for (let z = D - 1; z >= 0; z--) {
             const c = voxels[y]?.[x]?.[z]
             if (c && c !== 'transparent') return c
           }
@@ -133,10 +134,11 @@ export function renderView2D(voxels, view, W, H, D) {
       )
 
     case 'back':
+      // Camera is at -Z. Low z = closest to camera = rendered first.
       return Array.from({ length: H }, (_, y) =>
         Array.from({ length: W }, (_, col) => {
           const x = W - 1 - col
-          for (let z = D - 1; z >= 0; z--) {
+          for (let z = 0; z < D; z++) {
             const c = voxels[y]?.[x]?.[z]
             if (c && c !== 'transparent') return c
           }
@@ -205,7 +207,7 @@ export function renderDepthMap2D(voxels, view, W, H, D) {
     case 'front':
       return Array.from({ length: H }, (_, y) =>
         Array.from({ length: W }, (_, x) => {
-          for (let z = 0; z < D; z++) if (voxels[y]?.[x]?.[z] && voxels[y][x][z] !== 'transparent') return z - center
+          for (let z = D - 1; z >= 0; z--) if (voxels[y]?.[x]?.[z] && voxels[y][x][z] !== 'transparent') return z - center
           return null
         })
       )
@@ -213,7 +215,7 @@ export function renderDepthMap2D(voxels, view, W, H, D) {
       return Array.from({ length: H }, (_, y) =>
         Array.from({ length: W }, (_, col) => {
           const x = W - 1 - col
-          for (let z = D - 1; z >= 0; z--) if (voxels[y]?.[x]?.[z] && voxels[y][x][z] !== 'transparent') return z - center
+          for (let z = 0; z < D; z++) if (voxels[y]?.[x]?.[z] && voxels[y][x][z] !== 'transparent') return z - center
           return null
         })
       )
@@ -261,19 +263,25 @@ export function getVoxelTargets(col, row, view, paintDepth, W, H, D, paintDirect
 
   switch (view) {
     case 'front': {
+      // In 3D: high z (+Z) = front face visible to camera.
+      // 'front' direction → paint toward high z (z > center)
+      // 'back'  direction → paint toward low  z (z < center)
       const center = Math.floor(D / 2)
       const ext    = paintDepth - 1
-      const zStart = paintDirection === 'back'  ? center       : center - ext
-      const zEnd   = paintDirection === 'front' ? center       : center + ext
+      const zStart = paintDirection === 'front' ? center       : center - ext
+      const zEnd   = paintDirection === 'back'  ? center       : center + ext
       for (let z = Math.max(0, zStart); z <= Math.min(D - 1, zEnd); z++)
         targets.push({ x: col, y: row, z })
       break
     }
     case 'back': {
+      // In 3D: low z (-Z) = front face visible from back camera.
+      // 'front' direction → paint toward low z (z < center)
+      // 'back'  direction → paint toward high z (z > center)
       const center = Math.floor(D / 2)
       const ext    = paintDepth - 1
-      const zStart = paintDirection === 'front' ? center       : center - ext
-      const zEnd   = paintDirection === 'back'  ? center       : center + ext
+      const zStart = paintDirection === 'back'  ? center       : center - ext
+      const zEnd   = paintDirection === 'front' ? center       : center + ext
       for (let z = Math.max(0, zStart); z <= Math.min(D - 1, zEnd); z++)
         targets.push({ x: W - 1 - col, y: row, z })
       break
