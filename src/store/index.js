@@ -1,10 +1,62 @@
 import { create } from 'zustand'
 
 const DEFAULT_PALETTE = [
-  '#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff', '#ffff00',
-  '#ff00ff', '#00ffff', '#ff8800', '#8800ff', '#00ff88', '#ff0088',
-  '#884400', '#004488', '#448800', '#888888',
-  '#444444', '#cccccc', '#662200', '#002266',
+  // Blacks & whites
+  '#000000', '#1a1a1a', '#333333',
+  '#555555', '#888888', '#aaaaaa',
+  '#cccccc', '#e8e8e8', '#ffffff',
+
+  // Reds
+  '#ff0000', '#cc0000', '#880000',
+  '#ff4444', '#ff8888', '#ffcccc',
+
+  // Oranges
+  '#ff8800', '#cc6600', '#884400',
+  '#ffaa44', '#ffcc88', '#ffe4c0',
+
+  // Yellows
+  '#ffff00', '#cccc00', '#888800',
+  '#ffff66', '#ffff99', '#ffffcc',
+
+  // Greens
+  '#00ff00', '#00cc00', '#008800',
+  '#44ff44', '#88ff88', '#ccffcc',
+
+  // Teals / Cyans
+  '#00ffcc', '#00ccaa', '#008866',
+  '#00ffff', '#00cccc', '#008888',
+
+  // Blues
+  '#0000ff', '#0000cc', '#000088',
+  '#4444ff', '#8888ff', '#ccccff',
+
+  // Purples / Magentas
+  '#8800ff', '#6600cc', '#440088',
+  '#ff00ff', '#cc00cc', '#880088',
+  '#ff44ff', '#ff88ff', '#ffccff',
+
+  // Pinks
+  '#ff0088', '#cc0066', '#880044',
+  '#ff66aa', '#ffaacc', '#ffddee',
+
+  // Browns / Skin tones
+  '#662200', '#8b4513', '#a0522d',
+  '#c68642', '#d2a679', '#f5deb3',
+  '#ffe0bd', '#ffcd94', '#e8b88a',
+
+  // Nature / Earthy
+  '#228b22', '#3a5f0b', '#556b2f',
+  '#8b7355', '#a08060', '#c4a882',
+  '#4a3728', '#6b4c3b', '#8b6050',
+
+  // Sky / Water
+  '#87ceeb', '#4488cc', '#1a6699',
+  '#003366', '#004488', '#1155aa',
+
+  // Neon / Accent
+  '#ff6600', '#ff3300', '#cc2200',
+  '#00ff88', '#00cc66', '#009944',
+  '#ff00aa', '#cc0088', '#990066',
 ]
 
 const CANVAS_W = 32

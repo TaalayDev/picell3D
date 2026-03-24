@@ -8,6 +8,7 @@ import { useStore } from '../../store/index.js'
 import CanvasSizeDialog from './CanvasSizeDialog.jsx'
 import ImportDialog from '../canvas/ImportDialog.jsx'
 import SettingsDialog from './SettingsDialog.jsx'
+import ExportDialog from '../canvas/ExportDialog.jsx'
 
 const TOOLS = [
   { id: 'pencil', Icon: Pencil,      label: 'Pencil (P)', key: 'P' },
@@ -32,12 +33,14 @@ export default function Toolbar({ onExport, onRender }) {
   const [showSizeDialog,     setShowSizeDialog]     = useState(false)
   const [showImportDialog,   setShowImportDialog]   = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
+  const [showExportDialog,   setShowExportDialog]   = useState(false)
 
   return (
     <>
     {showSizeDialog     && <CanvasSizeDialog onClose={() => setShowSizeDialog(false)} />}
     {showImportDialog   && <ImportDialog     onClose={() => setShowImportDialog(false)} />}
     {showSettingsDialog && <SettingsDialog   onClose={() => setShowSettingsDialog(false)} />}
+    {showExportDialog   && <ExportDialog     onClose={() => setShowExportDialog(false)} />}
     <div className="flex items-center gap-1 px-2 py-1 border-b border-border"
       style={{ background: 'var(--color-surfaceAlt)' }}>
 
@@ -143,7 +146,7 @@ export default function Toolbar({ onExport, onRender }) {
       <div className="flex items-center gap-1.5 ml-auto">
         <button
           className="btn-brass flex items-center gap-1.5"
-          onClick={onExport}
+          onClick={() => setShowExportDialog(true)}
           title="Export as PNG"
         >
           <Download size={14} />

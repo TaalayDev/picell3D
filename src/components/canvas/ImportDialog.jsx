@@ -54,6 +54,12 @@ export default function ImportDialog({ onClose }) {
       const newLayers = [...layers]
       newLayers[layerIdx] = { ...layer, voxels: newVoxels }
       useStore.setState({ layers: newLayers })
+
+      // Add unique colors from the image to the palette
+      const uniqueColors = [...new Set(grid.flat().filter(Boolean))]
+      const { addToPalette } = useStore.getState()
+      uniqueColors.forEach(addToPalette)
+
       onClose()
     } finally {
       setLoading(false)
