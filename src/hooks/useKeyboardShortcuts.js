@@ -20,6 +20,9 @@ export function useKeyboardShortcuts() {
         case 'e': setActiveTool('eraser');   break
         case 'f': setActiveTool('fill');     break
         case 'm': setActiveTool('material'); break
+        case 'r': setActiveTool('rect');     break
+        case 'c': setActiveTool('circle');   break
+        case 'l': setActiveTool('line');     break
         case 'g': toggleGrid(); break
       }
     }

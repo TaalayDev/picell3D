@@ -1,6 +1,7 @@
 import { useRef, useEffect, useMemo } from 'react'
 import { useStore, renderView2D, renderDepthMap2D, getViewSize, getCompositedVoxels } from '../../store/index.js'
 import { useCanvasInput } from '../../hooks/useCanvasInput.js'
+import { useShapeInput, SHAPE_TOOLS } from '../../hooks/useShapeInput.js'
 import ReferenceOverlay from './ReferenceOverlay.jsx'
 
 function getCSSVar(name) {
@@ -18,11 +19,12 @@ const VIEW_LABELS = {
 
 export default function PixelCanvas() {
   const canvasRef    = useRef(null)
+  const overlayRef   = useRef(null)
   const containerRef = useRef(null)
 
   const {
     layers, pixelSize, canvasWidth, canvasHeight, depthDimension,
-    showGrid, showDepthText, activeTool, activeView,
+    showGrid, showDepthText, activeTool, activeView, currentColor,
   } = useStore()
 
   const D = depthDimension
@@ -34,10 +36,20 @@ export default function PixelCanvas() {
       depthMap: renderDepthMap2D(composited, activeView, canvasWidth, canvasHeight, D),
     }
   }, [layers, activeView, canvasWidth, canvasHeight, D])
+
   const { w: viewW, h: viewH } = getViewSize(activeView, canvasWidth, canvasHeight, D)
 
-  const { onPointerDown, onPointerMove, onPointerUp } = useCanvasInput(containerRef)
+  // ── Tool handlers ───────────────────────────────────────────────────────────
+  const canvasInput = useCanvasInput(containerRef)
+  const shapeInput  = useShapeInput(containerRef)
 
+  const isShape = SHAPE_TOOLS.has(activeTool)
+
+  function routeDown(e)  { isShape ? shapeInput.handlers.onPointerDown(e)  : canvasInput.onPointerDown(e) }
+  function routeMove(e)  { isShape ? shapeInput.handlers.onPointerMove(e)  : canvasInput.onPointerMove(e) }
+  function routeUp(e)    { isShape ? shapeInput.handlers.onPointerUp(e)    : canvasInput.onPointerUp(e) }
+
+  // ── Main canvas render ──────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || !view2d.length) return
@@ -63,10 +75,10 @@ export default function PixelCanvas() {
       }
     }
 
-    // Depth shadow pass — inner shadows on edges where adjacent pixels are shallower (protrude in front)
+    // Depth shadow pass
     if (depthMap.length) {
-      const maxAlpha  = 0.65
-      const shadowReach = 0.6 // fraction of pixelSize the shadow reaches inward
+      const maxAlpha   = 0.65
+      const shadowReach = 0.6
 
       for (let row = 0; row < viewH; row++) {
         for (let col = 0; col < viewW; col++) {
@@ -91,44 +103,31 @@ export default function PixelCanvas() {
 
           const reach = pixelSize * shadowReach
 
-          if (dL !== null && dL !== undefined && dL < d) {
-            const a = Math.min((d - dL) / D, 1) * maxAlpha
-            drawEdgeShadow(px, py, px + reach, py, a)
-          }
-          if (dT !== null && dT !== undefined && dT < d) {
-            const a = Math.min((d - dT) / D, 1) * maxAlpha
-            drawEdgeShadow(px, py, px, py + reach, a)
-          }
-          if (dR !== null && dR !== undefined && dR < d) {
-            const a = Math.min((d - dR) / D, 1) * maxAlpha
-            drawEdgeShadow(px + pixelSize, py, px + pixelSize - reach, py, a)
-          }
-          if (dB !== null && dB !== undefined && dB < d) {
-            const a = Math.min((d - dB) / D, 1) * maxAlpha
-            drawEdgeShadow(px, py + pixelSize, px, py + pixelSize - reach, a)
-          }
+          if (dL !== null && dL !== undefined && dL < d)
+            drawEdgeShadow(px, py, px + reach, py, Math.min((d - dL) / D, 1) * maxAlpha)
+          if (dT !== null && dT !== undefined && dT < d)
+            drawEdgeShadow(px, py, px, py + reach, Math.min((d - dT) / D, 1) * maxAlpha)
+          if (dR !== null && dR !== undefined && dR < d)
+            drawEdgeShadow(px + pixelSize, py, px + pixelSize - reach, py, Math.min((d - dR) / D, 1) * maxAlpha)
+          if (dB !== null && dB !== undefined && dB < d)
+            drawEdgeShadow(px, py + pixelSize, px, py + pixelSize - reach, Math.min((d - dB) / D, 1) * maxAlpha)
         }
       }
     }
 
+    // Grid
     if (showGrid && pixelSize >= 5) {
       ctx.strokeStyle = gridColor + '44'
       ctx.lineWidth   = 0.5
       for (let col = 0; col <= viewW; col++) {
-        ctx.beginPath()
-        ctx.moveTo(col * pixelSize, 0)
-        ctx.lineTo(col * pixelSize, ph)
-        ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(col * pixelSize, 0); ctx.lineTo(col * pixelSize, ph); ctx.stroke()
       }
       for (let row = 0; row <= viewH; row++) {
-        ctx.beginPath()
-        ctx.moveTo(0, row * pixelSize)
-        ctx.lineTo(pw, row * pixelSize)
-        ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(0, row * pixelSize); ctx.lineTo(pw, row * pixelSize); ctx.stroke()
       }
     }
 
-    // Depth numbers — only when pixels are large enough to be readable
+    // Depth numbers
     if (showDepthText && pixelSize >= 10 && depthMap.length) {
       const fontSize = Math.max(7, Math.floor(pixelSize * 0.38))
       ctx.font = `bold ${fontSize}px monospace`
@@ -141,7 +140,6 @@ export default function PixelCanvas() {
           const cx = col * pixelSize + pixelSize / 2
           const cy = row * pixelSize + pixelSize / 2
           const label = d > 0 ? `+${d}` : String(d)
-          // shadow for readability
           ctx.fillStyle = 'rgba(0,0,0,0.55)'
           ctx.fillText(label, cx + 0.5, cy + 0.5)
           ctx.fillStyle = 'rgba(255,255,255,0.85)'
@@ -160,6 +158,83 @@ export default function PixelCanvas() {
     }
   }, [view2d, depthMap, viewW, viewH, pixelSize, showGrid, showDepthText, activeView])
 
+  // ── Overlay canvas — shape preview + line handles ───────────────────────────
+  const { previewPixels, lineState } = shapeInput
+
+  useEffect(() => {
+    const overlay = overlayRef.current
+    if (!overlay) return
+    const pw = viewW * pixelSize
+    const ph = viewH * pixelSize
+    overlay.width  = pw
+    overlay.height = ph
+    const ctx = overlay.getContext('2d')
+    ctx.clearRect(0, 0, pw, ph)
+
+    // Ghost preview pixels
+    if (previewPixels.length > 0) {
+      ctx.fillStyle = currentColor + 'b0'
+      for (const { col, row } of previewPixels) {
+        ctx.fillRect(col * pixelSize, row * pixelSize, pixelSize, pixelSize)
+      }
+    }
+
+    // Line handles (only in editing mode)
+    if (lineState.isEditing && lineState.points.length >= 2) {
+      const pts = lineState.points
+      const hs  = Math.max(5, Math.round(pixelSize * 0.55)) // handle size
+      const mhs = Math.max(4, Math.round(pixelSize * 0.38)) // midpoint handle size
+
+      // Draw line in accent color
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'
+      ctx.lineWidth   = 1.5
+      ctx.setLineDash([3, 3])
+      ctx.beginPath()
+      ctx.moveTo((pts[0].col + 0.5) * pixelSize, (pts[0].row + 0.5) * pixelSize)
+      for (let i = 1; i < pts.length; i++)
+        ctx.lineTo((pts[i].col + 0.5) * pixelSize, (pts[i].row + 0.5) * pixelSize)
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      // Midpoint handles (hollow diamonds)
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'
+      ctx.fillStyle   = 'rgba(30,30,60,0.75)'
+      ctx.lineWidth   = 1
+      for (let i = 0; i < pts.length - 1; i++) {
+        const mx = (pts[i].col + pts[i + 1].col + 1) / 2 * pixelSize
+        const my = (pts[i].row + pts[i + 1].row + 1) / 2 * pixelSize
+        ctx.beginPath()
+        ctx.moveTo(mx, my - mhs)
+        ctx.lineTo(mx + mhs, my)
+        ctx.lineTo(mx, my + mhs)
+        ctx.lineTo(mx - mhs, my)
+        ctx.closePath()
+        ctx.fill(); ctx.stroke()
+      }
+
+      // Vertex handles (solid squares — start/end bigger)
+      for (let i = 0; i < pts.length; i++) {
+        const hx = (pts[i].col + 0.5) * pixelSize
+        const hy = (pts[i].row + 0.5) * pixelSize
+        const sz = (i === 0 || i === pts.length - 1) ? hs : hs * 0.8
+        ctx.fillStyle   = currentColor
+        ctx.strokeStyle = '#fff'
+        ctx.lineWidth   = 1.5
+        ctx.fillRect(hx - sz / 2, hy - sz / 2, sz, sz)
+        ctx.strokeRect(hx - sz / 2, hy - sz / 2, sz, sz)
+      }
+
+      // "Press Enter to commit" hint
+      if (pw > 80) {
+        ctx.font      = `${Math.max(9, pixelSize * 0.45)}px monospace`
+        ctx.fillStyle = 'rgba(255,255,255,0.5)'
+        ctx.textAlign = 'right'
+        ctx.textBaseline = 'bottom'
+        ctx.fillText('Enter ↵  commit · Esc  cancel', pw - 4, ph - 4)
+      }
+    }
+  }, [previewPixels, lineState, pixelSize, viewW, viewH, currentColor])
+
   return (
     <div className="flex items-center justify-center w-full h-full overflow-auto p-4">
       <div
@@ -167,33 +242,45 @@ export default function PixelCanvas() {
         className="relative flex-shrink-0"
         style={{
           boxShadow: '0 0 0 2px var(--color-border), 0 0 0 4px var(--color-surface), 0 8px 40px rgba(0,0,0,0.9)',
-          cursor: getCursor(activeTool),
+          cursor: getCursor(activeTool, shapeInput.isEditing),
         }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerLeave={onPointerUp}
+        onPointerDown={routeDown}
+        onPointerMove={routeMove}
+        onPointerUp={routeUp}
+        onPointerLeave={(e) => { if (!isShape) canvasInput.onPointerUp(e) }}
       >
+        {/* Main voxel canvas */}
         <canvas
           ref={canvasRef}
+          style={{ width: viewW * pixelSize, height: viewH * pixelSize, imageRendering: 'pixelated', display: 'block' }}
+        />
+
+        {/* Shape preview overlay (pointer-events: none so container receives all events) */}
+        <canvas
+          ref={overlayRef}
           style={{
-            width:          viewW * pixelSize,
-            height:         viewH * pixelSize,
-            imageRendering: 'pixelated',
-            display:        'block',
+            position: 'absolute', inset: 0,
+            width: viewW * pixelSize, height: viewH * pixelSize,
+            imageRendering: 'pixelated', pointerEvents: 'none',
           }}
         />
+
         <ReferenceOverlay pixelSize={pixelSize} />
       </div>
     </div>
   )
 }
 
-function getCursor(tool) {
+function getCursor(tool, isLineEditing) {
+  if (isLineEditing) return 'default'
   switch (tool) {
-    case 'pencil': return 'crosshair'
-    case 'eraser': return 'cell'
-    case 'fill':   return 'copy'
-    default:       return 'crosshair'
+    case 'pencil':   return 'crosshair'
+    case 'eraser':   return 'cell'
+    case 'fill':     return 'copy'
+    case 'rect':
+    case 'circle':
+    case 'ellipse':
+    case 'line':     return 'crosshair'
+    default:         return 'crosshair'
   }
 }

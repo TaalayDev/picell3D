@@ -271,36 +271,34 @@ export function renderDepthMap2D(voxels, view, W, H, D) {
   }
 }
 
+// Maps each view to its opposite face view
+export const OPPOSITE_VIEW = {
+  front: 'back',  back: 'front',
+  left:  'right', right: 'left',
+  top:   'bottom', bottom: 'top',
+}
+
 /**
  * Returns voxel coords {x,y,z}[] to paint when the user clicks
- * canvas pixel (col, row) in the given view (front only).
- * paintDirection: 'both' | 'front' | 'back' — only used for front/back view.
+ * canvas pixel (col, row) in the given view.
+ * Front/back are now face-based (start from the visible surface, go inward).
  */
-export function getVoxelTargets(col, row, view, paintDepth, W, H, D, paintDirection = 'both') {
+export function getVoxelTargets(col, row, view, paintDepth, W, H, D) {
   const targets = []
 
   switch (view) {
     case 'front': {
-      // In 3D: high z (+Z) = front face visible to camera.
-      // 'front' direction → paint toward high z (z > center)
-      // 'back'  direction → paint toward low  z (z < center)
-      const center = Math.floor(D / 2)
-      const ext    = paintDepth - 1
-      const zStart = paintDirection === 'front' ? center       : center - ext
-      const zEnd   = paintDirection === 'back'  ? center       : center + ext
-      for (let z = Math.max(0, zStart); z <= Math.min(D - 1, zEnd); z++)
+      // Front face at z = D-1 (+Z camera). Paint inward (toward -Z).
+      const zEnd   = D - 1
+      const zStart = Math.max(0, D - paintDepth)
+      for (let z = zEnd; z >= zStart; z--)
         targets.push({ x: col, y: row, z })
       break
     }
     case 'back': {
-      // In 3D: low z (-Z) = front face visible from back camera.
-      // 'front' direction → paint toward low z (z < center)
-      // 'back'  direction → paint toward high z (z > center)
-      const center = Math.floor(D / 2)
-      const ext    = paintDepth - 1
-      const zStart = paintDirection === 'back'  ? center       : center - ext
-      const zEnd   = paintDirection === 'front' ? center       : center + ext
-      for (let z = Math.max(0, zStart); z <= Math.min(D - 1, zEnd); z++)
+      // Back face at z = 0 (-Z camera). Paint inward (toward +Z).
+      const zEnd = Math.min(D - 1, paintDepth - 1)
+      for (let z = 0; z <= zEnd; z++)
         targets.push({ x: W - 1 - col, y: row, z })
       break
     }
@@ -340,8 +338,9 @@ export function getExistingVoxelTargets(voxels, col, row, view, maxCount, W, H, 
   }
 
   if (view === 'back') {
+    // Back camera is at -Z: z=0 is closest to the back camera, scan upward.
     const x = W - 1 - col
-    for (let z = D - 1; z >= 0; z--) { if (push(x, row, z)) break }
+    for (let z = 0; z < D; z++) { if (push(x, row, z)) break }
   } else if (view === 'left') {
     for (let x = 0; x < W; x++)       { if (push(x, row, col)) break }
   } else if (view === 'right') {
@@ -351,6 +350,48 @@ export function getExistingVoxelTargets(voxels, col, row, view, maxCount, W, H, 
     for (let y = 0; y < H; y++)       { if (push(col, y, row)) break }
   } else if (view === 'bottom') {
     for (let y = H - 1; y >= 0; y--) { if (push(col, y, row)) break }
+  }
+
+  return results
+}
+
+/**
+ * For side views (left/right/top/bottom) in draw mode:
+ * Scans the ray from the camera and returns empty voxel position(s) just in
+ * front of the first visible surface (toward the camera). Falls back to the
+ * face position when the ray is fully empty.
+ */
+export function getSurfaceVoxelTargets(voxels, col, row, view, paintDepth, W, H, D) {
+  const results = []
+
+  // Scan from fromIdx toward toIdx (inclusive). getCoords(i) → [x, y, z].
+  // Finds the first filled voxel and places paintDepth slots just in front of it.
+  const scanAndPlace = (fromIdx, toIdx, getCoords) => {
+    const dir = fromIdx <= toIdx ? 1 : -1
+    let surfaceI = null
+    for (let i = fromIdx; dir > 0 ? i <= toIdx : i >= toIdx; i += dir) {
+      const [x, y, z] = getCoords(i)
+      const c = voxels[y]?.[x]?.[z]
+      if (c && c !== 'transparent') { surfaceI = i; break }
+    }
+    // Start placing one step in front of surface (toward camera), or at face if empty.
+    const startI = surfaceI !== null ? surfaceI - dir : fromIdx
+    for (let d = 0; d < paintDepth; d++) {
+      const [x, y, z] = getCoords(startI - dir * d)
+      if (x >= 0 && x < W && y >= 0 && y < H && z >= 0 && z < D)
+        if (!results.some(t => t.x === x && t.y === y && t.z === z))
+          results.push({ x, y, z })
+    }
+  }
+
+  switch (view) {
+    // Back camera at -Z: z=0 is the face closest to back camera, scan inward toward z=D-1.
+    case 'back':   scanAndPlace(0,     D - 1, i => [W - 1 - col, row, i        ]); break
+    case 'left':   scanAndPlace(0,     W - 1, i => [i,   row, col              ]); break
+    case 'right':  scanAndPlace(W - 1, 0,     i => [i,   row, D - 1 - col      ]); break
+    case 'top':    scanAndPlace(0,     H - 1, i => [col, i,   row              ]); break
+    case 'bottom': scanAndPlace(H - 1, 0,     i => [col, i,   row              ]); break
+    default:       return getVoxelTargets(col, row, view, paintDepth, W, H, D)
   }
 
   return results
@@ -380,38 +421,92 @@ export const useStore = create((set, get) => ({
     set({ undoStack: [...undoStack.slice(-49), snapshotLayers(layers)], redoStack: [] })
   },
 
-  /** Paint (or erase) voxels at a canvas click position. Does NOT push undo. */
-  paintAt(col, row, color) {
-    const { layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView, paintDepth, paintDirection } = get()
+  /** Paint (or erase) voxels at a canvas click position. Does NOT push undo.
+   *  @param {string|null} opts.sideDrawModeOverride  Temporarily override sideDrawMode ('edit'|'draw'|null)
+   *  @param {boolean}     opts.fullDepthErase         Erase all voxels along the full ray depth
+   */
+  paintAt(col, row, color, { sideDrawModeOverride = null, fullDepthErase = false } = {}) {
+    const {
+      layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D,
+      activeView, paintDepth, sideDrawMode,
+      symmetryX, symmetryY, symmetryOpposite,
+    } = get()
     const layerIdx = layers.findIndex(l => l.id === activeLayerId)
     if (layerIdx < 0) return
     const layerVoxels = layers[layerIdx].voxels
+    const effectiveMode = sideDrawModeOverride ?? sideDrawMode
+    const { w, h } = getViewSize(activeView, W, H, D)
+    const editCount  = fullDepthErase ? D : paintDepth
+    const depthCount = fullDepthErase ? D : paintDepth
 
-    const applyTargets = (targets) => {
-      if (!targets.length) return false
-      const affectedY = new Set(targets.map(t => t.y))
-      const newVoxels = [...layerVoxels]
-      for (const y of affectedY) newVoxels[y] = layerVoxels[y].map(xRow => [...xRow])
-      for (const { x, y, z } of targets) newVoxels[y][x][z] = color
-      const newLayers = [...layers]
-      newLayers[layerIdx] = { ...layers[layerIdx], voxels: newVoxels }
-      set({ layers: newLayers })
-      return true
+    // Lazy composited voxels — only computed when a side-draw mode is needed.
+    let _composited = null
+    const getComposited = () => _composited ?? (_composited = getCompositedVoxels(layers, W, H, D))
+
+    // Returns 3D voxel targets for a canvas position in the given view.
+    // front is always face-based. back and all side views respect effectiveMode.
+    const getTargets = (c, r, view, forceDrawMode = false) => {
+      if (view === 'front') return getVoxelTargets(c, r, view, depthCount, W, H, D)
+      const mode = forceDrawMode ? 'draw' : effectiveMode
+      return mode === 'draw'
+        ? getSurfaceVoxelTargets(getComposited(), c, r, view, depthCount, W, H, D)
+        : getExistingVoxelTargets(layerVoxels, c, r, view, editCount, W, H, D)
     }
 
-    if (activeView !== 'front' && activeView !== 'back') {
-      // Non-front/back: operate only on existing voxels in the active layer
-      const targets = getExistingVoxelTargets(layerVoxels, col, row, activeView, 1, W, H, D)
-      applyTargets(targets)
-      return
+    // Build primary canvas positions including X/Y symmetry mirrors
+    const posList = []
+    const seenPos = new Set()
+    const addPos = (c, r) => {
+      if (c < 0 || c >= w || r < 0 || r >= h) return
+      const k = `${c},${r}`
+      if (seenPos.has(k)) return
+      seenPos.add(k)
+      posList.push([c, r])
+    }
+    addPos(col, row)
+    if (symmetryX) addPos(w - 1 - col, row)
+    if (symmetryY) addPos(col, h - 1 - row)
+    if (symmetryX && symmetryY) addPos(w - 1 - col, h - 1 - row)
+
+    // Collect all 3D targets (deduplicated)
+    const allTargets = []
+    const seenVox = new Set()
+    const addTarget = (t) => {
+      const k = `${t.x},${t.y},${t.z}`
+      if (!seenVox.has(k)) { seenVox.add(k); allTargets.push(t) }
     }
 
-    // Front/back view: unrestricted, centered depth
-    applyTargets(getVoxelTargets(col, row, activeView, paintDepth, W, H, D, paintDirection))
+    for (const [c, r] of posList)
+      getTargets(c, r, activeView).forEach(addTarget)
+
+    // Opposite-side symmetry: same canvas positions but for the opposite view.
+    // When active view is front (always draw), force draw mode for opposite too.
+    if (symmetryOpposite) {
+      const oppView = OPPOSITE_VIEW[activeView]
+      const { w: ow, h: oh } = getViewSize(oppView, W, H, D)
+      const forceOpp = activeView === 'front'
+      for (const [c, r] of posList) {
+        if (c >= 0 && c < ow && r >= 0 && r < oh)
+          getTargets(c, r, oppView, forceOpp).forEach(addTarget)
+      }
+    }
+
+    if (!allTargets.length) return
+    const affectedY = new Set(allTargets.map(t => t.y))
+    const newVoxels = [...layerVoxels]
+    for (const y of affectedY) newVoxels[y] = layerVoxels[y].map(xRow => [...xRow])
+    for (const { x, y, z } of allTargets) newVoxels[y][x][z] = color
+    const newLayers = [...layers]
+    newLayers[layerIdx] = { ...layers[layerIdx], voxels: newVoxels }
+    set({ layers: newLayers })
   },
 
   floodFillVoxel(col, row, newColor) {
-    const { layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView, paintDepth, paintDirection } = get()
+    const {
+      layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D,
+      activeView, paintDepth, sideDrawMode,
+      symmetryX, symmetryY, symmetryOpposite,
+    } = get()
     const layerIdx = layers.findIndex(l => l.id === activeLayerId)
     if (layerIdx < 0) return
     const layerVoxels = layers[layerIdx].voxels
@@ -437,11 +532,42 @@ export const useStore = create((set, get) => ({
       stack.push([c+1,r],[c-1,r],[c,r+1],[c,r-1])
     }
 
-    const allTargets = matching.flatMap(([c, r]) =>
-      (activeView === 'front' || activeView === 'back')
-        ? getVoxelTargets(c, r, activeView, paintDepth, W, H, D, paintDirection)
-        : getExistingVoxelTargets(layerVoxels, c, r, activeView, 1, W, H, D)
-    )
+    let _composited = null
+    const getComposited = () => _composited ?? (_composited = getCompositedVoxels(layers, W, H, D))
+
+    const getTargets = (c, r, view, forceDrawMode = false) => {
+      if (view === 'front') return getVoxelTargets(c, r, view, paintDepth, W, H, D)
+      const mode = forceDrawMode ? 'draw' : sideDrawMode
+      return mode === 'draw'
+        ? getSurfaceVoxelTargets(getComposited(), c, r, view, paintDepth, W, H, D)
+        : getExistingVoxelTargets(layerVoxels, c, r, view, paintDepth, W, H, D)
+    }
+
+    const seenVox = new Set()
+    const allTargets = []
+    const addTarget = (t) => {
+      const k = `${t.x},${t.y},${t.z}`
+      if (!seenVox.has(k)) { seenVox.add(k); allTargets.push(t) }
+    }
+
+    for (const [c, r] of matching) {
+      getTargets(c, r, activeView).forEach(addTarget)
+      if (symmetryX) { const mc = w - 1 - c; if (mc !== c) getTargets(mc, r, activeView).forEach(addTarget) }
+      if (symmetryY) { const mr = h - 1 - r; if (mr !== r) getTargets(c, mr, activeView).forEach(addTarget) }
+      if (symmetryX && symmetryY) getTargets(w - 1 - c, h - 1 - r, activeView).forEach(addTarget)
+      if (symmetryOpposite) {
+        const oppView = OPPOSITE_VIEW[activeView]
+        const { w: ow, h: oh } = getViewSize(oppView, W, H, D)
+        const forceOpp = activeView === 'front'
+        const opp = [[c,r]]
+        if (symmetryX) opp.push([ow-1-c, r])
+        if (symmetryY) opp.push([c, oh-1-r])
+        if (symmetryX && symmetryY) opp.push([ow-1-c, oh-1-r])
+        for (const [oc, or_] of opp)
+          if (oc >= 0 && oc < ow && or_ >= 0 && or_ < oh)
+            getTargets(oc, or_, oppView, forceOpp).forEach(addTarget)
+      }
+    }
     if (!allTargets.length) return
 
     const affectedY = new Set(allTargets.map(t => t.y))
@@ -615,13 +741,26 @@ export const useStore = create((set, get) => ({
   // ── Voxel view ───────────────────────────────────────────────────────────────
   activeView:     'front',
   paintDepth:     1,
-  paintDirection: 'both',
+  paintDirection: 'both', // kept for compat; no longer used for front/back
 
-  setActiveView:     (view) => set({ activeView: view }),
-  setPaintDepth:     (d)    => set(s => ({
+  // 'edit' = only modify existing voxels (default for all non-front views)
+  // 'draw' = freely place new voxels
+  sideDrawMode: 'edit',
+
+  // Symmetry flags
+  symmetryX:        false,
+  symmetryY:        false,
+  symmetryOpposite: false,
+
+  setActiveView:      (view) => set({ activeView: view }),
+  setPaintDepth:      (d)    => set(s => ({
     paintDepth: Math.max(1, Math.min(s.depthDimension, Math.round(d)))
   })),
-  setPaintDirection: (dir)  => set({ paintDirection: dir }),
+  setPaintDirection:  (dir)  => set({ paintDirection: dir }),
+  setSideDrawMode:    (mode) => set({ sideDrawMode: mode }),
+  setSymmetryX:       (v)    => set({ symmetryX: v }),
+  setSymmetryY:       (v)    => set({ symmetryY: v }),
+  setSymmetryOpposite:(v)    => set({ symmetryOpposite: v }),
 
   activeMaterial:    'solid',
   setActiveMaterial: (mat) => set({ activeMaterial: mat }),
@@ -629,13 +768,13 @@ export const useStore = create((set, get) => ({
   paintMaterialAt(col, row) {
     const {
       layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D,
-      activeView, paintDepth, paintDirection, activeMaterial,
+      activeView, paintDepth, activeMaterial,
     } = get()
     const layerIdx = layers.findIndex(l => l.id === activeLayerId)
     if (layerIdx < 0) return
     const layer = layers[layerIdx]
     const composited = getCompositedVoxels(layers, W, H, D)
-    const targets = getVoxelTargets(col, row, activeView, paintDepth, W, H, D, paintDirection)
+    const targets = getVoxelTargets(col, row, activeView, paintDepth, W, H, D)
     const newMaterials = { ...(layer.voxelMaterials || {}) }
     let changed = false
     for (const { x, y, z } of targets) {

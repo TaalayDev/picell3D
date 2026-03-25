@@ -1,19 +1,16 @@
 import { useMemo } from 'react'
 import { Box } from 'lucide-react'
-import { useStore, getCompositedVoxels } from '../../store/index.js'
+import { useStore, getCompositedVoxels, OPPOSITE_VIEW } from '../../store/index.js'
 
 const DEPTH_PRESETS = [4, 8, 16, 24, 32, 48, 64]
-
-const DIRECTIONS = [
-  { id: 'front', label: '← Front' },
-  { id: 'both',  label: '↔ Both'  },
-  { id: 'back',  label: 'Back →'  },
-]
 
 export default function VoxelOptionsPanel() {
   const {
     canvasWidth, canvasHeight, depthDimension, setDepthDimension,
-    paintDepth, setPaintDepth, paintDirection, setPaintDirection, layers, activeView,
+    paintDepth, setPaintDepth, layers, activeView,
+    sideDrawMode, setSideDrawMode,
+    symmetryX, symmetryY, symmetryOpposite,
+    setSymmetryX, setSymmetryY, setSymmetryOpposite,
   } = useStore()
 
   const voxelCount = useMemo(() => {
@@ -26,7 +23,9 @@ export default function VoxelOptionsPanel() {
     return count
   }, [layers, canvasWidth, canvasHeight, depthDimension])
 
+  const isFront    = activeView === 'front'
   const isFrontBack = activeView === 'front' || activeView === 'back'
+  const oppLabel   = OPPOSITE_VIEW[activeView]
 
   return (
     <div className="flex flex-col h-full">
@@ -93,19 +92,19 @@ export default function VoxelOptionsPanel() {
           </div>
         </div>
 
-        {/* Paint direction — front/back views only */}
-        {isFrontBack && (
+        {/* Draw / Edit mode — all views except front */}
+        {!isFront && (
           <div>
             <div className="mb-1.5">
-              <label className="text-xs text-text-muted uppercase tracking-wide">Direction</label>
+              <label className="text-xs text-text-muted uppercase tracking-wide">Side Mode</label>
             </div>
-            <div className="grid grid-cols-3 gap-1">
-              {DIRECTIONS.map(({ id, label }) => (
+            <div className="grid grid-cols-2 gap-1">
+              {[['edit', 'Edit'], ['draw', 'Draw']].map(([id, label]) => (
                 <button
                   key={id}
-                  onClick={() => setPaintDirection(id)}
-                  className={`text-xs py-0.5 rounded border transition-colors ${
-                    paintDirection === id
+                  onClick={() => setSideDrawMode(id)}
+                  className={`text-xs py-1 rounded border transition-colors ${
+                    sideDrawMode === id
                       ? 'border-accent bg-accent/20 text-accent'
                       : 'border-border text-text-muted hover:text-text hover:border-accent/50'
                   }`}
@@ -114,8 +113,28 @@ export default function VoxelOptionsPanel() {
                 </button>
               ))}
             </div>
+            <p className="text-xs text-text-muted mt-1 leading-tight">
+              Hold <kbd className="text-text font-mono px-0.5 border border-border rounded">Alt</kbd> to temporarily use the other mode.<br />
+              Hold <kbd className="text-text font-mono px-0.5 border border-border rounded">Shift</kbd> + Eraser to erase full depth.
+            </p>
           </div>
         )}
+
+        {/* Symmetry */}
+        <div>
+          <div className="mb-1.5">
+            <label className="text-xs text-text-muted uppercase tracking-wide">Symmetry</label>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <SymToggle label="X Axis" value={symmetryX} onChange={setSymmetryX} />
+            <SymToggle label="Y Axis" value={symmetryY} onChange={setSymmetryY} />
+            <SymToggle
+              label={`Opp. side (${oppLabel})`}
+              value={symmetryOpposite}
+              onChange={setSymmetryOpposite}
+            />
+          </div>
+        </div>
 
         {/* Stats */}
         <div className="flex flex-col gap-1.5 text-xs">
@@ -146,6 +165,29 @@ export default function VoxelOptionsPanel() {
           }
         </div>
       </div>
+    </div>
+  )
+}
+
+function SymToggle({ label, value, onChange }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-xs text-text-muted">{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={value}
+        onClick={() => onChange(!value)}
+        className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 transition-colors focus:outline-none ${
+          value ? 'border-accent bg-accent/30' : 'border-border bg-surface-alt'
+        }`}
+      >
+        <span
+          className={`pointer-events-none inline-block h-3 w-3 rounded-full shadow transition-transform ${
+            value ? 'translate-x-4 bg-accent' : 'translate-x-0 bg-text-muted'
+          }`}
+        />
+      </button>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useEffect } from 'react'
 import { useStore, getViewSize } from '../store/index.js'
 
 /** Bresenham's line — returns all integer coords between (x0,y0) and (x1,y1) */
@@ -20,6 +20,27 @@ function bresenham(x0, y0, x1, y1) {
 export function useCanvasInput(containerRef) {
   const isDrawing = useRef(false)
   const lastPixel = useRef(null)
+  // Track Alt key for temporary draw-mode override on non-front views
+  const isAltHeld   = useRef(false)
+  // Track Shift key for full-depth erase
+  const isShiftHeld = useRef(false)
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === 'Alt')   { e.preventDefault(); isAltHeld.current   = true }
+      if (e.key === 'Shift') { isShiftHeld.current = true }
+    }
+    const onKeyUp = (e) => {
+      if (e.key === 'Alt')   isAltHeld.current   = false
+      if (e.key === 'Shift') isShiftHeld.current = false
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup',   onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup',   onKeyUp)
+    }
+  }, [])
 
   const getPixelCoords = useCallback((e) => {
     const { pixelSize } = useStore.getState()
@@ -31,16 +52,21 @@ export function useCanvasInput(containerRef) {
 
   const applyTool = useCallback(({ col, row }) => {
     const s = useStore.getState()
-    const { activeTool, currentColor, activeView, canvasWidth: W, canvasHeight: H, depthDimension: D } = s
+    const { activeTool, currentColor, activeView, canvasWidth: W, canvasHeight: H, depthDimension: D, sideDrawMode } = s
     const { w, h } = getViewSize(activeView, W, H, D)
     if (col < 0 || row < 0 || col >= w || row >= h) return
 
+    // Alt held → temporarily flip the side draw mode
+    const sideDrawModeOverride = (isAltHeld.current && activeView !== 'front')
+      ? (sideDrawMode === 'edit' ? 'draw' : 'edit')
+      : null
+
     switch (activeTool) {
       case 'pencil':
-        s.paintAt(col, row, currentColor)
+        s.paintAt(col, row, currentColor, { sideDrawModeOverride })
         break
       case 'eraser':
-        s.paintAt(col, row, 'transparent')
+        s.paintAt(col, row, 'transparent', { sideDrawModeOverride, fullDepthErase: isShiftHeld.current })
         break
       case 'material':
         s.paintMaterialAt(col, row)

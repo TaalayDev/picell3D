@@ -3,6 +3,7 @@ import {
   Pencil, Eraser, PaintBucket, Sparkles,
   Cog, Grid3X3, Square, Columns2, Box,
   Undo2, Redo2, Trash2, Download, Frame, ImagePlus, Settings2, Aperture,
+  RectangleHorizontal, Circle, Ellipse, Minus,
 } from 'lucide-react'
 import { useStore } from '../../store/index.js'
 import CanvasSizeDialog from './CanvasSizeDialog.jsx'
@@ -11,10 +12,15 @@ import SettingsDialog from './SettingsDialog.jsx'
 import ExportDialog from '../canvas/ExportDialog.jsx'
 
 const TOOLS = [
-  { id: 'pencil',   Icon: Pencil,      label: 'Pencil (P)',   key: 'P' },
-  { id: 'eraser',   Icon: Eraser,      label: 'Eraser (E)',   key: 'E' },
-  { id: 'fill',     Icon: PaintBucket, label: 'Fill (F)',     key: 'F' },
-  { id: 'material', Icon: Sparkles,    label: 'Material (M)', key: 'M' },
+  { id: 'pencil',   Icon: Pencil,                 label: 'Pencil (P)',     key: 'P', group: 'draw' },
+  { id: 'eraser',   Icon: Eraser,                 label: 'Eraser (E)',     key: 'E', group: 'draw' },
+  { id: 'fill',     Icon: PaintBucket,            label: 'Fill (F)',       key: 'F', group: 'draw' },
+  { id: 'material', Icon: Sparkles,               label: 'Material (M)',   key: 'M', group: 'draw' },
+  // shapes
+  { id: 'rect',     Icon: RectangleHorizontal,    label: 'Rectangle (R)',  key: 'R', group: 'shape' },
+  { id: 'circle',   Icon: Circle,                 label: 'Circle (C)',     key: 'C', group: 'shape' },
+  { id: 'ellipse',  Icon: Ellipse,                label: 'Ellipse',               group: 'shape' },
+  { id: 'line',     Icon: Minus,                  label: 'Line (L)',       key: 'L', group: 'shape' },
 ]
 
 const VIEW_MODES = [
@@ -58,8 +64,21 @@ export default function Toolbar({ onExport, onRender }) {
       </div>
 
       {/* Drawing tools */}
+      <div className="flex items-center gap-0.5 mr-1 pr-1 border-r border-border">
+        {TOOLS.filter(t => t.group === 'draw').map(tool => (
+          <ToolButton
+            key={tool.id}
+            Icon={tool.Icon}
+            label={tool.label}
+            active={activeTool === tool.id}
+            onClick={() => setActiveTool(tool.id)}
+          />
+        ))}
+      </div>
+
+      {/* Shape tools */}
       <div className="flex items-center gap-0.5 mr-2 pr-2 border-r border-border">
-        {TOOLS.map(tool => (
+        {TOOLS.filter(t => t.group === 'shape').map(tool => (
           <ToolButton
             key={tool.id}
             Icon={tool.Icon}
