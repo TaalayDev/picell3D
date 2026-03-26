@@ -1,98 +1,5 @@
+import { useState } from 'react'
 import { useStore } from '../../store/index.js'
-
-// ── Template helpers ──────────────────────────────────────────────────────────
-
-function applyTemplate(type) {
-  const { canvasWidth: W, canvasHeight: H, depthDimension: D, clearCanvas, paintVoxelDirect } = useStore.getState()
-  clearCanvas()
-
-  const z = D - 1  // front face
-
-  if (type === 'coin') {
-    const cx = (W - 1) / 2, cy = (H - 1) / 2
-    const r  = Math.min(W, H) / 2 - 1
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const d = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
-        if (d > r) continue
-        const t = d / r
-        const color = t < 0.25 ? '#fffacc' : t < 0.6 ? '#ffd700' : t < 0.85 ? '#c89820' : '#7a5a10'
-        paintVoxelDirect(x, y, z, color)
-        if (z > 0) paintVoxelDirect(x, y, z - 1, t < 0.6 ? '#a07810' : '#6a4a08')
-      }
-    }
-  } else if (type === 'character') {
-    const cx = Math.floor(W / 2)
-    // skin / outfit palette
-    const skin = '#f5c5a0', hair = '#3a2010', shirt = '#4466cc', pants = '#223388', shoe = '#222222'
-    // head
-    for (let y = 2; y <= 5; y++)
-      for (let x = cx - 2; x <= cx + 2; x++) {
-        paintVoxelDirect(x, y, z, y === 2 ? hair : skin)
-      }
-    // body
-    for (let y = 6; y <= 11; y++)
-      for (let x = cx - 2; x <= cx + 1; x++)
-        paintVoxelDirect(x, y, z, shirt)
-    // arms
-    for (let y = 6; y <= 9; y++) {
-      paintVoxelDirect(cx - 3, y, z, skin)
-      paintVoxelDirect(cx + 2, y, z, skin)
-    }
-    // legs
-    for (let y = 12; y <= 15; y++) {
-      for (let x = cx - 2; x <= cx - 1; x++) paintVoxelDirect(x, y, z, y < 15 ? pants : shoe)
-      for (let x = cx;     x <= cx + 1; x++) paintVoxelDirect(x, y, z, y < 15 ? pants : shoe)
-    }
-  } else if (type === 'building') {
-    const bx1 = Math.floor((W - 10) / 2), bx2 = bx1 + 9
-    const wall = '#8899bb', window_ = '#ffffaa', roof = '#556699', door = '#553322'
-    // walls
-    for (let y = 4; y < H; y++)
-      for (let x = bx1; x <= bx2; x++)
-        paintVoxelDirect(x, y, z, y === 4 ? roof : wall)
-    // windows (2 rows of 2)
-    for (const wy of [6, 9]) {
-      for (const wx of [bx1 + 1, bx1 + 3, bx1 + 6, bx1 + 8])
-        paintVoxelDirect(wx, wy, z, window_)
-    }
-    // door
-    for (let y = 12; y < H; y++) {
-      paintVoxelDirect(bx1 + 4, y, z, door)
-      paintVoxelDirect(bx1 + 5, y, z, door)
-    }
-    // chimneys
-    for (let y = 1; y <= 4; y++) {
-      paintVoxelDirect(bx1 + 2, y, z, wall)
-      paintVoxelDirect(bx1 + 7, y, z, wall)
-    }
-    // depth
-    for (let dz = 1; dz <= Math.min(D - 1, 3); dz++) {
-      const dwall = dz === 1 ? '#6677aa' : dz === 2 ? '#445588' : '#334466'
-      for (let y = 4; y < H; y++)
-        for (let x = bx1; x <= bx2; x++)
-          if (x === bx1 || x === bx2 || y === 4 || y === H - 1)
-            paintVoxelDirect(x, y, D - 1 - dz, dwall)
-    }
-  } else if (type === 'gem') {
-    const cx = Math.floor(W / 2), cy = Math.floor(H / 2)
-    // Diamond / gem facets
-    const colors = ['#ff44cc', '#cc22aa', '#ff88ee', '#aa0088']
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const dx = Math.abs(x - cx), dy = Math.abs(y - cy)
-        const r = 7
-        if (dx + dy > r) continue
-        const facet = (x < cx && y < cy) ? 0 : (x >= cx && y < cy) ? 2 : (x < cx) ? 1 : 3
-        const shade = (dx + dy) / r
-        const c = colors[facet]
-        // Simple hex blend with white for highlight
-        paintVoxelDirect(x, y, z, shade < 0.3 ? '#ffffff' : c)
-        if (z > 0) paintVoxelDirect(x, y, z - 1, c)
-      }
-    }
-  }
-}
 
 // ── Templates config ──────────────────────────────────────────────────────────
 
@@ -106,8 +13,19 @@ const TEMPLATES = [
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function StartOverlay({ onDone }) {
-  function handleTemplate(id) {
-    applyTemplate(id)
+  const [loading, setLoading] = useState(null)
+
+  async function handleTemplate(id) {
+    setLoading(id)
+    try {
+      const res  = await fetch(`/templates/${id}.picell3d`)
+      const data = await res.json()
+      // Keep the current palette; templates don't override it
+      data.palette = useStore.getState().palette
+      useStore.getState().loadProjectData(data)
+    } catch {
+      // Fallback: just start blank if fetch fails
+    }
     onDone()
   }
 
@@ -159,6 +77,7 @@ export default function StartOverlay({ onDone }) {
               <button
                 key={t.id}
                 onClick={() => handleTemplate(t.id)}
+                disabled={loading !== null}
                 className="flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all"
                 style={{
                   background: 'color-mix(in srgb, var(--color-surfaceAlt) 80%, transparent)',
@@ -173,7 +92,7 @@ export default function StartOverlay({ onDone }) {
                   e.currentTarget.style.background  = 'color-mix(in srgb, var(--color-surfaceAlt) 80%, transparent)'
                 }}
               >
-                <span className="text-2xl">{t.emoji}</span>
+                <span className="text-2xl">{loading === t.id ? '⏳' : t.emoji}</span>
                 <div>
                   <div className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>{t.label}</div>
                   <div className="text-xs" style={{ color: 'var(--color-textMuted)' }}>{t.desc}</div>

@@ -4,7 +4,7 @@ import {
   Grid3X3, Square, Columns2, Box,
   Undo2, Redo2, Trash2, Download, Frame, ImagePlus, Settings2, Aperture,
   RectangleHorizontal, Circle, Ellipse, Minus,
-  BoxSelect,
+  BoxSelect, Droplets, HelpCircle,
   Save, FolderOpen,
 } from 'lucide-react'
 import { useStore } from '../../store/index.js'
@@ -14,16 +14,17 @@ import SettingsDialog from './SettingsDialog.jsx'
 import ExportDialog from '../canvas/ExportDialog.jsx'
 
 const TOOLS = [
-  { id: 'pencil',   Icon: Pencil,                 label: 'Pencil (P)',     key: 'P', group: 'draw' },
-  { id: 'eraser',   Icon: Eraser,                 label: 'Eraser (E)',     key: 'E', group: 'draw' },
-  { id: 'fill',     Icon: PaintBucket,            label: 'Fill (F)',       key: 'F', group: 'draw' },
-  { id: 'material', Icon: Sparkles,               label: 'Material (M)',   key: 'M', group: 'draw' },
-  { id: 'select',   Icon: BoxSelect,              label: 'Select (S)',     key: 'S', group: 'draw' },
+  { id: 'pencil',   Icon: Pencil,              label: 'Pencil (P)',    key: 'P', group: 'draw' },
+  { id: 'eraser',   Icon: Eraser,              label: 'Eraser (E)',    key: 'E', group: 'draw' },
+  { id: 'fill',     Icon: PaintBucket,         label: 'Fill (F)',      key: 'F', group: 'draw' },
+  { id: 'blend',    Icon: Droplets,            label: 'Blend (B)',     key: 'B', group: 'draw' },
+  { id: 'material', Icon: Sparkles,            label: 'Material (M)', key: 'M', group: 'draw' },
+  { id: 'select',   Icon: BoxSelect,           label: 'Select (S)',   key: 'S', group: 'draw' },
   // shapes
-  { id: 'rect',     Icon: RectangleHorizontal,    label: 'Rectangle (R)',  key: 'R', group: 'shape' },
-  { id: 'circle',   Icon: Circle,                 label: 'Circle (C)',     key: 'C', group: 'shape' },
-  { id: 'ellipse',  Icon: Ellipse,                label: 'Ellipse',               group: 'shape' },
-  { id: 'line',     Icon: Minus,                  label: 'Line (L)',       key: 'L', group: 'shape' },
+  { id: 'rect',     Icon: RectangleHorizontal, label: 'Rectangle (R)', key: 'R', group: 'shape' },
+  { id: 'circle',   Icon: Circle,              label: 'Circle (C)',    key: 'C', group: 'shape' },
+  { id: 'ellipse',  Icon: Ellipse,             label: 'Ellipse',               group: 'shape' },
+  { id: 'line',     Icon: Minus,               label: 'Line (L)',      key: 'L', group: 'shape' },
 ]
 
 const VIEW_MODES = [
@@ -40,6 +41,7 @@ export default function Toolbar({ onExport, onRender }) {
     clearCanvas, undo, redo,
     viewMode, setViewMode,
     getProjectData, loadProjectData,
+    toggleShortcutsPanel,
   } = useStore()
   const [showSizeDialog,     setShowSizeDialog]     = useState(false)
   const [showImportDialog,   setShowImportDialog]   = useState(false)
@@ -84,7 +86,7 @@ export default function Toolbar({ onExport, onRender }) {
     <div className="flex items-center gap-1 px-2 py-1 border-b border-border"
       style={{ background: 'var(--color-surfaceAlt)' }}>
 
-      {/* Logo + Settings */}
+      {/* Logo + Settings + Shortcuts */}
       <div className="flex items-center gap-2 mr-3 pr-3 border-r border-border">
         <span className="font-theme text-text text-sm tracking-wider">Picell3D</span>
         <button
@@ -93,6 +95,13 @@ export default function Toolbar({ onExport, onRender }) {
           className="flex items-center justify-center w-6 h-6 rounded border border-transparent text-text-muted hover:text-accent hover:border-accent/50 transition-colors"
         >
           <Settings2 size={13} />
+        </button>
+        <button
+          onClick={toggleShortcutsPanel}
+          title="Keyboard shortcuts (?)"
+          className="flex items-center justify-center w-6 h-6 rounded border border-transparent text-text-muted hover:text-accent hover:border-accent/50 transition-colors"
+        >
+          <HelpCircle size={13} />
         </button>
       </div>
 

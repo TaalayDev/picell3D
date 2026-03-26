@@ -70,10 +70,13 @@ export default function RenderPage({ onClose }) {
   const [customBg,     setCustomBg]     = useState('#111111')
   const [bgMode,       setBgMode]       = useState('dark')
 
-  // Rebuild whenever layers change
+  // Rebuild whenever layers or dimensions change
   useEffect(() => {
     const unsub = useStore.subscribe((s, p) => {
-      if (s.layers !== p.layers) rebuild()
+      if (s.layers !== p.layers ||
+          s.canvasWidth !== p.canvasWidth ||
+          s.canvasHeight !== p.canvasHeight ||
+          s.depthDimension !== p.depthDimension) rebuild()
     })
     return unsub
   }, [rebuild])

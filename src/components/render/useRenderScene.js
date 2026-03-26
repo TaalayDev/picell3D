@@ -1,9 +1,13 @@
 import { useEffect, useRef, useCallback } from 'react'
 import * as THREE from 'three'
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { GLTFExporter }  from 'three/addons/exporters/GLTFExporter.js'
-import { useStore, getCompositedVoxels } from '../../store/index.js'
-import { buildVoxelMeshHQ } from '../../lib/meshBuilderHQ.js'
+import { OrbitControls }   from 'three/addons/controls/OrbitControls.js'
+import { GLTFExporter }    from 'three/addons/exporters/GLTFExporter.js'
+import { EffectComposer }  from 'three/addons/postprocessing/EffectComposer.js'
+import { RenderPass }      from 'three/addons/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
+import { useStore, getCompositedVoxels, getCompositedMaterials } from '../../store/index.js'
+import { buildVoxelMesh }   from '../../lib/meshBuilder.js'
+import { buildVoxelMeshHQ } from '../../lib/meshBuilderHQ.js'   // used for GLB export only
 
 // ── Lighting presets ─────────────────────────────────────────────────────────
 export const LIGHT_PRESETS = {
@@ -42,11 +46,11 @@ export const LIGHT_PRESETS = {
 }
 
 export const BG_PRESETS = [
-  { label: 'Dark',    value: '#111111' },
-  { label: 'Charcoal',value: '#1a1a1a' },
-  { label: 'Navy',    value: '#060d1a' },
-  { label: 'White',   value: '#f0f0f0' },
-  { label: 'Custom',  value: null      },
+  { label: 'Dark',     value: '#111111' },
+  { label: 'Charcoal', value: '#1a1a1a' },
+  { label: 'Navy',     value: '#060d1a' },
+  { label: 'White',    value: '#f0f0f0' },
+  { label: 'Custom',   value: null      },
 ]
 
 export function useRenderScene(containerRef) {
@@ -54,6 +58,7 @@ export function useRenderScene(containerRef) {
   const sceneRef     = useRef(null)
   const cameraRef    = useRef(null)
   const controlsRef  = useRef(null)
+  const composerRef  = useRef(null)
   const meshGroupRef = useRef(null)
   const disposeRef   = useRef(null)
   const frameRef     = useRef(null)
@@ -66,10 +71,8 @@ export function useRenderScene(containerRef) {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(container.clientWidth, container.clientHeight)
-    renderer.toneMapping       = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.1
-    renderer.outputColorSpace  = THREE.SRGBColorSpace
-    renderer.shadowMap.enabled = false
+    renderer.toneMapping = THREE.NoToneMapping   // match 3D preview colors exactly
+    renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.setClearColor(0x111111, 1)
     container.appendChild(renderer.domElement)
     rendererRef.current = renderer
@@ -98,12 +101,21 @@ export function useRenderScene(containerRef) {
     controls.target.set(0, 1.5, 0)
     controlsRef.current = controls
 
+    // Post-processing — match 3D preview bloom settings
+    const composer = new EffectComposer(renderer)
+    composer.addPass(new RenderPass(scene, camera))
+    composer.addPass(new UnrealBloomPass(
+      new THREE.Vector2(container.clientWidth, container.clientHeight),
+      0.55, 0.40, 0.42,
+    ))
+    composerRef.current = composer
+
     let running = true
     function animate() {
       if (!running) return
       frameRef.current = requestAnimationFrame(animate)
       controls.update()
-      renderer.render(scene, camera)
+      composer.render()
     }
     animate()
 
@@ -111,6 +123,7 @@ export function useRenderScene(containerRef) {
       const w = container.clientWidth, h = container.clientHeight
       if (!w || !h) return
       renderer.setSize(w, h)
+      composer.setSize(w, h)
       camera.aspect = w / h
       camera.updateProjectionMatrix()
     })
@@ -128,12 +141,12 @@ export function useRenderScene(containerRef) {
 
   // ── Lighting preset apply ─────────────────────────────────────────────────
   const applyPreset = useCallback((presetKey) => {
-    const scene  = sceneRef.current
+    const scene    = sceneRef.current
     const renderer = rendererRef.current
+    const composer = composerRef.current
     if (!scene) return
     const preset = LIGHT_PRESETS[presetKey] ?? LIGHT_PRESETS.studio
 
-    // Remove old lights
     scene.children.filter(c => c.isLight).forEach(l => scene.remove(l))
 
     const [ac, ai] = preset.ambient
@@ -154,10 +167,9 @@ export function useRenderScene(containerRef) {
     rim.position.set(...rp)
     scene.add(rim)
 
-    if (renderer) {
-      renderer.setClearColor(preset.bg, 1)
-      if (scene.fog) scene.fog.color.setHex(preset.bg)
-    }
+    const hex = preset.bg
+    renderer?.setClearColor(hex, 1)
+    if (scene.fog) scene.fog.color.setHex(hex)
   }, [])
 
   const applyBg = useCallback((hexStr) => {
@@ -166,13 +178,14 @@ export function useRenderScene(containerRef) {
     if (sceneRef.current?.fog) sceneRef.current.fog.color.setHex(hex)
   }, [])
 
-  // ── Mesh rebuild ──────────────────────────────────────────────────────────
+  // ── Mesh rebuild — same pipeline as 3D preview ────────────────────────────
   const rebuild = useCallback(() => {
     const scene = sceneRef.current
     if (!scene) return
     const { layers, canvasWidth: W, canvasHeight: H, depthDimension: D } = useStore.getState()
-    const composited = getCompositedVoxels(layers, W, H, D)
-    const { group, dispose } = buildVoxelMeshHQ(composited, W, H, D)
+    const composited   = getCompositedVoxels(layers, W, H, D)
+    const voxelMats    = getCompositedMaterials(layers)
+    const { group, dispose } = buildVoxelMesh(composited, W, H, D, {}, voxelMats)
 
     if (meshGroupRef.current) {
       scene.remove(meshGroupRef.current)
@@ -188,21 +201,28 @@ export function useRenderScene(containerRef) {
     applyPreset('studio')
   }, [rebuild, applyPreset])
 
-  // ── PNG export ────────────────────────────────────────────────────────────
+  // ── PNG export ─────────────────────────────────────────────────────────────
   const exportPng = useCallback((size = 2048) => {
-    const renderer = rendererRef.current
-    const scene    = sceneRef.current
-    const { canvasWidth: W, canvasHeight: H, depthDimension: D } = useStore.getState()
-    if (!renderer || !scene) return
+    const renderer  = rendererRef.current
+    const composer  = composerRef.current
+    const scene     = sceneRef.current
+    const camera    = cameraRef.current
+    if (!renderer || !scene || !camera) return
 
+    const { canvasWidth: W, canvasHeight: H, depthDimension: D } = useStore.getState()
     const maxDim = Math.max(W, H, D)
     const dist   = maxDim * 0.1 * 3
-    const cam    = new THREE.PerspectiveCamera(42, 1, 0.01, 60)
-    cam.position.set(dist, dist * 0.8, dist)
-    cam.lookAt(0, 0, 0)
+    const exportCam = new THREE.PerspectiveCamera(42, 1, 0.01, 60)
+    exportCam.position.set(dist, dist * 0.8, dist)
+    exportCam.lookAt(0, 0, 0)
 
+    // Temporarily swap camera on the RenderPass and resize
+    const rp = composer.passes[0]
+    const prevCam = rp.camera
+    rp.camera = exportCam
     renderer.setSize(size, size)
-    renderer.render(scene, cam)
+    composer.setSize(size, size)
+    composer.render()
 
     const dataUrl = renderer.domElement.toDataURL('image/png')
     const link    = document.createElement('a')
@@ -210,15 +230,18 @@ export function useRenderScene(containerRef) {
     link.href = dataUrl
     link.click()
 
+    // Restore
+    rp.camera = prevCam
     const container = containerRef.current
     if (container) {
       renderer.setSize(container.clientWidth, container.clientHeight)
-      cameraRef.current.aspect = container.clientWidth / container.clientHeight
-      cameraRef.current.updateProjectionMatrix()
+      composer.setSize(container.clientWidth, container.clientHeight)
+      camera.aspect = container.clientWidth / container.clientHeight
+      camera.updateProjectionMatrix()
     }
   }, [])
 
-  // ── GLB export ────────────────────────────────────────────────────────────
+  // ── GLB export — still uses HQ PBR builder ────────────────────────────────
   const exportGlb = useCallback(() => {
     const { layers, canvasWidth: W, canvasHeight: H, depthDimension: D } = useStore.getState()
     const composited = getCompositedVoxels(layers, W, H, D)

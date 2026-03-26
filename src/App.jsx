@@ -14,9 +14,11 @@ import VoxelOptionsPanel from './components/panels/VoxelOptionsPanel.jsx'
 import LayersPanel       from './components/panels/LayersPanel.jsx'
 import RenderPage        from './components/render/RenderPage.jsx'
 import StartOverlay      from './components/onboarding/StartOverlay.jsx'
+import ShortcutsPanel    from './components/layout/ShortcutsPanel.jsx'
 
-const AUTOSAVE_KEY = 'picell3d_autosave'
+const AUTOSAVE_KEY  = 'picell3d_autosave'
 const ONBOARDING_KEY = 'picell3d_onboarding_done'
+const SETTINGS_KEY  = 'picell3d_settings'
 
 const VIEWS = [
   { id: 'front',  Icon: Monitor,     label: 'Front'  },
@@ -32,6 +34,7 @@ export default function App() {
   const viewMode    = useStore(s => s.viewMode)
   const setViewMode = useStore(s => s.setViewMode)
   const activeTool  = useStore(s => s.activeTool)
+  const showShortcutsPanel = useStore(s => s.showShortcutsPanel)
   const exportFn    = useRef(null)
   const [renderOpen, setRenderOpen] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(
@@ -39,6 +42,56 @@ export default function App() {
   )
 
   useKeyboardShortcuts()
+
+  // ── Persist UI preferences (separate from project data) ─────────────────────
+  useEffect(() => {
+    // Load on mount
+    try {
+      const saved = localStorage.getItem(SETTINGS_KEY)
+      if (saved) {
+        const p = JSON.parse(saved)
+        const api = useStore.getState()
+        if (p.activeTheme)                          api.setActiveTheme(p.activeTheme)
+        if (p.viewMode)                             api.setViewMode(p.viewMode)
+        if (typeof p.showGrid === 'boolean' && p.showGrid !== api.showGrid) api.toggleGrid()
+        if (typeof p.showDepthText === 'boolean')   api.setShowDepthText(p.showDepthText)
+        if (typeof p.pixelSize === 'number')        api.setPixelSize(p.pixelSize)
+        if (typeof p.paintDepth === 'number')       api.setPaintDepth(p.paintDepth)
+        if (p.paintDirection)                       api.setPaintDirection(p.paintDirection)
+        if (p.sideDrawMode)                         api.setSideDrawMode(p.sideDrawMode)
+        if (typeof p.symmetryX === 'boolean')       api.setSymmetryX(p.symmetryX)
+        if (typeof p.symmetryY === 'boolean')       api.setSymmetryY(p.symmetryY)
+        if (typeof p.symmetryOpposite === 'boolean') api.setSymmetryOpposite(p.symmetryOpposite)
+        if (p.blendEndColor)                        api.setBlendEndColor(p.blendEndColor)
+      }
+    } catch { /* ignore */ }
+
+    // Auto-save preferences on any store change (debounced)
+    let timer = null
+    const unsub = useStore.subscribe((state) => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        try {
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+            activeTheme:      state.activeTheme,
+            showGrid:         state.showGrid,
+            showDepthText:    state.showDepthText,
+            viewMode:         state.viewMode,
+            pixelSize:        state.pixelSize,
+            paintDepth:       state.paintDepth,
+            paintDirection:   state.paintDirection,
+            sideDrawMode:     state.sideDrawMode,
+            symmetryX:        state.symmetryX,
+            symmetryY:        state.symmetryY,
+            symmetryOpposite: state.symmetryOpposite,
+            blendEndColor:    state.blendEndColor,
+          }))
+        } catch { /* ignore quota errors */ }
+      }, 500)
+    })
+    return () => { unsub(); clearTimeout(timer) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Restore autosave on first load ──────────────────────────────────────────
   useEffect(() => {
@@ -187,6 +240,7 @@ export default function App() {
       {renderOpen && <RenderPage onClose={() => setRenderOpen(false)} />}
       {showOnboarding && <StartOverlay onDone={handleOnboardingDone} />}
       {!showOnboarding && <FirstVoxelHint />}
+      {showShortcutsPanel && <ShortcutsPanel />}
     </div>
   )
 }

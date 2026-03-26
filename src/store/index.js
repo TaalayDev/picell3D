@@ -77,6 +77,7 @@ function makeLayer(W, H, D, name) {
     id: `layer-${_layerSeq}`,
     name: name ?? `Layer ${_layerSeq}`,
     visible: true,
+    opacity: 1,
     voxels: makeEmptyVoxels(W, H, D),
     voxelMaterials: {},  // 'y,x,z' → 'solid'|'emissive'|'neon'|'metal'|'glass'
   }
@@ -412,7 +413,9 @@ export const useStore = create((set, get) => ({
   showGrid:       true,
   currentColor:   '#c8860a',
   activeTool:     'pencil',
+  blendEndColor:  '#003366',
   palette:        DEFAULT_PALETTE,
+  recentColors:   [],
   undoStack:      [],
   redoStack:      [],
 
@@ -580,7 +583,12 @@ export const useStore = create((set, get) => ({
     set({ layers: newLayers })
   },
 
-  setCurrentColor: (color) => set({ currentColor: color }),
+  setCurrentColor(color) {
+    set(s => ({
+      currentColor: color,
+      recentColors: [color, ...s.recentColors.filter(c => c !== color)].slice(0, 10),
+    }))
+  },
   setActiveTool:   (tool)  => set({ activeTool: tool }),
   setPixelSize:    (size)  => set({ pixelSize: Math.max(4, Math.min(32, size)) }),
   toggleGrid:      ()      => set(s => ({ showGrid: !s.showGrid })),
@@ -738,6 +746,51 @@ export const useStore = create((set, get) => ({
     set({ layers: next })
   },
 
+  duplicateLayer(id) {
+    const { layers } = get()
+    const idx = layers.findIndex(l => l.id === id)
+    if (idx < 0) return
+    const src = layers[idx]
+    _layerSeq++
+    const dup = {
+      ...src,
+      id: `layer-${_layerSeq}`,
+      name: `${src.name} copy`,
+      voxels: src.voxels.map(plane => plane.map(row => [...row])),
+      voxelMaterials: { ...src.voxelMaterials },
+    }
+    const next = [...layers]
+    next.splice(idx + 1, 0, dup)
+    set({ layers: next, activeLayerId: dup.id })
+  },
+
+  setLayerOpacity(id, opacity) {
+    const { layers } = get()
+    set({ layers: layers.map(l => l.id === id ? { ...l, opacity: Math.max(0, Math.min(1, opacity)) } : l) })
+  },
+
+  mergeLayers() {
+    const { layers, canvasWidth: W, canvasHeight: H, depthDimension: D } = get()
+    const visible = layers.filter(l => l.visible)
+    if (visible.length <= 1) return
+    get().pushUndo()
+    const merged = makeEmptyVoxels(W, H, D)
+    for (const layer of visible) {
+      for (let y = 0; y < H; y++)
+        for (let x = 0; x < W; x++)
+          for (let z = 0; z < D; z++) {
+            const c = layer.voxels[y]?.[x]?.[z]
+            if (c && c !== 'transparent') merged[y][x][z] = c
+          }
+    }
+    _layerSeq++
+    const mergedLayer = {
+      id: `layer-${_layerSeq}`, name: 'Merged', visible: true, opacity: 1,
+      voxels: merged, voxelMaterials: {},
+    }
+    set({ layers: [mergedLayer, ...layers.filter(l => !l.visible)], activeLayerId: mergedLayer.id })
+  },
+
   // ── Voxel view ───────────────────────────────────────────────────────────────
   activeView:     'front',
   paintDepth:     1,
@@ -799,13 +852,16 @@ export const useStore = create((set, get) => ({
   clearReferenceImage: ()    => set({ referenceImage: null }),
 
   // ── UI ───────────────────────────────────────────────────────────────────────
-  viewMode:      'split',
-  activeTheme:   'synthwave',
-  showDepthText: true,
+  viewMode:          'split',
+  activeTheme:       'synthwave',
+  showDepthText:     true,
+  showShortcutsPanel: false,
 
-  setViewMode:      (mode)  => set({ viewMode: mode }),
-  setActiveTheme:   (theme) => set({ activeTheme: theme }),
-  setShowDepthText: (v)     => set({ showDepthText: v }),
+  setViewMode:           (mode)  => set({ viewMode: mode }),
+  setActiveTheme:        (theme) => set({ activeTheme: theme }),
+  setShowDepthText:      (v)     => set({ showDepthText: v }),
+  setBlendEndColor:      (c)     => set({ blendEndColor: c }),
+  toggleShortcutsPanel:  ()      => set(s => ({ showShortcutsPanel: !s.showShortcutsPanel })),
 
   // ── Project I/O ──────────────────────────────────────────────────────────────
 
@@ -861,15 +917,41 @@ export const useStore = create((set, get) => ({
     const { selection, layers, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView } = get()
     if (!selection) return
     const { x1, y1, x2, y2 } = selection
+    const tw = x2 - x1 + 1, th = y2 - y1 + 1
     const composited = getCompositedVoxels(layers, W, H, D)
     const view2d = renderView2D(composited, activeView, W, H, D)
-    const colors = []
-    for (let row = y1; row <= y2; row++) {
-      const r = []
-      for (let col = x1; col <= x2; col++) r.push(view2d[row]?.[col] ?? 'transparent')
-      colors.push(r)
+
+    // 2D visible-face colors (for floating paste overlay display)
+    const colors = Array.from({ length: th }, (_, drow) =>
+      Array.from({ length: tw }, (_, dcol) =>
+        view2d[y1 + drow]?.[x1 + dcol] ?? 'transparent'
+      )
+    )
+
+    // Full 3D voxel list — preserves depth for front/back views.
+    // Stores (dcol, drow, z, color) where dcol/drow are canvas offsets
+    // and z is the absolute voxel depth coordinate.
+    const voxelList = []
+    if (activeView === 'front') {
+      for (let drow = 0; drow < th; drow++)
+        for (let dcol = 0; dcol < tw; dcol++)
+          for (let z = 0; z < D; z++) {
+            const c = composited[y1 + drow]?.[x1 + dcol]?.[z]
+            if (c && c !== 'transparent') voxelList.push({ dcol, drow, z, color: c })
+          }
+    } else if (activeView === 'back') {
+      for (let drow = 0; drow < th; drow++)
+        for (let dcol = 0; dcol < tw; dcol++) {
+          const vx = W - 1 - (x1 + dcol)
+          for (let z = 0; z < D; z++) {
+            const c = composited[y1 + drow]?.[vx]?.[z]
+            if (c && c !== 'transparent') voxelList.push({ dcol, drow, z, color: c })
+          }
+        }
     }
-    set({ clipboard: { w: x2 - x1 + 1, h: y2 - y1 + 1, colors } })
+    // Side views fall back to colors-only (voxelList stays empty → 2D fallback in commitPaste)
+
+    set({ clipboard: { w: tw, h: th, colors, voxelList } })
   },
 
   cutSelection() {
@@ -905,7 +987,16 @@ export const useStore = create((set, get) => ({
     const { w: viewW, h: viewH } = getViewSize(activeView, W, H, D)
     const col = Math.floor((viewW - clipboard.w) / 2)
     const row = Math.floor((viewH - clipboard.h) / 2)
-    set({ floatingPaste: { col, row, w: clipboard.w, h: clipboard.h, colors: clipboard.colors }, selection: null })
+    set({
+      floatingPaste: {
+        col, row,
+        w: clipboard.w, h: clipboard.h,
+        colors: clipboard.colors,
+        voxelList: clipboard.voxelList?.length ? clipboard.voxelList : null,
+        copyView: clipboard.voxelList?.length ? activeView : null,
+      },
+      selection: null,
+    })
   },
 
   moveFloatingPaste(col, row) {
@@ -920,21 +1011,42 @@ export const useStore = create((set, get) => ({
     const layerIdx = layers.findIndex(l => l.id === activeLayerId)
     if (layerIdx < 0) return
     get().pushUndo()
-    const { col: startCol, row: startRow, w, h, colors } = floatingPaste
+    const { col: startCol, row: startRow, w, h, colors, voxelList } = floatingPaste
     const { w: viewW, h: viewH } = getViewSize(activeView, W, H, D)
     const layerVoxels = layers[layerIdx].voxels
     const allTargets = []
-    for (let drow = 0; drow < h; drow++) {
-      for (let dcol = 0; dcol < w; dcol++) {
-        const color = colors[drow]?.[dcol]
-        if (!color || color === 'transparent') continue
+
+    if (voxelList?.length) {
+      // Full 3D paste — preserves depth
+      for (const { dcol, drow, z, color } of voxelList) {
         const col = startCol + dcol
         const row = startRow + drow
-        if (col < 0 || col >= viewW || row < 0 || row >= viewH) continue
-        const targets = getVoxelTargets(col, row, activeView, 1, W, H, D)
-        for (const t of targets) allTargets.push({ ...t, color })
+        let vx, vy
+        if (activeView === 'front') {
+          vx = col; vy = row
+        } else if (activeView === 'back') {
+          vx = W - 1 - col; vy = row
+        } else {
+          continue // other views: skip 3D, handled by 2D fallback below
+        }
+        if (vx >= 0 && vx < W && vy >= 0 && vy < H && z >= 0 && z < D)
+          allTargets.push({ x: vx, y: vy, z, color })
+      }
+    } else {
+      // 2D fallback — single depth layer
+      for (let drow = 0; drow < h; drow++) {
+        for (let dcol = 0; dcol < w; dcol++) {
+          const color = colors[drow]?.[dcol]
+          if (!color || color === 'transparent') continue
+          const col = startCol + dcol
+          const row = startRow + drow
+          if (col < 0 || col >= viewW || row < 0 || row >= viewH) continue
+          const targets = getVoxelTargets(col, row, activeView, 1, W, H, D)
+          for (const t of targets) allTargets.push({ ...t, color })
+        }
       }
     }
+
     const affectedY = new Set(allTargets.map(t => t.y))
     const newVoxels = [...layerVoxels]
     for (const y of affectedY) newVoxels[y] = layerVoxels[y].map(xRow => [...xRow])
@@ -949,14 +1061,25 @@ export const useStore = create((set, get) => ({
   flipClipboard(axis) {
     const { clipboard } = get()
     if (!clipboard) return
-    const flipped = axis === 'h'
+    const { w, h } = clipboard
+
+    const flippedColors = axis === 'h'
       ? clipboard.colors.map(row => [...row].reverse())
       : [...clipboard.colors].reverse()
-    const newClip = { ...clipboard, colors: flipped }
+
+    const flippedVoxelList = clipboard.voxelList?.map(v => ({
+      ...v,
+      dcol: axis === 'h' ? (w - 1 - v.dcol) : v.dcol,
+      drow: axis === 'v' ? (h - 1 - v.drow) : v.drow,
+    })) ?? null
+
+    const newClip = { ...clipboard, colors: flippedColors, voxelList: flippedVoxelList }
     const { floatingPaste } = get()
     set({
       clipboard: newClip,
-      floatingPaste: floatingPaste ? { ...floatingPaste, colors: flipped } : null,
+      floatingPaste: floatingPaste
+        ? { ...floatingPaste, colors: flippedColors, voxelList: flippedVoxelList }
+        : null,
     })
   },
 

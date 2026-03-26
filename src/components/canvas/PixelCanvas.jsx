@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo } from 'react'
+import { useRef, useEffect, useMemo, useCallback } from 'react'
 import { useStore, renderView2D, renderDepthMap2D, getViewSize, getCompositedVoxels } from '../../store/index.js'
 import { useCanvasInput } from '../../hooks/useCanvasInput.js'
 import { useShapeInput, SHAPE_TOOLS } from '../../hooks/useShapeInput.js'
@@ -22,24 +22,87 @@ export default function PixelCanvas() {
   const canvasRef    = useRef(null)
   const overlayRef   = useRef(null)
   const containerRef = useRef(null)
+  const scrollRef    = useRef(null)   // the outer overflow-auto div
+  const isSpaceHeld  = useRef(false)
+  const isPanning    = useRef(false)
+  const panStart     = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 })
 
   const {
-    layers, pixelSize, canvasWidth, canvasHeight, depthDimension,
+    layers, pixelSize, setPixelSize, canvasWidth, canvasHeight, depthDimension,
     showGrid, showDepthText, activeTool, activeView, currentColor,
     selection, floatingPaste,
   } = useStore()
 
   const D = depthDimension
 
-  const { view2d, depthMap } = useMemo(() => {
+  // Compute per-layer views (for opacity support) + composited depthMap
+  const { layerViews, depthMap, view2d } = useMemo(() => {
     const composited = getCompositedVoxels(layers, canvasWidth, canvasHeight, D)
     return {
-      view2d:   renderView2D(composited, activeView, canvasWidth, canvasHeight, D),
+      layerViews: layers
+        .filter(l => l.visible)
+        .map(l => ({
+          view2d:  renderView2D(l.voxels, activeView, canvasWidth, canvasHeight, D),
+          opacity: l.opacity ?? 1,
+        })),
       depthMap: renderDepthMap2D(composited, activeView, canvasWidth, canvasHeight, D),
+      view2d:   renderView2D(composited, activeView, canvasWidth, canvasHeight, D),
     }
   }, [layers, activeView, canvasWidth, canvasHeight, D])
 
   const { w: viewW, h: viewH } = getViewSize(activeView, canvasWidth, canvasHeight, D)
+
+  // ── Space+drag pan ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === ' ' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault()
+        isSpaceHeld.current = true
+      }
+    }
+    const onKeyUp = (e) => { if (e.key === ' ') isSpaceHeld.current = false }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup',   onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup',   onKeyUp)
+    }
+  }, [])
+
+  // ── Zoom to fit ──────────────────────────────────────────────────────────────
+  const zoomToFit = useCallback(() => {
+    if (!scrollRef.current) return
+    const rect = scrollRef.current.getBoundingClientRect()
+    const pad  = 32
+    const fit  = Math.floor(Math.min((rect.width - pad) / viewW, (rect.height - pad) / viewH))
+    setPixelSize(Math.max(2, Math.min(fit, 64)))
+  }, [viewW, viewH, setPixelSize])
+
+  // Listen for Ctrl+0 zoom-to-fit event from keyboard shortcuts
+  useEffect(() => {
+    const handler = () => zoomToFit()
+    document.addEventListener('picell-zoom-fit', handler)
+    return () => document.removeEventListener('picell-zoom-fit', handler)
+  }, [zoomToFit])
+
+  function handlePanDown(e) {
+    if (!isSpaceHeld.current) return
+    isPanning.current = true
+    panStart.current  = {
+      x: e.clientX, y: e.clientY,
+      scrollLeft: scrollRef.current.scrollLeft,
+      scrollTop:  scrollRef.current.scrollTop,
+    }
+    e.preventDefault()
+    e.stopPropagation()
+  }
+  function handlePanMove(e) {
+    if (!isPanning.current) return
+    scrollRef.current.scrollLeft = panStart.current.scrollLeft - (e.clientX - panStart.current.x)
+    scrollRef.current.scrollTop  = panStart.current.scrollTop  - (e.clientY - panStart.current.y)
+    e.preventDefault()
+  }
+  function handlePanUp() { isPanning.current = false }
 
   // ── Tool handlers ───────────────────────────────────────────────────────────
   const canvasInput   = useCanvasInput(containerRef)
@@ -50,14 +113,17 @@ export default function PixelCanvas() {
   const isSelect = activeTool === 'select'
 
   function routeDown(e)  {
+    if (isSpaceHeld.current) { handlePanDown(e); return }
     if (isSelect) return selectInput.onPointerDown(e)
     isShape ? shapeInput.handlers.onPointerDown(e)  : canvasInput.onPointerDown(e)
   }
   function routeMove(e)  {
+    if (isPanning.current) { handlePanMove(e); return }
     if (isSelect) return selectInput.onPointerMove(e)
     isShape ? shapeInput.handlers.onPointerMove(e)  : canvasInput.onPointerMove(e)
   }
   function routeUp(e)    {
+    handlePanUp()
     if (isSelect) return selectInput.onPointerUp(e)
     isShape ? shapeInput.handlers.onPointerUp(e)    : canvasInput.onPointerUp(e)
   }
@@ -65,7 +131,7 @@ export default function PixelCanvas() {
   // ── Main canvas render ──────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || !view2d.length) return
+    if (!canvas) return
     const ctx = canvas.getContext('2d')
     const pw = viewW * pixelSize
     const ph = viewH * pixelSize
@@ -76,17 +142,27 @@ export default function PixelCanvas() {
     const checkerLight = getCSSVar('--color-canvasBg') || '#241a0c'
     const gridColor    = getCSSVar('--color-border')   || '#7a5c2e'
 
+    // Draw checker background first
     for (let row = 0; row < viewH; row++) {
       for (let col = 0; col < viewW; col++) {
-        const x = col * pixelSize
-        const y = row * pixelSize
-        const color = view2d[row]?.[col] ?? 'transparent'
-        ctx.fillStyle = color === 'transparent'
-          ? (col + row) % 2 === 0 ? checkerDark : checkerLight
-          : color
-        ctx.fillRect(x, y, pixelSize, pixelSize)
+        ctx.fillStyle = (col + row) % 2 === 0 ? checkerDark : checkerLight
+        ctx.fillRect(col * pixelSize, row * pixelSize, pixelSize, pixelSize)
       }
     }
+
+    // Draw each visible layer with its opacity
+    for (const { view2d: lv, opacity } of layerViews) {
+      ctx.globalAlpha = opacity
+      for (let row = 0; row < viewH; row++) {
+        for (let col = 0; col < viewW; col++) {
+          const color = lv[row]?.[col]
+          if (!color || color === 'transparent') continue
+          ctx.fillStyle = color
+          ctx.fillRect(col * pixelSize, row * pixelSize, pixelSize, pixelSize)
+        }
+      }
+    }
+    ctx.globalAlpha = 1
 
     // Depth shadow pass
     if (depthMap.length) {
@@ -169,7 +245,7 @@ export default function PixelCanvas() {
       ctx.textBaseline = 'top'
       ctx.fillText(label, 4, 4)
     }
-  }, [view2d, depthMap, viewW, viewH, pixelSize, showGrid, showDepthText, activeView])
+  }, [layerViews, depthMap, viewW, viewH, pixelSize, showGrid, showDepthText, activeView])
 
   // ── Overlay canvas — shape preview + line handles + selection ───────────────
   const { previewPixels, lineState } = shapeInput
@@ -291,25 +367,37 @@ export default function PixelCanvas() {
   }, [previewPixels, lineState, pixelSize, viewW, viewH, currentColor, selection, floatingPaste])
 
   return (
-    <div className="flex items-center justify-center w-full h-full overflow-auto p-4">
+    <div ref={scrollRef} className="flex items-center justify-center w-full h-full overflow-auto p-4 relative">
+      {/* Zoom to fit button */}
+      <button
+        onClick={zoomToFit}
+        title="Zoom to fit (Ctrl+0)"
+        className="absolute top-2 right-2 z-10 text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent transition-colors"
+        style={{ background: 'color-mix(in srgb, var(--color-surface) 90%, transparent)' }}
+      >
+        Fit
+      </button>
       <div
         ref={containerRef}
         className="relative flex-shrink-0"
         style={{
           boxShadow: '0 0 0 2px var(--color-border), 0 0 0 4px var(--color-surface), 0 8px 40px rgba(0,0,0,0.9)',
-          cursor: getCursor(activeTool, shapeInput.isEditing, floatingPaste),
+          cursor: getCursor(activeTool, shapeInput.isEditing, floatingPaste, isSpaceHeld),
         }}
         onPointerDown={routeDown}
         onPointerMove={routeMove}
         onPointerUp={routeUp}
         onPointerLeave={(e) => {
+          handlePanUp()
           if (isSelect) selectInput.onPointerUp(e)
           else if (!isShape) canvasInput.onPointerUp(e)
         }}
+        onContextMenu={canvasInput.onContextMenu}
       >
         {/* Main voxel canvas */}
         <canvas
           ref={canvasRef}
+          data-main-canvas="true"
           style={{ width: viewW * pixelSize, height: viewH * pixelSize, imageRendering: 'pixelated', display: 'block' }}
         />
 
@@ -329,13 +417,15 @@ export default function PixelCanvas() {
   )
 }
 
-function getCursor(tool, isLineEditing, floatingPaste) {
+function getCursor(tool, isLineEditing, floatingPaste, isSpaceHeld) {
+  if (isSpaceHeld?.current) return isPanning?.current ? 'grabbing' : 'grab'
   if (isLineEditing) return 'default'
   if (tool === 'select') return floatingPaste ? 'move' : 'crosshair'
   switch (tool) {
     case 'pencil':   return 'crosshair'
     case 'eraser':   return 'cell'
     case 'fill':     return 'copy'
+    case 'blend':    return 'crosshair'
     case 'rect':
     case 'circle':
     case 'ellipse':
