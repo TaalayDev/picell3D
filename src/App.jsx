@@ -13,6 +13,10 @@ import MaterialPanel   from './components/panels/MaterialPanel.jsx'
 import VoxelOptionsPanel from './components/panels/VoxelOptionsPanel.jsx'
 import LayersPanel       from './components/panels/LayersPanel.jsx'
 import RenderPage        from './components/render/RenderPage.jsx'
+import StartOverlay      from './components/onboarding/StartOverlay.jsx'
+
+const AUTOSAVE_KEY = 'picell3d_autosave'
+const ONBOARDING_KEY = 'picell3d_onboarding_done'
 
 const VIEWS = [
   { id: 'front',  Icon: Monitor,     label: 'Front'  },
@@ -30,12 +34,59 @@ export default function App() {
   const activeTool  = useStore(s => s.activeTool)
   const exportFn    = useRef(null)
   const [renderOpen, setRenderOpen] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(
+    () => !localStorage.getItem(ONBOARDING_KEY)
+  )
 
   useKeyboardShortcuts()
+
+  // ── Restore autosave on first load ──────────────────────────────────────────
+  useEffect(() => {
+    if (showOnboarding) return // don't restore if onboarding will show (user picks template)
+    try {
+      const saved = localStorage.getItem(AUTOSAVE_KEY)
+      if (saved) {
+        const data = JSON.parse(saved)
+        useStore.getState().loadProjectData(data)
+      }
+    } catch { /* ignore corrupt data */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Autosave to localStorage every 30 s ─────────────────────────────────────
+  useEffect(() => {
+    const id = setInterval(() => {
+      try {
+        const data = useStore.getState().getProjectData()
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data))
+      } catch { /* ignore quota errors */ }
+    }, 30_000)
+    return () => clearInterval(id)
+  }, [])
+
+  // ── Warn before unload ───────────────────────────────────────────────────────
+  useEffect(() => {
+    const onBeforeUnload = (e) => {
+      e.preventDefault()
+      e.returnValue = '' // required for Chrome
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [])
 
   useEffect(() => {
     applyTheme(getTheme(activeTheme))
   }, [activeTheme])
+
+  function handleOnboardingDone() {
+    localStorage.setItem(ONBOARDING_KEY, '1')
+    setShowOnboarding(false)
+    // Save fresh state
+    try {
+      const data = useStore.getState().getProjectData()
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data))
+    } catch { /* ignore */ }
+  }
 
   const theme     = getTheme(activeTheme)
   const PainterBg = theme.PainterBackground
@@ -134,6 +185,46 @@ export default function App() {
       </div>
 
       {renderOpen && <RenderPage onClose={() => setRenderOpen(false)} />}
+      {showOnboarding && <StartOverlay onDone={handleOnboardingDone} />}
+      {!showOnboarding && <FirstVoxelHint />}
+    </div>
+  )
+}
+
+// ── First-voxel hint ──────────────────────────────────────────────────────────
+
+const HINT_KEY = 'picell3d_first_voxel_shown'
+
+function FirstVoxelHint() {
+  const layers = useStore(s => s.layers)
+  const [visible, setVisible] = useState(false)
+  const shownRef = useRef(false)
+
+  useEffect(() => {
+    if (shownRef.current || localStorage.getItem(HINT_KEY)) return
+    const hasVoxel = layers.some(l =>
+      l.voxels.some(plane => plane.some(row => row.some(c => c && c !== 'transparent')))
+    )
+    if (hasVoxel) {
+      shownRef.current = true
+      localStorage.setItem(HINT_KEY, '1')
+      setVisible(true)
+      setTimeout(() => setVisible(false), 5000)
+    }
+  }, [layers])
+
+  if (!visible) return null
+  return (
+    <div
+      className="fixed bottom-8 right-4 z-40 px-4 py-3 rounded-lg text-sm font-medium animate-pulse"
+      style={{
+        background: 'color-mix(in srgb, var(--color-accent) 20%, var(--color-surface))',
+        border:     '1px solid var(--color-accent)',
+        color:      'var(--color-accent)',
+        boxShadow:  '0 0 20px color-mix(in srgb, var(--color-accent) 40%, transparent)',
+      }}
+    >
+      Nice! Now check the 3D preview →
     </div>
   )
 }

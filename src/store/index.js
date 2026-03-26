@@ -806,4 +806,182 @@ export const useStore = create((set, get) => ({
   setViewMode:      (mode)  => set({ viewMode: mode }),
   setActiveTheme:   (theme) => set({ activeTheme: theme }),
   setShowDepthText: (v)     => set({ showDepthText: v }),
+
+  // ── Project I/O ──────────────────────────────────────────────────────────────
+
+  getProjectData() {
+    const {
+      layers, canvasWidth, canvasHeight, depthDimension,
+      palette, activeTheme, activeLayerId,
+    } = get()
+    return {
+      version: 1,
+      canvasWidth, canvasHeight, depthDimension,
+      activeLayerId, palette, activeTheme, layers,
+    }
+  },
+
+  loadProjectData(data) {
+    if (!data || data.version !== 1 || !Array.isArray(data.layers)) return false
+    set({
+      layers:         data.layers,
+      canvasWidth:    data.canvasWidth    ?? CANVAS_W,
+      canvasHeight:   data.canvasHeight   ?? CANVAS_H,
+      depthDimension: data.depthDimension ?? DEPTH_D,
+      palette:        data.palette        ?? DEFAULT_PALETTE,
+      activeTheme:    data.activeTheme    ?? 'synthwave',
+      activeLayerId:  data.activeLayerId  ?? data.layers[0]?.id,
+      undoStack:      [],
+      redoStack:      [],
+      selection:      null,
+      floatingPaste:  null,
+    })
+    return true
+  },
+
+  // ── Selection tool ───────────────────────────────────────────────────────────
+  selection:     null,   // {x1, y1, x2, y2} in canvas 2D coords (normalized)
+  clipboard:     null,   // {w, h, colors: string[][]} visible colors
+  floatingPaste: null,   // {col, row, w, h, colors: string[][]}
+
+  setSelection(rect) {
+    if (!rect) { set({ selection: null }); return }
+    const { x1, y1, x2, y2 } = rect
+    set({
+      selection: {
+        x1: Math.min(x1, x2), y1: Math.min(y1, y2),
+        x2: Math.max(x1, x2), y2: Math.max(y1, y2),
+      },
+    })
+  },
+
+  clearSelection() { set({ selection: null, floatingPaste: null }) },
+
+  copySelection() {
+    const { selection, layers, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView } = get()
+    if (!selection) return
+    const { x1, y1, x2, y2 } = selection
+    const composited = getCompositedVoxels(layers, W, H, D)
+    const view2d = renderView2D(composited, activeView, W, H, D)
+    const colors = []
+    for (let row = y1; row <= y2; row++) {
+      const r = []
+      for (let col = x1; col <= x2; col++) r.push(view2d[row]?.[col] ?? 'transparent')
+      colors.push(r)
+    }
+    set({ clipboard: { w: x2 - x1 + 1, h: y2 - y1 + 1, colors } })
+  },
+
+  cutSelection() {
+    const { selection, layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView } = get()
+    if (!selection) return
+    get().copySelection()
+    const { x1, y1, x2, y2 } = selection
+    const layerIdx = layers.findIndex(l => l.id === activeLayerId)
+    if (layerIdx < 0) return
+    const { w: viewW, h: viewH } = getViewSize(activeView, W, H, D)
+    get().pushUndo()
+    const layerVoxels = layers[layerIdx].voxels
+    const allTargets = []
+    for (let row = y1; row <= y2; row++) {
+      for (let col = x1; col <= x2; col++) {
+        if (col < 0 || col >= viewW || row < 0 || row >= viewH) continue
+        const targets = getVoxelTargets(col, row, activeView, D, W, H, D)
+        allTargets.push(...targets)
+      }
+    }
+    const affectedY = new Set(allTargets.map(t => t.y))
+    const newVoxels = [...layerVoxels]
+    for (const y of affectedY) newVoxels[y] = layerVoxels[y].map(xRow => [...xRow])
+    for (const { x, y, z } of allTargets) newVoxels[y][x][z] = 'transparent'
+    const newLayers = [...layers]
+    newLayers[layerIdx] = { ...layers[layerIdx], voxels: newVoxels }
+    set({ layers: newLayers, selection: null })
+  },
+
+  pasteFromClipboard() {
+    const { clipboard, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView } = get()
+    if (!clipboard) return
+    const { w: viewW, h: viewH } = getViewSize(activeView, W, H, D)
+    const col = Math.floor((viewW - clipboard.w) / 2)
+    const row = Math.floor((viewH - clipboard.h) / 2)
+    set({ floatingPaste: { col, row, w: clipboard.w, h: clipboard.h, colors: clipboard.colors }, selection: null })
+  },
+
+  moveFloatingPaste(col, row) {
+    const { floatingPaste } = get()
+    if (!floatingPaste) return
+    set({ floatingPaste: { ...floatingPaste, col, row } })
+  },
+
+  commitPaste() {
+    const { floatingPaste, layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView } = get()
+    if (!floatingPaste) return
+    const layerIdx = layers.findIndex(l => l.id === activeLayerId)
+    if (layerIdx < 0) return
+    get().pushUndo()
+    const { col: startCol, row: startRow, w, h, colors } = floatingPaste
+    const { w: viewW, h: viewH } = getViewSize(activeView, W, H, D)
+    const layerVoxels = layers[layerIdx].voxels
+    const allTargets = []
+    for (let drow = 0; drow < h; drow++) {
+      for (let dcol = 0; dcol < w; dcol++) {
+        const color = colors[drow]?.[dcol]
+        if (!color || color === 'transparent') continue
+        const col = startCol + dcol
+        const row = startRow + drow
+        if (col < 0 || col >= viewW || row < 0 || row >= viewH) continue
+        const targets = getVoxelTargets(col, row, activeView, 1, W, H, D)
+        for (const t of targets) allTargets.push({ ...t, color })
+      }
+    }
+    const affectedY = new Set(allTargets.map(t => t.y))
+    const newVoxels = [...layerVoxels]
+    for (const y of affectedY) newVoxels[y] = layerVoxels[y].map(xRow => [...xRow])
+    for (const { x, y, z, color } of allTargets) newVoxels[y][x][z] = color
+    const newLayers = [...layers]
+    newLayers[layerIdx] = { ...layers[layerIdx], voxels: newVoxels }
+    set({ layers: newLayers, floatingPaste: null })
+  },
+
+  cancelPaste() { set({ floatingPaste: null }) },
+
+  flipClipboard(axis) {
+    const { clipboard } = get()
+    if (!clipboard) return
+    const flipped = axis === 'h'
+      ? clipboard.colors.map(row => [...row].reverse())
+      : [...clipboard.colors].reverse()
+    const newClip = { ...clipboard, colors: flipped }
+    const { floatingPaste } = get()
+    set({
+      clipboard: newClip,
+      floatingPaste: floatingPaste ? { ...floatingPaste, colors: flipped } : null,
+    })
+  },
+
+  deleteSelection() {
+    const { selection, layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView } = get()
+    if (!selection) return
+    const { x1, y1, x2, y2 } = selection
+    const layerIdx = layers.findIndex(l => l.id === activeLayerId)
+    if (layerIdx < 0) return
+    const { w: viewW, h: viewH } = getViewSize(activeView, W, H, D)
+    get().pushUndo()
+    const layerVoxels = layers[layerIdx].voxels
+    const allTargets = []
+    for (let row = y1; row <= y2; row++) {
+      for (let col = x1; col <= x2; col++) {
+        if (col < 0 || col >= viewW || row < 0 || row >= viewH) continue
+        allTargets.push(...getVoxelTargets(col, row, activeView, D, W, H, D))
+      }
+    }
+    const affectedY = new Set(allTargets.map(t => t.y))
+    const newVoxels = [...layerVoxels]
+    for (const y of affectedY) newVoxels[y] = layerVoxels[y].map(xRow => [...xRow])
+    for (const { x, y, z } of allTargets) newVoxels[y][x][z] = 'transparent'
+    const newLayers = [...layers]
+    newLayers[layerIdx] = { ...layers[layerIdx], voxels: newVoxels }
+    set({ layers: newLayers, selection: null })
+  },
 }))

@@ -2,6 +2,7 @@ import { useRef, useEffect, useMemo } from 'react'
 import { useStore, renderView2D, renderDepthMap2D, getViewSize, getCompositedVoxels } from '../../store/index.js'
 import { useCanvasInput } from '../../hooks/useCanvasInput.js'
 import { useShapeInput, SHAPE_TOOLS } from '../../hooks/useShapeInput.js'
+import { useSelectionInput } from '../../hooks/useSelectionInput.js'
 import ReferenceOverlay from './ReferenceOverlay.jsx'
 
 function getCSSVar(name) {
@@ -25,6 +26,7 @@ export default function PixelCanvas() {
   const {
     layers, pixelSize, canvasWidth, canvasHeight, depthDimension,
     showGrid, showDepthText, activeTool, activeView, currentColor,
+    selection, floatingPaste,
   } = useStore()
 
   const D = depthDimension
@@ -40,14 +42,25 @@ export default function PixelCanvas() {
   const { w: viewW, h: viewH } = getViewSize(activeView, canvasWidth, canvasHeight, D)
 
   // ── Tool handlers ───────────────────────────────────────────────────────────
-  const canvasInput = useCanvasInput(containerRef)
-  const shapeInput  = useShapeInput(containerRef)
+  const canvasInput   = useCanvasInput(containerRef)
+  const shapeInput    = useShapeInput(containerRef)
+  const selectInput   = useSelectionInput(containerRef)
 
-  const isShape = SHAPE_TOOLS.has(activeTool)
+  const isShape  = SHAPE_TOOLS.has(activeTool)
+  const isSelect = activeTool === 'select'
 
-  function routeDown(e)  { isShape ? shapeInput.handlers.onPointerDown(e)  : canvasInput.onPointerDown(e) }
-  function routeMove(e)  { isShape ? shapeInput.handlers.onPointerMove(e)  : canvasInput.onPointerMove(e) }
-  function routeUp(e)    { isShape ? shapeInput.handlers.onPointerUp(e)    : canvasInput.onPointerUp(e) }
+  function routeDown(e)  {
+    if (isSelect) return selectInput.onPointerDown(e)
+    isShape ? shapeInput.handlers.onPointerDown(e)  : canvasInput.onPointerDown(e)
+  }
+  function routeMove(e)  {
+    if (isSelect) return selectInput.onPointerMove(e)
+    isShape ? shapeInput.handlers.onPointerMove(e)  : canvasInput.onPointerMove(e)
+  }
+  function routeUp(e)    {
+    if (isSelect) return selectInput.onPointerUp(e)
+    isShape ? shapeInput.handlers.onPointerUp(e)    : canvasInput.onPointerUp(e)
+  }
 
   // ── Main canvas render ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -158,7 +171,7 @@ export default function PixelCanvas() {
     }
   }, [view2d, depthMap, viewW, viewH, pixelSize, showGrid, showDepthText, activeView])
 
-  // ── Overlay canvas — shape preview + line handles ───────────────────────────
+  // ── Overlay canvas — shape preview + line handles + selection ───────────────
   const { previewPixels, lineState } = shapeInput
 
   useEffect(() => {
@@ -171,12 +184,54 @@ export default function PixelCanvas() {
     const ctx = overlay.getContext('2d')
     ctx.clearRect(0, 0, pw, ph)
 
-    // Ghost preview pixels
+    // Ghost preview pixels (shape tools)
     if (previewPixels.length > 0) {
       ctx.fillStyle = currentColor + 'b0'
       for (const { col, row } of previewPixels) {
         ctx.fillRect(col * pixelSize, row * pixelSize, pixelSize, pixelSize)
       }
+    }
+
+    // Selection rect
+    if (selection) {
+      const sx = selection.x1 * pixelSize
+      const sy = selection.y1 * pixelSize
+      const sw = (selection.x2 - selection.x1 + 1) * pixelSize
+      const sh = (selection.y2 - selection.y1 + 1) * pixelSize
+      ctx.save()
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'
+      ctx.lineWidth   = 1.5
+      ctx.setLineDash([4, 3])
+      ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, sh - 1)
+      ctx.strokeStyle = 'rgba(0,100,255,0.6)'
+      ctx.setLineDash([4, 3])
+      ctx.lineDashOffset = 4
+      ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, sh - 1)
+      ctx.fillStyle = 'rgba(100,160,255,0.07)'
+      ctx.fillRect(sx, sy, sw, sh)
+      ctx.setLineDash([])
+      ctx.restore()
+    }
+
+    // Floating paste preview
+    if (floatingPaste) {
+      const { col: fc, row: fr, w: fw, h: fh, colors } = floatingPaste
+      for (let drow = 0; drow < fh; drow++) {
+        for (let dcol = 0; dcol < fw; dcol++) {
+          const color = colors[drow]?.[dcol]
+          if (!color || color === 'transparent') continue
+          ctx.fillStyle = color + 'cc'
+          ctx.fillRect((fc + dcol) * pixelSize, (fr + drow) * pixelSize, pixelSize, pixelSize)
+        }
+      }
+      // Blue dashed border around floating paste
+      ctx.save()
+      ctx.strokeStyle = 'rgba(100,200,255,0.9)'
+      ctx.lineWidth   = 1.5
+      ctx.setLineDash([4, 3])
+      ctx.strokeRect(fc * pixelSize + 0.5, fr * pixelSize + 0.5, fw * pixelSize - 1, fh * pixelSize - 1)
+      ctx.setLineDash([])
+      ctx.restore()
     }
 
     // Line handles (only in editing mode)
@@ -233,7 +288,7 @@ export default function PixelCanvas() {
         ctx.fillText('Enter ↵  commit · Esc  cancel', pw - 4, ph - 4)
       }
     }
-  }, [previewPixels, lineState, pixelSize, viewW, viewH, currentColor])
+  }, [previewPixels, lineState, pixelSize, viewW, viewH, currentColor, selection, floatingPaste])
 
   return (
     <div className="flex items-center justify-center w-full h-full overflow-auto p-4">
@@ -242,12 +297,15 @@ export default function PixelCanvas() {
         className="relative flex-shrink-0"
         style={{
           boxShadow: '0 0 0 2px var(--color-border), 0 0 0 4px var(--color-surface), 0 8px 40px rgba(0,0,0,0.9)',
-          cursor: getCursor(activeTool, shapeInput.isEditing),
+          cursor: getCursor(activeTool, shapeInput.isEditing, floatingPaste),
         }}
         onPointerDown={routeDown}
         onPointerMove={routeMove}
         onPointerUp={routeUp}
-        onPointerLeave={(e) => { if (!isShape) canvasInput.onPointerUp(e) }}
+        onPointerLeave={(e) => {
+          if (isSelect) selectInput.onPointerUp(e)
+          else if (!isShape) canvasInput.onPointerUp(e)
+        }}
       >
         {/* Main voxel canvas */}
         <canvas
@@ -271,8 +329,9 @@ export default function PixelCanvas() {
   )
 }
 
-function getCursor(tool, isLineEditing) {
+function getCursor(tool, isLineEditing, floatingPaste) {
   if (isLineEditing) return 'default'
+  if (tool === 'select') return floatingPaste ? 'move' : 'crosshair'
   switch (tool) {
     case 'pencil':   return 'crosshair'
     case 'eraser':   return 'cell'

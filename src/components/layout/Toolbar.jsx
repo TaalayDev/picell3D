@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   Pencil, Eraser, PaintBucket, Sparkles,
-  Cog, Grid3X3, Square, Columns2, Box,
+  Grid3X3, Square, Columns2, Box,
   Undo2, Redo2, Trash2, Download, Frame, ImagePlus, Settings2, Aperture,
   RectangleHorizontal, Circle, Ellipse, Minus,
+  BoxSelect,
+  Save, FolderOpen,
 } from 'lucide-react'
 import { useStore } from '../../store/index.js'
 import CanvasSizeDialog from './CanvasSizeDialog.jsx'
@@ -16,6 +18,7 @@ const TOOLS = [
   { id: 'eraser',   Icon: Eraser,                 label: 'Eraser (E)',     key: 'E', group: 'draw' },
   { id: 'fill',     Icon: PaintBucket,            label: 'Fill (F)',       key: 'F', group: 'draw' },
   { id: 'material', Icon: Sparkles,               label: 'Material (M)',   key: 'M', group: 'draw' },
+  { id: 'select',   Icon: BoxSelect,              label: 'Select (S)',     key: 'S', group: 'draw' },
   // shapes
   { id: 'rect',     Icon: RectangleHorizontal,    label: 'Rectangle (R)',  key: 'R', group: 'shape' },
   { id: 'circle',   Icon: Circle,                 label: 'Circle (C)',     key: 'C', group: 'shape' },
@@ -36,11 +39,41 @@ export default function Toolbar({ onExport, onRender }) {
     toggleGrid, showGrid,
     clearCanvas, undo, redo,
     viewMode, setViewMode,
+    getProjectData, loadProjectData,
   } = useStore()
   const [showSizeDialog,     setShowSizeDialog]     = useState(false)
   const [showImportDialog,   setShowImportDialog]   = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
   const [showExportDialog,   setShowExportDialog]   = useState(false)
+  const fileInputRef = useRef(null)
+
+  function handleSaveProject() {
+    const data = getProjectData()
+    const json = JSON.stringify(data)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = 'project.picell3d'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function handleLoadProject(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result)
+        if (!loadProjectData(data)) alert('Invalid .picell3d file')
+      } catch {
+        alert('Failed to read project file')
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
 
   return (
     <>
@@ -154,6 +187,27 @@ export default function Toolbar({ onExport, onRender }) {
         <ImagePlus size={12} />
         <span>Import</span>
       </button>
+
+      {/* Save / Load project */}
+      <input ref={fileInputRef} type="file" accept=".picell3d" className="hidden" onChange={handleLoadProject} />
+      <div className="flex items-center gap-0.5 mr-2 pr-2 border-r border-border">
+        <button
+          className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent transition-colors"
+          onClick={handleSaveProject}
+          title="Save project (Ctrl+S)"
+        >
+          <Save size={12} />
+          <span>Save</span>
+        </button>
+        <button
+          className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent transition-colors"
+          onClick={() => fileInputRef.current?.click()}
+          title="Load project"
+        >
+          <FolderOpen size={12} />
+          <span>Load</span>
+        </button>
+      </div>
 
       {/* Actions */}
       <div className="flex items-center gap-0.5 mr-auto">

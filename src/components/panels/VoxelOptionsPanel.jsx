@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Box } from 'lucide-react'
+import { Box, FlipHorizontal, FlipVertical, Copy, Scissors, Clipboard } from 'lucide-react'
 import { useStore, getCompositedVoxels, OPPOSITE_VIEW } from '../../store/index.js'
 
 const DEPTH_PRESETS = [4, 8, 16, 24, 32, 48, 64]
@@ -11,6 +11,10 @@ export default function VoxelOptionsPanel() {
     sideDrawMode, setSideDrawMode,
     symmetryX, symmetryY, symmetryOpposite,
     setSymmetryX, setSymmetryY, setSymmetryOpposite,
+    activeTool,
+    selection, clipboard, floatingPaste,
+    copySelection, cutSelection, pasteFromClipboard, deleteSelection,
+    flipClipboard, commitPaste, cancelPaste,
   } = useStore()
 
   const voxelCount = useMemo(() => {
@@ -36,6 +40,94 @@ export default function VoxelOptionsPanel() {
       </div>
 
       <div className="flex flex-col gap-4 p-3">
+
+        {/* ── Selection tool options ───────────────────────────────────────── */}
+        {activeTool === 'select' && (
+          <div className="flex flex-col gap-2">
+            <div className="text-xs text-text-muted uppercase tracking-wide">Selection</div>
+            {/* Actions */}
+            <div className="grid grid-cols-3 gap-1">
+              <button
+                disabled={!selection}
+                onClick={copySelection}
+                className="flex flex-col items-center gap-0.5 py-1.5 rounded border border-border text-text-muted disabled:opacity-30 hover:enabled:text-text hover:enabled:border-accent/60 transition-colors text-xs"
+                title="Copy (Ctrl+C)"
+              >
+                <Copy size={14} />
+                Copy
+              </button>
+              <button
+                disabled={!selection}
+                onClick={cutSelection}
+                className="flex flex-col items-center gap-0.5 py-1.5 rounded border border-border text-text-muted disabled:opacity-30 hover:enabled:text-text hover:enabled:border-accent/60 transition-colors text-xs"
+                title="Cut (Ctrl+X)"
+              >
+                <Scissors size={14} />
+                Cut
+              </button>
+              <button
+                disabled={!clipboard}
+                onClick={pasteFromClipboard}
+                className="flex flex-col items-center gap-0.5 py-1.5 rounded border border-border text-text-muted disabled:opacity-30 hover:enabled:text-text hover:enabled:border-accent/60 transition-colors text-xs"
+                title="Paste (Ctrl+V)"
+              >
+                <Clipboard size={14} />
+                Paste
+              </button>
+            </div>
+            {/* Flip */}
+            <div className="grid grid-cols-2 gap-1">
+              <button
+                disabled={!clipboard && !floatingPaste}
+                onClick={() => flipClipboard('h')}
+                className="flex items-center justify-center gap-1 py-1 rounded border border-border text-text-muted disabled:opacity-30 hover:enabled:text-text hover:enabled:border-accent/60 transition-colors text-xs"
+                title="Flip horizontal"
+              >
+                <FlipHorizontal size={13} /> Flip H
+              </button>
+              <button
+                disabled={!clipboard && !floatingPaste}
+                onClick={() => flipClipboard('v')}
+                className="flex items-center justify-center gap-1 py-1 rounded border border-border text-text-muted disabled:opacity-30 hover:enabled:text-text hover:enabled:border-accent/60 transition-colors text-xs"
+                title="Flip vertical"
+              >
+                <FlipVertical size={13} /> Flip V
+              </button>
+            </div>
+            {/* Commit / cancel floating paste */}
+            {floatingPaste && (
+              <div className="flex gap-1">
+                <button
+                  onClick={commitPaste}
+                  className="flex-1 py-1 text-xs rounded border text-center transition-colors"
+                  style={{ borderColor: 'var(--color-accent)', color: 'var(--color-accent)', background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' }}
+                  title="Commit paste (Enter)"
+                >
+                  Commit ↵
+                </button>
+                <button
+                  onClick={cancelPaste}
+                  className="flex-1 py-1 text-xs rounded border border-border text-text-muted hover:text-text hover:border-accent/50 transition-colors text-center"
+                  title="Cancel paste (Esc)"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+            {selection && (
+              <button
+                onClick={deleteSelection}
+                className="w-full py-1 text-xs rounded border border-border text-text-muted hover:text-red-400 hover:border-red-900 transition-colors"
+                title="Delete selection (Delete)"
+              >
+                Delete
+              </button>
+            )}
+            <div className="text-xs text-text-muted leading-relaxed opacity-60">
+              Drag inside selection to move · Enter to commit paste · Esc to cancel
+            </div>
+          </div>
+        )}
 
         {/* Depth dimension (hidden for front/back which use canvas size) */}
         {!isFrontBack && (
