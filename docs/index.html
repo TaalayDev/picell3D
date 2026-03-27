@@ -349,7 +349,7 @@
       Draw on a familiar canvas, watch depth appear, then export to Blender, Unity, or anywhere.
     </p>
     <div class="hero-btns">
-      <a href="../" class="btn-p lg">Launch Picell3D — Free</a>
+      <a href="https://taalaydev.github.io/picell-3d/editor.html" class="btn-p lg">Launch Picell3D — Free</a>
       <a href="https://github.com/" class="btn-s lg">GitHub →</a>
     </div>
     <div class="hero-stats">
@@ -413,33 +413,33 @@
   </div>
   <div class="examples-grid">
     <div class="ex-card reveal delay-1">
-      <div class="ex-scene" id="scene-sword">
+      <div class="ex-scene" id="scene-character">
         <div class="ex-hint">drag to rotate</div>
       </div>
       <div class="ex-body">
-        <span class="ex-tag">Weapon</span>
-        <h3 class="ex-title">Relic Sword</h3>
-        <p class="ex-desc">A readable hero prop with a bright blade core, gold guard, and a simple handle wrap. Exactly the kind of item concept you can rough out fast.</p>
+        <span class="ex-tag">Character</span>
+        <h3 class="ex-title">Pixel Character</h3>
+        <p class="ex-desc">A simple game character built from the front canvas in minutes. Hair, shirt, arms, legs — all drawn with pencil and given depth automatically.</p>
       </div>
     </div>
     <div class="ex-card reveal delay-2">
-      <div class="ex-scene" id="scene-chest">
+      <div class="ex-scene" id="scene-coin">
         <div class="ex-hint">drag to rotate</div>
       </div>
       <div class="ex-body">
-        <span class="ex-tag">Loot</span>
-        <h3 class="ex-title">Treasure Chest</h3>
-        <p class="ex-desc">A chunky stylized chest with metal bands, a lock plate, and a curved lid. Great for showing how fast blocky forms turn into solid props.</p>
+        <span class="ex-tag">Prop</span>
+        <h3 class="ex-title">Gold Coin</h3>
+        <p class="ex-desc">A radially shaded coin showing how flat pixel art gets real thickness. The depth layer turns a 2D circle into a solid, spinnable prop.</p>
       </div>
     </div>
     <div class="ex-card reveal delay-3">
-      <div class="ex-scene" id="scene-flask">
+      <div class="ex-scene" id="scene-house">
         <div class="ex-hint">drag to rotate</div>
       </div>
       <div class="ex-body">
-        <span class="ex-tag">Consumable</span>
-        <h3 class="ex-title">Potion Flask</h3>
-        <p class="ex-desc">A rounded bottle silhouette with a glowing liquid core and orbiting spark voxels. Small props like this make the tool feel immediately useful.</p>
+        <span class="ex-tag">Architecture</span>
+        <h3 class="ex-title">House</h3>
+        <p class="ex-desc">A stylized building with rooftop, windows, door, and chimneys. Multiple depth layers stack the walls to give a fully solid 3D structure.</p>
       </div>
     </div>
   </div>
@@ -518,7 +518,7 @@
   <h2 class="reveal">Start creating.<br><span class="grad">It's free.</span></h2>
   <p class="reveal">No signup. No install. Just open and draw.</p>
   <div class="cta-btns reveal">
-    <a href="../" class="btn-p lg">Launch Picell3D</a>
+    <a href="https://taalaydev.github.io/picell-3d/editor.html" class="btn-p lg">Launch Picell3D</a>
     <a href="https://github.com/" class="btn-s lg">View Source</a>
   </div>
 </section>
@@ -527,7 +527,7 @@
 <footer>
   <div class="f-logo">Picell<em>3D</em></div>
   <ul class="f-links">
-    <li><a href="../">App</a></li>
+    <li><a href="https://taalaydev.github.io/picell-3d/editor.html">App</a></li>
     <li><a href="https://github.com/">GitHub</a></li>
     <li><a href="#">Docs</a></li>
     <li><a href="#">Concept</a></li>
@@ -547,7 +547,6 @@
 <script type="module">
 import * as THREE from 'three'
 import { OrbitControls }   from 'three/addons/controls/OrbitControls.js'
-import { GLTFLoader }      from 'three/addons/loaders/GLTFLoader.js'
 import { EffectComposer }  from 'three/addons/postprocessing/EffectComposer.js'
 import { RenderPass }      from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
@@ -604,244 +603,66 @@ function buildVoxelMesh(voxels) {
   return group
 }
 
-// ── Grid helper to build pixel art voxels ─────────────────────────────────
-function pixelArt(layers, palette) {
-  // layers: string[][] (array of 2D grids, z=0 is back)
-  // palette: { char: hexNumber }
-  const result = []
-  const D = layers.length, H = layers[0].length, W = layers[0][0].length
-  for (let zi = 0; zi < D; zi++) {
-    for (let ri = 0; ri < H; ri++) {
-      const row = layers[zi][ri]
-      for (let ci = 0; ci < row.length; ci++) {
-        const ch = row[ci]
-        if (!palette[ch]) continue
-        result.push({
-          x: ci - Math.floor(W / 2),
-          y: H - 1 - ri,
-          z: zi - Math.floor(D / 2),
-          color: palette[ch],
-        })
+// ── VOX loader (MagicaVoxel .vox — inverse of exportVox.js mapping) ────────
+// Export maps: VOX.x=canvasX, VOX.y=depthZ, VOX.z=H-1-canvasY, SIZE=(W,D,H)
+// So import maps: scene.x=vox.x-W/2, scene.y=vox.z (Y-up), scene.z=vox.y-D/2
+async function loadVox(url) {
+  const resp = await fetch(url)
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${url}`)
+  const buf = await resp.arrayBuffer()
+  const dv  = new DataView(buf)
+
+  const id4  = off => String.fromCharCode(dv.getUint8(off),dv.getUint8(off+1),dv.getUint8(off+2),dv.getUint8(off+3))
+  const u32  = off => dv.getUint32(off, true)
+  const u8   = off => dv.getUint8(off)
+
+  if (id4(0) !== 'VOX ') throw new Error('Not a .vox file')
+
+  let sizeX = 0, sizeY = 0, sizeZ = 0
+  const raw = []
+  let pal   = null
+
+  function parse(start, end) {
+    let off = start
+    while (off + 12 <= end) {
+      const name   = id4(off)
+      const cSize  = u32(off + 4)
+      const kSize  = u32(off + 8)
+      const cStart = off + 12
+      const cEnd   = cStart + cSize
+      const kEnd   = cEnd   + kSize
+
+      if (name === 'MAIN') {
+        parse(cEnd, kEnd)
+      } else if (name === 'SIZE') {
+        sizeX = u32(cStart);  sizeY = u32(cStart + 4);  sizeZ = u32(cStart + 8)
+      } else if (name === 'XYZI') {
+        const n = u32(cStart)
+        for (let i = 0; i < n; i++) {
+          const b = cStart + 4 + i * 4
+          raw.push({ x: u8(b), y: u8(b+1), z: u8(b+2), i: u8(b+3) })
+        }
+      } else if (name === 'RGBA') {
+        pal = []
+        for (let i = 0; i < 256; i++) {
+          const b = cStart + i * 4
+          pal.push((u8(b) << 16) | (u8(b+1) << 8) | u8(b+2))
+        }
       }
-    }
-  }
-  return result
-}
-
-function addBox(target, x0, y0, z0, w, h, d, color) {
-  for (let x = x0; x < x0 + w; x++) {
-    for (let y = y0; y < y0 + h; y++) {
-      for (let z = z0; z < z0 + d; z++) {
-        target.push({ x, y, z, color })
-      }
-    }
-  }
-}
-
-// ── Voxel models ───────────────────────────────────────────────────────────
-
-// Sword
-const swordLayers = [
-  [ // z = -1
-    '......S......',
-    '......S......',
-    '......S......',
-    '.....SSS.....',
-    '.....SSS.....',
-    '.....SSS.....',
-    '.....SSS.....',
-    '.....SSS.....',
-    '.....SSS.....',
-    '.....SSS.....',
-    '.....SSS.....',
-    '....GGGGG....',
-    '.....GCG.....',
-    '.....HHH.....',
-    '.....HHH.....',
-    '.....HHH.....',
-    '.....HHH.....',
-    '....HHHHH....',
-    '.....HHH.....',
-    '......G......',
-  ],
-  [ // z = 0
-    '......S......',
-    '......S......',
-    '.....SSS.....',
-    '.....SCS.....',
-    '.....SCS.....',
-    '.....SCS.....',
-    '.....SCS.....',
-    '.....SCS.....',
-    '.....SCS.....',
-    '.....SCS.....',
-    '....SSSSS....',
-    '...GGGGGGG...',
-    '....GCGCG....',
-    '.....HHH.....',
-    '.....HHH.....',
-    '.....HHH.....',
-    '.....HHH.....',
-    '....HHHHH....',
-    '.....HHH.....',
-    '......G......',
-  ],
-  [ // z = +1
-    '......S......',
-    '......S......',
-    '......S......',
-    '.....SSS.....',
-    '.....SSS.....',
-    '.....SSS.....',
-    '.....SSS.....',
-    '.....SSS.....',
-    '.....SSS.....',
-    '.....SSS.....',
-    '.....SSS.....',
-    '....GGGGG....',
-    '.....GCG.....',
-    '.....HHH.....',
-    '.....HHH.....',
-    '.....HHH.....',
-    '.....HHH.....',
-    '....HHHHH....',
-    '.....HHH.....',
-    '......G......',
-  ],
-]
-const swordPalette = {
-  S: 0xe8f7ff,
-  C: 0x7cf5ff,
-  G: 0xffb347,
-  H: 0x5a2a12,
-}
-const SWORD = [
-  ...pixelArt(swordLayers, swordPalette),
-  ...(() => {
-    const base = []
-    for (let x = -5; x <= 5; x++) {
-      for (let z = -3; z <= 3; z++) {
-        const edge = Math.abs(x) === 5 || Math.abs(z) === 3
-        base.push({ x, y: -1, z, color: edge ? 0xff2d78 : 0x160425 })
-      }
-    }
-    base.push({ x: 0, y: 10, z: -2, color: 0x00e5ff })
-    base.push({ x: 0, y: 11, z: -2, color: 0xffffff })
-    return base
-  })(),
-]
-
-// Treasure chest
-const CHEST = (() => {
-  const vox = []
-
-  addBox(vox, -5, 0, -3, 10, 4, 7, 0x5a2a12)
-  addBox(vox, -5, 4, -3, 10, 1, 7, 0x76401d)
-  addBox(vox, -4, 5, -3, 8, 1, 7, 0x8e4b20)
-  addBox(vox, -3, 6, -3, 6, 1, 7, 0xa85c2a)
-
-  addBox(vox, -5, 0, -3, 1, 7, 7, 0xffb347)
-  addBox(vox, 4, 0, -3, 1, 7, 7, 0xffb347)
-  addBox(vox, -1, 0, -3, 2, 7, 7, 0xd8902f)
-  addBox(vox, -2, 1, 3, 4, 3, 1, 0xffd36e)
-  addBox(vox, -1, 2, 4, 2, 2, 1, 0xffd36e)
-
-  addBox(vox, -4, -1, -2, 2, 1, 2, 0x2a0b06)
-  addBox(vox, 2, -1, -2, 2, 1, 2, 0x2a0b06)
-  addBox(vox, -4, -1, 1, 2, 1, 2, 0x2a0b06)
-  addBox(vox, 2, -1, 1, 2, 1, 2, 0x2a0b06)
-
-  for (let x = -6; x <= 6; x++) {
-    for (let z = -4; z <= 4; z++) {
-      const edge = Math.abs(x) === 6 || Math.abs(z) === 4
-      vox.push({ x, y: -2, z, color: edge ? 0x00e5ff : 0x130326 })
+      off = kEnd
     }
   }
 
-  return vox
-})()
+  parse(8, buf.byteLength)
+  if (!pal) pal = Array(256).fill(0x888888)
 
-// Potion flask
-const flaskLayers = [
-  [ // z = -2
-    '.....C.....',
-    '.....C.....',
-    '.....G.....',
-    '....GGG....',
-    '....GLG....',
-    '...GLLLG...',
-    '...GLLLG...',
-    '...GLLLG...',
-    '....GLG....',
-    '....GGG....',
-    '.....G.....',
-  ],
-  [ // z = -1
-    '.....C.....',
-    '.....C.....',
-    '....GGG....',
-    '...GGGGG...',
-    '...GLLLG...',
-    '..GGLLLGG..',
-    '..GGLLLGG..',
-    '..GGLLLGG..',
-    '...GLLLG...',
-    '...GGGGG...',
-    '....GGG....',
-  ],
-  [ // z = 0
-    '.....C.....',
-    '.....C.....',
-    '....GGG....',
-    '...GGGGG...',
-    '..GGLLLGG..',
-    '..GLLLLLG..',
-    '.GGLLLLLGG.',
-    '..GLLLLLG..',
-    '..GGLLLGG..',
-    '...GGGGG...',
-    '....GGG....',
-  ],
-  [ // z = +1
-    '.....C.....',
-    '.....C.....',
-    '....GGG....',
-    '...GGGGG...',
-    '...GLLLG...',
-    '..GGLLLGG..',
-    '..GGLLLGG..',
-    '..GGLLLGG..',
-    '...GLLLG...',
-    '...GGGGG...',
-    '....GGG....',
-  ],
-  [ // z = +2
-    '.....C.....',
-    '.....C.....',
-    '.....G.....',
-    '....GGG....',
-    '....GLG....',
-    '...GLLLG...',
-    '...GLLLG...',
-    '...GLLLG...',
-    '....GLG....',
-    '....GGG....',
-    '.....G.....',
-  ],
-]
-const flaskPalette = {
-  C: 0xb06a37,
-  G: 0x8fefff,
-  L: 0xff2d78,
+  return raw.map(v => ({
+    x:     v.x - Math.floor(sizeX / 2),
+    y:     v.z,                           // VOX z = height (Y-up in Three.js)
+    z:     v.y - Math.floor(sizeY / 2),   // VOX y = depth
+    color: pal[(v.i - 1) & 0xff] ?? 0x888888,
+  }))
 }
-const FLASK = [
-  ...pixelArt(flaskLayers, flaskPalette),
-  { x: 0, y: 4, z: 0, color: 0xffffff },
-  { x: -5, y: 2, z: -2, color: 0x00e5ff },
-  { x: 5, y: 4, z: 1, color: 0xff2d78 },
-  { x: -3, y: 8, z: 2, color: 0xffffff },
-  { x: 4, y: 9, z: -1, color: 0x00e5ff },
-]
 
 // ── Scene factory ──────────────────────────────────────────────────────────
 function makeScene(container, voxels, opts = {}) {
@@ -935,189 +756,60 @@ function makeScene(container, voxels, opts = {}) {
   return () => { live = false; ro.disconnect(); controls.dispose(); renderer.dispose() }
 }
 
-async function makeModelScene(container, modelUrl, opts = {}) {
-  const {
-    camPos        = [2.6, 1.7, 3.8],
-    autoRotate    = true,
-    rotateSpeed   = 0.65,
-    bloomStrength = 0.5,
-    bloomThreshold = 0.6,
-    fog           = true,
-    minPolarAngle = Math.PI * 0.18,
-    maxPolarAngle = Math.PI * 0.82,
-  } = opts
-
-  const W = container.clientWidth || 400
-  const H = container.clientHeight || 300
-
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  renderer.setSize(W, H)
-  renderer.setClearColor(0x060010, 1)
-  renderer.toneMapping = THREE.ACESFilmicToneMapping
-  renderer.toneMappingExposure = 1.15
-  renderer.outputColorSpace = THREE.SRGBColorSpace
-  renderer.shadowMap.enabled = true
-  container.appendChild(renderer.domElement)
-
-  const scene = new THREE.Scene()
-  if (fog) scene.fog = new THREE.FogExp2(0x060010, 0.04)
-
-  scene.add(new THREE.AmbientLight(0xf3d9ff, 1.0))
-
-  const key = new THREE.DirectionalLight(0xffffff, 2.4)
-  key.position.set(4, 6, 5)
-  key.castShadow = true
-  scene.add(key)
-
-  const fill = new THREE.DirectionalLight(0x00e5ff, 1.2)
-  fill.position.set(-5, 2, -4)
-  scene.add(fill)
-
-  const rim = new THREE.DirectionalLight(0xff2d78, 1.0)
-  rim.position.set(0, 5, -6)
-  scene.add(rim)
-
-  const floor = new THREE.Mesh(
-    new THREE.CircleGeometry(3.2, 64),
-    new THREE.MeshStandardMaterial({
-      color: 0x110321,
-      emissive: 0x16042a,
-      metalness: 0.25,
-      roughness: 0.55,
-    })
-  )
-  floor.rotation.x = -Math.PI / 2
-  floor.position.y = -0.7
-  floor.receiveShadow = true
-  scene.add(floor)
-
-  const grid = new THREE.GridHelper(8, 24, 0xff2d78, 0x1a0035)
-  grid.position.y = -0.69
-  scene.add(grid)
-
-  const camera = new THREE.PerspectiveCamera(45, W / H, 0.01, 100)
-  camera.position.set(...camPos)
-
-  const controls = new OrbitControls(camera, renderer.domElement)
-  controls.enableDamping = true
-  controls.dampingFactor = 0.06
-  controls.autoRotate = autoRotate
-  controls.autoRotateSpeed = rotateSpeed
-  controls.enablePan = false
-  controls.minPolarAngle = minPolarAngle
-  controls.maxPolarAngle = maxPolarAngle
-
-  const composer = new EffectComposer(renderer)
-  composer.addPass(new RenderPass(scene, camera))
-  composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), bloomStrength, 0.4, bloomThreshold))
-
-  const loader = new GLTFLoader()
-  const gltf = await loader.loadAsync(modelUrl)
-  const root = gltf.scene
-  root.traverse(obj => {
-    if (!obj.isMesh) return
-    obj.castShadow = true
-    obj.receiveShadow = true
-    const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
-    for (const m of mats) {
-      if (!m) continue
-      m.envMapIntensity = 1.1
-      m.needsUpdate = true
-    }
-  })
-  scene.add(root)
-
-  const box = new THREE.Box3().setFromObject(root)
-  const size = box.getSize(new THREE.Vector3())
-  const maxAxis = Math.max(size.x, size.y, size.z) || 1
-  const scale = 2.6 / maxAxis
-
-  root.scale.setScalar(scale)
-  root.updateMatrixWorld(true)
-
-  const scaledBox = new THREE.Box3().setFromObject(root)
-  const scaledCenter = scaledBox.getCenter(new THREE.Vector3())
-  root.position.set(-scaledCenter.x, -scaledBox.min.y - 0.68, -scaledCenter.z)
-  root.rotation.y = -Math.PI / 5
-  root.updateMatrixWorld(true)
-
-  const finalBox = new THREE.Box3().setFromObject(root)
-  const finalCenter = finalBox.getCenter(new THREE.Vector3())
-  const finalSphere = finalBox.getBoundingSphere(new THREE.Sphere())
-  const radius = Math.max(finalSphere.radius, 0.75)
-
-  camera.near = Math.max(0.05, radius / 40)
-  camera.far = Math.max(100, radius * 30)
-  camera.updateProjectionMatrix()
-
-  controls.target.copy(finalCenter)
-  controls.minDistance = radius * 1.35
-  controls.maxDistance = radius * 6
-
-  const startDir = new THREE.Vector3(...camPos).normalize()
-  const startDistance = Math.max(radius * 2.4, controls.minDistance + radius * 0.45)
-  camera.position.copy(finalCenter).add(startDir.multiplyScalar(startDistance))
-  controls.update()
-
-  const ro = new ResizeObserver(() => {
-    const nw = container.clientWidth
-    const nh = container.clientHeight
-    if (!nw || !nh) return
-    renderer.setSize(nw, nh)
-    composer.setSize(nw, nh)
-    camera.aspect = nw / nh
-    camera.updateProjectionMatrix()
-  })
-  ro.observe(container)
-
-  container.addEventListener('pointerenter', () => { controls.autoRotate = false })
-  container.addEventListener('pointerleave', () => { controls.autoRotate = true })
-
-  let live = true
-  function tick() {
-    if (!live) return
-    requestAnimationFrame(tick)
-    controls.update()
-    composer.render()
-  }
-  tick()
-
-  return () => { live = false; ro.disconnect(); controls.dispose(); renderer.dispose() }
-}
-
 // ── Initialize all scenes ──────────────────────────────────────────────────
 
-// Hero
-makeModelScene(
-  document.getElementById('scene-hero'),
-  './examples/car_model.glb',
-  { camPos:[2.6, 1.8, 4.4], autoRotate: true, rotateSpeed: 0.55, bloomStrength: 0.7, bloomThreshold: 0.5,
-    minPolarAngle: Math.PI * 0.28, maxPolarAngle: Math.PI * 0.72 }
-).catch(err => {
-  console.error('Failed to load hero model:', err)
-})
+// Auto-fit camera for any voxel model size
+function fitCamera(voxels) {
+  let minY = Infinity, maxY = -Infinity
+  let extX = 0, extZ = 0
+  for (const v of voxels) {
+    minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y)
+    extX = Math.max(extX, Math.abs(v.x)); extZ = Math.max(extZ, Math.abs(v.z))
+  }
+  const cy  = ((minY + maxY) / 2) * U
+  const ext = Math.max(extX, maxY - minY, extZ) * U || 1
+  return { camPos: [ext * 0.7, cy + ext * 0.5, ext * 1.4], camTarget: [0, cy, 0] }
+}
 
-// Example — Sword
-makeScene(
-  document.getElementById('scene-sword'),
-  SWORD,
-  { camPos:[2.4, 2.8, 4.8], camTarget:[0, 7, 0], bloomStrength: 0.78, rotateSpeed: 0.7 }
-)
+// Hero — car.vox
+loadVox('./examples/car.vox').then(voxels => {
+  const fit = fitCamera(voxels)
+  makeScene(document.getElementById('scene-hero'), voxels, {
+    ...fit,
+    autoRotate: true, rotateSpeed: 0.55,
+    bloomStrength: 0.75, bloomThreshold: 0.30,
+  })
+}).catch(err => console.error('Hero VOX load failed:', err))
 
-// Example — Chest
-makeScene(
-  document.getElementById('scene-chest'),
-  CHEST,
-  { camPos:[4.4, 3.4, 5.8], camTarget:[0, 2.4, 0], rotateSpeed: 0.58, bloomStrength: 0.9, bloomThreshold: 0.28 }
-)
+// Example — Character
+loadVox('./examples/character.vox').then(voxels => {
+  const fit = fitCamera(voxels)
+  makeScene(document.getElementById('scene-character'), voxels, {
+    ...fit,
+    bloomStrength: 0.60, rotateSpeed: 0.70,
+  })
+}).catch(err => console.error('Character VOX load failed:', err))
 
-// Example — Flask
-makeScene(
-  document.getElementById('scene-flask'),
-  FLASK,
-  { camPos:[2.6, 2.3, 4], camTarget:[0, 3.2, 0], bloomStrength: 1.1, bloomThreshold: 0.24 }
-)
+// Example — Coin
+loadVox('./examples/coin.vox').then(voxels => {
+  const fit = fitCamera(voxels)
+  makeScene(document.getElementById('scene-coin'), voxels, {
+    camPos: [fit.camPos[0], fit.camPos[1] * 1.2, fit.camPos[2]],
+    camTarget: fit.camTarget,
+    bloomStrength: 0.80, rotateSpeed: 0.65, bloomThreshold: 0.28,
+  })
+}).catch(err => console.error('Coin VOX load failed:', err))
+
+// Example — House
+loadVox('./examples/house.vox').then(voxels => {
+  const fit = fitCamera(voxels)
+  makeScene(document.getElementById('scene-house'), voxels, {
+    ...fit,
+    bloomStrength: 0.55, rotateSpeed: 0.55,
+  })
+}).catch(err => console.error('House VOX load failed:', err))
+
+
 
 // ── Scroll reveal ──────────────────────────────────────────────────────────
 const io = new IntersectionObserver(entries => {
