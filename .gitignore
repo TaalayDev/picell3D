@@ -2,3 +2,5 @@
 /CONCEPT.md
 /node_modules
 /package-lock.json
+/dist
+/release

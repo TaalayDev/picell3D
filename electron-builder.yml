@@ -1,0 +1,24 @@
+appId: com.picell3d.app
+productName: Picell3D
+copyright: Copyright © 2026
+
+files:
+  - dist/**/*
+  - electron/**/*
+
+directories:
+  output: release
+
+mac:
+  category: public.app-category.graphics-design
+  target:
+    - dmg
+    - zip
+
+win:
+  target:
+    - nsis
+
+linux:
+  target:
+    - AppImage

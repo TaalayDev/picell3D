@@ -119,6 +119,8 @@ export default function App() {
 
   // ── Warn before unload ───────────────────────────────────────────────────────
   useEffect(() => {
+    // In Electron, the main process handles quit confirmation natively.
+    if (window.electron?.isElectron) return
     const onBeforeUnload = (e) => {
       e.preventDefault()
       e.returnValue = '' // required for Chrome
