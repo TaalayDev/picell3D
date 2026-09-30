@@ -15,10 +15,13 @@ export default function VoxelOptionsPanel() {
     fillScope, setFillScope, viewMode,
     planeLock, setPlaneLock, planeAxis, setPlaneAxis, planeDepth, setPlaneDepth,
     shapeMode, setShapeMode, shapeThickness, setShapeThickness,
+    primitiveDepth, setPrimitiveDepth,
     brushSize, setBrushSize,
     symmetryX, symmetryY, symmetryOpposite,
     setSymmetryX, setSymmetryY, setSymmetryOpposite,
     activeTool,
+    selection3D, moveSelection3D, rotateSelection3D, flipSelection3D,
+    applySelection3D, clearSelection3D, deleteSelection3D,
     selectionMode, setSelectionMode,
     selection, clipboard, floatingPaste, selectionAnchor,
     copySelection, cutSelection, pasteFromClipboard, deleteSelection,
@@ -39,8 +42,10 @@ export default function VoxelOptionsPanel() {
   const isFront    = activeView === 'front'
   const isFrontBack = activeView === 'front' || activeView === 'back'
   const oppLabel   = OPPOSITE_VIEW[activeView]
-  const planeToolActive = ['pencil', 'eraser', 'material', 'blend', 'rect', 'circle', 'ellipse', 'line'].includes(activeTool)
-  const isShapeTool = ['rect', 'circle', 'ellipse', 'line'].includes(activeTool)
+  const volumeTools = ['box3d', 'sphere3d', 'cylinder3d']
+  const isVolumeTool = volumeTools.includes(activeTool)
+  const planeToolActive = ['pencil', 'eraser', 'material', 'blend', 'rect', 'circle', 'ellipse', 'line', ...volumeTools].includes(activeTool)
+  const isShapeTool = ['rect', 'circle', 'ellipse', 'line', ...volumeTools].includes(activeTool)
   const isBrushTool = ['pencil', 'eraser', 'material', 'blend'].includes(activeTool)
   const effectiveShapeMode = activeTool === 'line' ? 'outline' : shapeMode
   const planeSize = planeAxis === 'x'
@@ -94,6 +99,7 @@ export default function VoxelOptionsPanel() {
                 ? 'The brush expands across the active face or locked plane.'
                 : 'The brush paints a square area around the cursor.'}
             </p>
+
           </div>
         )}
 
@@ -183,6 +189,25 @@ export default function VoxelOptionsPanel() {
                   ? 'Fills the entire shape.'
                   : 'Thickness grows inward without changing the outer size.'}
             </p>
+            {isVolumeTool && activeTool !== 'sphere3d' && (
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-xs text-text-muted">
+                    {activeTool === 'cylinder3d' ? 'Height' : 'Depth'}
+                  </label>
+                  <span className="text-xs font-mono text-accent">{primitiveDepth}</span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={Math.min(64, Math.max(canvasWidth, canvasHeight, depthDimension))}
+                  value={primitiveDepth}
+                  onChange={e => setPrimitiveDepth(parseInt(e.target.value))}
+                  className="w-full cursor-pointer"
+                  style={{ accentColor: 'var(--color-accent)' }}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -243,8 +268,100 @@ export default function VoxelOptionsPanel() {
           </div>
         )}
 
-        {/* ── Selection tool options ───────────────────────────────────────── */}
-        {activeTool === 'select' && (
+        {/* ── 3D selection and transforms ─────────────────────────────────── */}
+        {activeTool === 'select' && viewMode === 'preview-only' && (
+          <div className="flex flex-col gap-3">
+            <div>
+              <div className="text-xs text-text-muted uppercase tracking-wide">3D Selection</div>
+              <p className="text-xs text-text-muted mt-1 leading-tight">
+                Drag between two blocks to select occupied voxels on the active layer.
+              </p>
+            </div>
+
+            <div className="flex justify-between text-xs text-text-muted">
+              <span>Selected voxels</span>
+              <span className="font-mono text-accent">{selection3D?.voxels?.length ?? 0}</span>
+            </div>
+
+            <div className={!selection3D ? 'opacity-40 pointer-events-none' : ''}>
+              <div className="text-[10px] text-text-muted uppercase tracking-wider mb-1">Move</div>
+              <div className="grid grid-cols-2 gap-1">
+                {[
+                  ['X−', -1, 0, 0], ['X+', 1, 0, 0],
+                  ['Y−', 0, -1, 0], ['Y+', 0, 1, 0],
+                  ['Z−', 0, 0, -1], ['Z+', 0, 0, 1],
+                ].map(([label, dx, dy, dz]) => (
+                  <button
+                    key={label}
+                    onClick={() => moveSelection3D(dx, dy, dz)}
+                    className="py-1 rounded border border-border text-xs font-mono text-text-muted hover:text-text hover:border-accent/60 transition-colors"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className={!selection3D ? 'opacity-40 pointer-events-none' : ''}>
+              <div className="text-[10px] text-text-muted uppercase tracking-wider mb-1">Rotate 90°</div>
+              <div className="grid grid-cols-3 gap-1">
+                {['x', 'y', 'z'].map(axis => (
+                  <button
+                    key={axis}
+                    onClick={() => rotateSelection3D(axis, 1)}
+                    className="flex items-center justify-center gap-1 py-1 rounded border border-border text-xs text-text-muted hover:text-text hover:border-accent/60 transition-colors"
+                  >
+                    <RotateCw size={12} /> {axis.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className={!selection3D ? 'opacity-40 pointer-events-none' : ''}>
+              <div className="text-[10px] text-text-muted uppercase tracking-wider mb-1">Flip</div>
+              <div className="grid grid-cols-3 gap-1">
+                {['x', 'y', 'z'].map(axis => (
+                  <button
+                    key={axis}
+                    onClick={() => flipSelection3D(axis)}
+                    className="py-1 rounded border border-border text-xs font-mono text-text-muted hover:text-text hover:border-accent/60 transition-colors"
+                  >
+                    {axis.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {selection3D && (
+              <div className="grid grid-cols-2 gap-1">
+                <button
+                  onClick={applySelection3D}
+                  className="py-1.5 rounded text-xs font-medium bg-accent text-surface"
+                  title="Apply transform (Enter)"
+                >
+                  Apply ↵
+                </button>
+                <button
+                  onClick={clearSelection3D}
+                  className="py-1.5 rounded border border-border text-xs text-text-muted hover:text-text"
+                  title="Cancel transform (Esc)"
+                >
+                  Cancel Esc
+                </button>
+                <button
+                  onClick={deleteSelection3D}
+                  className="col-span-2 flex items-center justify-center gap-1 py-1.5 rounded border border-border text-xs text-text-muted hover:text-red-400 hover:border-red-900 transition-colors"
+                  title="Delete selected voxels"
+                >
+                  <Trash2 size={13} /> Delete selection
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── 2D selection tool options ────────────────────────────────────── */}
+        {activeTool === 'select' && viewMode !== 'preview-only' && (
           <div className="flex flex-col gap-2">
             <div className="text-xs text-text-muted uppercase tracking-wide">Selection</div>
 
@@ -503,7 +620,7 @@ export default function VoxelOptionsPanel() {
         )}
 
         {/* Paint depth */}
-        <div>
+        {!isVolumeTool && !(activeTool === 'select' && viewMode === 'preview-only') && <div>
           <div className="flex justify-between items-center mb-1.5">
             <label className="text-xs text-text-muted uppercase tracking-wide">Paint Depth</label>
             <span className="text-xs font-mono text-accent">{paintDepth}</span>
@@ -521,7 +638,7 @@ export default function VoxelOptionsPanel() {
             <span>1</span>
             <span>{isFrontBack ? Math.ceil(depthDimension / 2) : depthDimension}</span>
           </div>
-        </div>
+        </div>}
 
         {/* Draw / Edit mode — all views except front */}
         {!isFront && (
@@ -552,7 +669,7 @@ export default function VoxelOptionsPanel() {
         )}
 
         {/* Symmetry */}
-        <div>
+        {!isVolumeTool && !(activeTool === 'select' && viewMode === 'preview-only') && <div>
           <div className="mb-1.5">
             <label className="text-xs text-text-muted uppercase tracking-wide">Symmetry</label>
           </div>
@@ -565,7 +682,7 @@ export default function VoxelOptionsPanel() {
               onChange={setSymmetryOpposite}
             />
           </div>
-        </div>
+        </div>}
 
         {/* Stats */}
         <div className="flex flex-col gap-1.5 text-xs">

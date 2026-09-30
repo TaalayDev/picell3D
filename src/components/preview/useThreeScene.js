@@ -4,20 +4,42 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
-import { buildVoxelMesh } from '../../lib/meshBuilder.js'
-import { SHAPE_TOOLS_3D, dominantAxis, lockVoxelToPlane, compute3DShapeVoxels } from '../../lib/shapeRasterizer3D.js'
+import { createChunkedVoxelMesh } from '../../lib/chunkedMeshBuilder.js'
+import {
+  SHAPE_TOOLS_3D, VOLUME_PRIMITIVE_TOOLS_3D,
+  dominantAxis, lockVoxelToPlane, compute3DShapeVoxels, computeVolumePrimitiveVoxels,
+} from '../../lib/shapeRasterizer3D.js'
 import { samplePointerSegment } from '../../lib/strokeSampler.js'
 import { expandVoxelBrush } from '../../lib/brushFootprint.js'
 import { useStore, getCompositedVoxels, getCompositedMaterials } from '../../store/index.js'
 
 // ── 3D Edit helpers ────────────────────────────────────────────────────────────
-const EDIT_UNIT = 0.1           // must match meshBuilder.js UNIT
+const EDIT_UNIT = 0.1           // must match chunkMesher.js VOXEL_UNIT
 const EDIT_EPS  = EDIT_UNIT * 0.6  // offset to step inside/outside a face
-const PLANE_DRAW_TOOLS = new Set(['pencil', 'eraser', 'material', 'blend', ...SHAPE_TOOLS_3D])
+const ALL_SHAPE_TOOLS_3D = new Set([...SHAPE_TOOLS_3D, ...VOLUME_PRIMITIVE_TOOLS_3D])
+const PLANE_DRAW_TOOLS = new Set(['pencil', 'eraser', 'material', 'blend', ...ALL_SHAPE_TOOLS_3D])
 const BRUSH_TOOLS_3D = new Set(['pencil', 'eraser', 'material', 'blend'])
 
 function isLockedPlaneActive(state) {
   return state.planeLock && PLANE_DRAW_TOOLS.has(state.activeTool)
+}
+
+function computeShapeDragVoxels(drag, W, H, D) {
+  if (VOLUME_PRIMITIVE_TOOLS_3D.has(drag.tool)) {
+    return computeVolumePrimitiveVoxels(
+      drag.tool, drag.start, drag.end, drag.axis, W, H, D,
+      {
+        filled: drag.filled,
+        thickness: drag.thickness,
+        depth: drag.primitiveDepth,
+        direction: drag.direction,
+      },
+    )
+  }
+  return compute3DShapeVoxels(
+    drag.tool, drag.start, drag.end, drag.axis, W, H, D,
+    drag.filled, drag.thickness,
+  )
 }
 
 function worldToVoxel(wx, wy, wz, W, H, D) {
@@ -81,11 +103,11 @@ export function useThreeScene(containerRef) {
   const controlsRef     = useRef(null)
   const meshGroupRef    = useRef(null)
   const disposeGroupRef = useRef(null)
+  const chunkedMeshRef  = useRef(null)
   const frameRef        = useRef(null)
   const rebuildTimerRef = useRef(null)
   const floorRef        = useRef(null)
   const ghostRef        = useRef(null)
-  const composerRef     = useRef(null)
   const shapeActionRef  = useRef(null)
   const [isShapeEditing, setIsShapeEditing] = useState(false)
   const [isPointerLocked, setIsPointerLocked] = useState(false)
@@ -247,6 +269,14 @@ export function useThreeScene(containerRef) {
     shapeHandleGroup.visible = false
     scene.add(shapeHandleGroup)
 
+    const selectionPreviewMat = new THREE.MeshBasicMaterial({
+      color: 0x22ccff, transparent: true, opacity: 0.38, depthWrite: false,
+    })
+    const selectionPreviewGroup = new THREE.Group()
+    scene.add(selectionPreviewGroup)
+    let selectionPreviewMesh = null
+    let selectionBoundsHelper = null
+
     // ── Camera ────────────────────────────────────────────────────────────
     const camera = new THREE.PerspectiveCamera(
       45, container.clientWidth / container.clientHeight, 0.01, 50
@@ -274,7 +304,6 @@ export function useThreeScene(containerRef) {
       0.42,  // threshold — neon (~0.85 lum) and emissive (~0.6 lum) exceed this
     )
     composer.addPass(bloomPass)
-    composerRef.current = composer
 
     // ── Edit: 3D interaction (active when viewMode === 'preview-only') ──
     const raycaster = new THREE.Raycaster()
@@ -284,6 +313,7 @@ export function useThreeScene(containerRef) {
     let lastPointerPoint = null
     let strokePaintedKeys = new Set()
     let shapeDrag    = null  // { tool, start, end, axis, plane, voxels }
+    let selectionDrag = null
 
     // ── Fly Mode State ────────────────────────────────────────────────
     let isFlyMode = Boolean(useStore.getState().flyMode)
@@ -466,6 +496,42 @@ export function useThreeScene(containerRef) {
       shapePreviewGroup.add(shapePreviewMesh)
     }
 
+    function clearSelectionPreview() {
+      if (selectionPreviewMesh) selectionPreviewGroup.remove(selectionPreviewMesh)
+      selectionPreviewMesh = null
+      if (selectionBoundsHelper) {
+        selectionPreviewGroup.remove(selectionBoundsHelper)
+        selectionBoundsHelper.geometry?.dispose()
+        selectionBoundsHelper.material?.dispose()
+      }
+      selectionBoundsHelper = null
+    }
+
+    function updateSelectionPreview(state = useStore.getState()) {
+      clearSelectionPreview()
+      const selection = state.selection3D
+      if (state.viewMode !== 'preview-only' || state.activeTool !== 'select' || !selection?.voxels?.length) return
+      const { canvasWidth: W, canvasHeight: H, depthDimension: D } = state
+      selectionPreviewMesh = new THREE.InstancedMesh(ghostBoxGeo, selectionPreviewMat, selection.voxels.length)
+      const matrix = new THREE.Matrix4()
+      const box = new THREE.Box3()
+      for (let i = 0; i < selection.voxels.length; i++) {
+        const voxel = selection.voxels[i]
+        const center = voxelCenterWorld(voxel.x, voxel.y, voxel.z, W, H, D)
+        matrix.makeTranslation(...center.toArray())
+        selectionPreviewMesh.setMatrixAt(i, matrix)
+        box.expandByPoint(center)
+      }
+      selectionPreviewMesh.instanceMatrix.needsUpdate = true
+      selectionPreviewGroup.add(selectionPreviewMesh)
+      box.min.addScalar(-EDIT_UNIT / 2)
+      box.max.addScalar(EDIT_UNIT / 2)
+      selectionBoundsHelper = new THREE.Box3Helper(box, 0x22ccff)
+      selectionBoundsHelper.material.depthTest = false
+      selectionBoundsHelper.renderOrder = 21
+      selectionPreviewGroup.add(selectionBoundsHelper)
+    }
+
     function updateShapeHandles(W, H, D) {
       if (!shapeDrag?.editing) {
         shapeHandleGroup.visible = false
@@ -497,16 +563,9 @@ export function useThreeScene(containerRef) {
       const point = lockVoxelToPlane(rawPoint, shapeDrag.start, shapeDrag.axis)
       const start = handle === 'start' ? point : shapeDrag.start
       const end = handle === 'end' ? point : shapeDrag.end
-      const voxels = compute3DShapeVoxels(
-        shapeDrag.tool,
-        start,
-        end,
-        shapeDrag.axis,
-        W, H, D,
-        shapeDrag.filled,
-        shapeDrag.thickness,
-      )
-      shapeDrag = { ...shapeDrag, start, end, voxels }
+      const nextDrag = { ...shapeDrag, start, end }
+      const voxels = computeShapeDragVoxels(nextDrag, W, H, D)
+      shapeDrag = { ...nextDrag, voxels }
       updateShapePreview(voxels, W, H, D)
       updateShapeHandles(W, H, D)
     }
@@ -539,8 +598,9 @@ export function useThreeScene(containerRef) {
       const isEyedrop  = activeTool === 'eyedropper'
       const isMaterial = activeTool === 'material'
       const isFill     = activeTool === 'fill'
+      const isSelect   = activeTool === 'select'
       const isBrush    = BRUSH_TOOLS_3D.has(activeTool)
-      const col = isErase ? 0xff4444 : isEyedrop ? 0x00ccff : isMaterial ? 0xffaa00 : 0x00ff88
+      const col = isErase ? 0xff4444 : isEyedrop || isSelect ? 0x22ccff : isMaterial ? 0xffaa00 : 0x00ff88
       hideBrushPreview()
 
       if (!isFlyMode) {
@@ -580,7 +640,7 @@ export function useThreeScene(containerRef) {
         faceMesh.visible = false
         return
       }
-      const adjacent   = !isErase && !isEyedrop && !isMaterial && !isFill
+      const adjacent   = !isErase && !isEyedrop && !isMaterial && !isFill && !isSelect
       const vox = getEditVoxel(hit, W, H, D, adjacent)
       if (isBrush) {
         ghost.visible = false
@@ -771,6 +831,7 @@ export function useThreeScene(containerRef) {
 
     // ── Keyboard: Space toggles between paint-drag and orbit-drag ─────
     const onKeyDown = (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(e.target?.tagName)) return
       if (isFlyMode) {
         if (e.code === 'KeyW' || e.key === 'ArrowUp') {
           e.preventDefault()
@@ -834,6 +895,23 @@ export function useThreeScene(containerRef) {
         finishShapeDrag(true)
         setCursor('crosshair')
         return
+      }
+      if (useStore.getState().activeTool === 'select' && useStore.getState().selection3D) {
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          useStore.getState().clearSelection3D()
+          return
+        }
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          useStore.getState().applySelection3D()
+          return
+        }
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          e.preventDefault()
+          useStore.getState().deleteSelection3D()
+          return
+        }
       }
       if (e.code !== 'Space' || !isEditMode()) return
       e.preventDefault()
@@ -908,6 +986,21 @@ export function useThreeScene(containerRef) {
       const store = useStore.getState()
       const { activeTool, canvasWidth: W, canvasHeight: H, depthDimension: D } = store
 
+      if (activeTool === 'select') {
+        const hit = getRaycastHit(e.clientX, e.clientY)
+        if (!hit || hit.object === floorPick) return
+        const start = getEditVoxel(hit, W, H, D, false)
+        selectionDrag = { start, end: start }
+        store.setSelection3DBox(start, start)
+        controls.enabled = false
+        renderer.domElement.setPointerCapture(e.pointerId)
+        if (ghostRef.current) ghostRef.current.visible = false
+        hideBrushPreview()
+        faceMesh.visible = false
+        setCursor('crosshair')
+        return
+      }
+
       if (shapeDrag?.editing) {
         const dragHandle = getShapeHandle(e.clientX, e.clientY)
         if (!dragHandle) return
@@ -918,7 +1011,7 @@ export function useThreeScene(containerRef) {
         return
       }
 
-      if (SHAPE_TOOLS_3D.has(activeTool)) {
+      if (ALL_SHAPE_TOOLS_3D.has(activeTool)) {
         const lockedTarget = getLockedPlaneTarget(e.clientX, e.clientY, store)
         if (isLockedPlaneActive(store) && !lockedTarget) return
         const hit = lockedTarget ? null : getRaycastHit(e.clientX, e.clientY)
@@ -932,13 +1025,21 @@ export function useThreeScene(containerRef) {
         )
         const filled = activeTool !== 'line' && store.shapeMode === 'fill'
         const thickness = store.shapeThickness
-        const voxels = compute3DShapeVoxels(
-          activeTool, start, start, axis, W, H, D, filled, thickness,
-        )
-        shapeDrag = {
-          tool: activeTool, start, end: start, axis, plane, voxels,
-          locked: Boolean(lockedTarget), filled, thickness,
+        const primitiveDepth = store.primitiveDepth
+        let direction = Math.sign(normal[axis]) || 1
+        if (VOLUME_PRIMITIVE_TOOLS_3D.has(activeTool) && activeTool !== 'sphere3d') {
+          const axisSize = axis === 'x' ? W : axis === 'y' ? H : D
+          const coordinate = start[axis]
+          const preferredRoom = direction > 0 ? axisSize - 1 - coordinate : coordinate
+          const oppositeRoom = direction > 0 ? coordinate : axisSize - 1 - coordinate
+          if (preferredRoom < primitiveDepth - 1 && oppositeRoom > preferredRoom) direction *= -1
         }
+        const nextDrag = {
+          tool: activeTool, start, end: start, axis, plane,
+          locked: Boolean(lockedTarget), filled, thickness, primitiveDepth, direction,
+        }
+        const voxels = computeShapeDragVoxels(nextDrag, W, H, D)
+        shapeDrag = { ...nextDrag, voxels }
         controls.enabled = false
         isPainting = false
         renderer.domElement.setPointerCapture(e.pointerId)
@@ -1007,6 +1108,20 @@ export function useThreeScene(containerRef) {
         faceMesh.visible = false
         return
       }
+      if (selectionDrag && !spaceHeld) {
+        const hit = getRaycastHit(e.clientX, e.clientY)
+        if (hit && hit.object !== floorPick) {
+          const { canvasWidth: W, canvasHeight: H, depthDimension: D } = useStore.getState()
+          const end = getEditVoxel(hit, W, H, D, false)
+          const key = `${end.x},${end.y},${end.z}`
+          const previousKey = `${selectionDrag.end.x},${selectionDrag.end.y},${selectionDrag.end.z}`
+          if (key !== previousKey) {
+            selectionDrag = { ...selectionDrag, end }
+            useStore.getState().setSelection3DBox(selectionDrag.start, end)
+          }
+        }
+        return
+      }
       if (shapeDrag && !spaceHeld) {
         if (ghostRef.current) ghostRef.current.visible = false
         hideBrushPreview()
@@ -1042,6 +1157,14 @@ export function useThreeScene(containerRef) {
         lastDragPos = null
         strokePaintedKeys = new Set()
         lastPaintKey = null
+        return
+      }
+
+      if (selectionDrag) {
+        selectionDrag = null
+        syncControls()
+        try { renderer.domElement.releasePointerCapture(e.pointerId) } catch (_) {}
+        setCursor('crosshair')
         return
       }
 
@@ -1081,6 +1204,7 @@ export function useThreeScene(containerRef) {
     syncControls()
     if (isEditMode() || isFlyMode) setCursor('crosshair')
     updateDrawingPlane()
+    updateSelectionPreview()
 
     const onPointerLockChange = () => {
       const locked = document.pointerLockElement === renderer.domElement
@@ -1129,16 +1253,18 @@ export function useThreeScene(containerRef) {
         finishShapeDrag(false)
       } else if (
         shapeDrag?.editing
-        && (state.shapeMode !== previous.shapeMode || state.shapeThickness !== previous.shapeThickness)
+        && (
+          state.shapeMode !== previous.shapeMode
+          || state.shapeThickness !== previous.shapeThickness
+          || state.primitiveDepth !== previous.primitiveDepth
+        )
       ) {
         const { canvasWidth: W, canvasHeight: H, depthDimension: D } = state
         const filled = shapeDrag.tool !== 'line' && state.shapeMode === 'fill'
         const thickness = state.shapeThickness
-        const voxels = compute3DShapeVoxels(
-          shapeDrag.tool, shapeDrag.start, shapeDrag.end, shapeDrag.axis,
-          W, H, D, filled, thickness,
-        )
-        shapeDrag = { ...shapeDrag, filled, thickness, voxels }
+        const nextDrag = { ...shapeDrag, filled, thickness, primitiveDepth: state.primitiveDepth }
+        const voxels = computeShapeDragVoxels(nextDrag, W, H, D)
+        shapeDrag = { ...nextDrag, voxels }
         updateShapePreview(voxels, W, H, D)
         updateShapeHandles(W, H, D)
       }
@@ -1154,6 +1280,14 @@ export function useThreeScene(containerRef) {
       ) {
         updateDrawingPlane(state)
       }
+      if (
+        state.selection3D !== previous.selection3D
+        || state.activeTool !== previous.activeTool
+        || state.viewMode !== previous.viewMode
+        || state.canvasWidth !== previous.canvasWidth
+        || state.canvasHeight !== previous.canvasHeight
+        || state.depthDimension !== previous.depthDimension
+      ) updateSelectionPreview(state)
     })
 
     window.addEventListener('keydown', onKeyDown)
@@ -1213,7 +1347,7 @@ export function useThreeScene(containerRef) {
         controls.update()
       }
 
-      composerRef.current ? composerRef.current.render() : renderer.render(scene, camera)
+      composer.render()
     }
     animate()
 
@@ -1265,8 +1399,11 @@ export function useThreeScene(containerRef) {
       shapeHandleGeo.dispose()
       shapeStartHandleMat.dispose()
       shapeEndHandleMat.dispose()
+      clearSelectionPreview()
+      selectionPreviewMat.dispose()
       floorGeo.dispose()
       floorMat.dispose()
+      composer.dispose()
       renderer.dispose()
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement)
@@ -1288,27 +1425,39 @@ export function useThreeScene(containerRef) {
     return unsub
   }, [])
 
-  // ── Mesh rebuild ──────────────────────────────────────────────────────
+  // ── Incremental chunk mesh rebuild ────────────────────────────────────
   const rebuild = useCallback(() => {
     if (!sceneRef.current) return
     const { layers, canvasWidth, canvasHeight, depthDimension } = useStore.getState()
     const composited  = getCompositedVoxels(layers, canvasWidth, canvasHeight, depthDimension)
     const voxelMats   = getCompositedMaterials(layers)
-    const { group, dispose } = buildVoxelMesh(composited, canvasWidth, canvasHeight, depthDimension, {}, voxelMats)
 
-    if (meshGroupRef.current) {
-      sceneRef.current.remove(meshGroupRef.current)
-      disposeGroupRef.current?.()
+    if (!chunkedMeshRef.current) {
+      const chunkedMesh = createChunkedVoxelMesh()
+      chunkedMeshRef.current = chunkedMesh
+      meshGroupRef.current = chunkedMesh.group
+      disposeGroupRef.current = chunkedMesh.dispose
+      sceneRef.current.add(chunkedMesh.group)
     }
-    sceneRef.current.add(group)
-    meshGroupRef.current = group
-    disposeGroupRef.current = dispose
+    chunkedMeshRef.current.update(
+      composited,
+      canvasWidth,
+      canvasHeight,
+      depthDimension,
+      {},
+      voxelMats,
+    )
   }, [])
 
   useEffect(() => {
     rebuild()
     const unsub = useStore.subscribe((state, prevState) => {
-      if (state.layers !== prevState.layers || state.depthDimension !== prevState.depthDimension) {
+      if (
+        state.layers !== prevState.layers
+        || state.canvasWidth !== prevState.canvasWidth
+        || state.canvasHeight !== prevState.canvasHeight
+        || state.depthDimension !== prevState.depthDimension
+      ) {
         clearTimeout(rebuildTimerRef.current)
         rebuildTimerRef.current = setTimeout(rebuild, 80)
       }
@@ -1316,6 +1465,11 @@ export function useThreeScene(containerRef) {
     return () => {
       unsub()
       clearTimeout(rebuildTimerRef.current)
+      if (meshGroupRef.current) sceneRef.current?.remove(meshGroupRef.current)
+      disposeGroupRef.current?.()
+      chunkedMeshRef.current = null
+      meshGroupRef.current = null
+      disposeGroupRef.current = null
     }
   }, [rebuild])
 

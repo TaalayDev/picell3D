@@ -29,6 +29,12 @@ const TOOLS = [
 ]
 const SHAPE_TOOLS = TOOLS.filter(t => t.group === 'shape')
 
+const PRIMITIVE_TOOLS = [
+  { id: 'box3d',      Icon: Box,      label: 'Box' },
+  { id: 'sphere3d',   Icon: Circle,   label: 'Sphere' },
+  { id: 'cylinder3d', Icon: Columns2, label: 'Cylinder' },
+]
+
 const SELECT_MODES = [
   { id: 'rect',  Icon: BoxSelect,   label: 'Rectangle Select' },
   { id: 'lasso', Icon: LassoSelect, label: 'Lasso Select' },
@@ -60,8 +66,10 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
 
   // The shape button shows the last shape used, so one click re-selects it
   const [lastShape, setLastShape] = useState('rect')
+  const [lastPrimitive, setLastPrimitive] = useState('box3d')
   useEffect(() => {
     if (SHAPE_TOOLS.some(t => t.id === activeTool)) setLastShape(activeTool)
+    if (PRIMITIVE_TOOLS.some(t => t.id === activeTool)) setLastPrimitive(activeTool)
   }, [activeTool])
 
   function handleSaveProject() {
@@ -160,6 +168,21 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
           title={SHAPE_TOOLS.find(t => t.id === lastShape)?.label}
           onActivate={() => setActiveTool(lastShape)}
           onPick={(id) => setActiveTool(id)}
+        />
+        <ToolMenuButton
+          heading="Volume Primitive"
+          options={PRIMITIVE_TOOLS}
+          value={lastPrimitive}
+          active={PRIMITIVE_TOOLS.some(t => t.id === activeTool)}
+          title={PRIMITIVE_TOOLS.find(t => t.id === lastPrimitive)?.label}
+          onActivate={() => {
+            if (viewMode !== 'preview-only') setViewMode('preview-only')
+            setActiveTool(lastPrimitive)
+          }}
+          onPick={(id) => {
+            if (viewMode !== 'preview-only') setViewMode('preview-only')
+            setActiveTool(id)
+          }}
         />
       </div>
 

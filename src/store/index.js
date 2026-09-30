@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import { rotateBox, scaleBox, shiftVoxelListDepth, getDefaultAnchor, getPresetAnchor } from '../lib/selectionTransform.js'
 import { clampBrushSize } from '../lib/brushFootprint.js'
+import {
+  areVoxelsInBounds, collectVoxelsInBox, flipVoxels, moveVoxels, rotateVoxels90,
+} from '../lib/voxelSelection3D.js'
 
 const DEFAULT_PALETTE = [
   // Blacks & whites
@@ -591,7 +594,13 @@ export const useStore = create((set, get) => ({
       recentColors: [color, ...s.recentColors.filter(c => c !== color)].slice(0, 10),
     }))
   },
-  setActiveTool:   (tool)  => set({ activeTool: tool }),
+  setActiveTool:   (tool)  => set(s => ({
+    activeTool: tool,
+    selection3D: tool === 'select' ? s.selection3D : null,
+    flyMode: ['select', 'rect', 'circle', 'ellipse', 'line', 'box3d', 'sphere3d', 'cylinder3d'].includes(tool)
+      ? false
+      : s.flyMode,
+  })),
   setPixelSize:    (size)  => set({ pixelSize: Math.max(4, Math.min(32, size)) }),
   toggleGrid:      ()      => set(s => ({ showGrid: !s.showGrid })),
 
@@ -908,6 +917,7 @@ export const useStore = create((set, get) => ({
   // Shape rendering shared by the 2D canvas and the 3D editor.
   shapeMode:      'outline',
   shapeThickness: 1,
+  primitiveDepth: 4,
 
   brushSize: 1,
 
@@ -941,6 +951,9 @@ export const useStore = create((set, get) => ({
   setShapeMode:       (mode) => set({ shapeMode: mode === 'fill' ? 'fill' : 'outline' }),
   setShapeThickness:  (value) => set({
     shapeThickness: Math.max(1, Math.min(8, Math.round(value))),
+  }),
+  setPrimitiveDepth:  (value) => set({
+    primitiveDepth: Math.max(1, Math.min(64, Math.round(value))),
   }),
   setBrushSize:       (value) => set({ brushSize: clampBrushSize(value) }),
   setSymmetryX:       (v)    => set({ symmetryX: v }),
@@ -1064,6 +1077,7 @@ export const useStore = create((set, get) => ({
       undoStack:      [],
       redoStack:      [],
       selection:      null,
+      selection3D:    null,
       floatingPaste:  null,
       lassoPreview:   null,
       selectionAnchor: null,
@@ -1072,6 +1086,94 @@ export const useStore = create((set, get) => ({
   },
 
   // ── Selection tool ───────────────────────────────────────────────────────────
+  selection3D: null, // {layerId, source: Voxel[], voxels: Voxel[]}
+
+  setSelection3DBox(start, end) {
+    const { layers, activeLayerId } = get()
+    const layer = layers.find(item => item.id === activeLayerId)
+    const voxels = collectVoxelsInBox(layer, start, end)
+    set({
+      selection3D: voxels.length
+        ? { layerId: activeLayerId, source: voxels.map(v => ({ ...v })), voxels }
+        : null,
+    })
+  },
+
+  clearSelection3D() {
+    set({ selection3D: null })
+  },
+
+  moveSelection3D(dx, dy, dz) {
+    const { selection3D, canvasWidth: W, canvasHeight: H, depthDimension: D } = get()
+    if (!selection3D) return
+    const voxels = moveVoxels(selection3D.voxels, dx, dy, dz)
+    if (areVoxelsInBounds(voxels, W, H, D)) set({ selection3D: { ...selection3D, voxels } })
+  },
+
+  flipSelection3D(axis) {
+    const { selection3D } = get()
+    if (!selection3D) return
+    set({ selection3D: { ...selection3D, voxels: flipVoxels(selection3D.voxels, axis) } })
+  },
+
+  rotateSelection3D(axis, direction = 1) {
+    const { selection3D, canvasWidth: W, canvasHeight: H, depthDimension: D } = get()
+    if (!selection3D) return
+    const voxels = rotateVoxels90(selection3D.voxels, axis, direction)
+    if (areVoxelsInBounds(voxels, W, H, D)) set({ selection3D: { ...selection3D, voxels } })
+  },
+
+  applySelection3D() {
+    const { selection3D, layers, canvasWidth: W, canvasHeight: H, depthDimension: D } = get()
+    if (!selection3D || !areVoxelsInBounds(selection3D.voxels, W, H, D)) return
+    const layerIdx = layers.findIndex(layer => layer.id === selection3D.layerId)
+    if (layerIdx < 0) return
+    get().pushUndo()
+    const layer = layers[layerIdx]
+    const affectedY = new Set([
+      ...selection3D.source.map(v => v.y),
+      ...selection3D.voxels.map(v => v.y),
+    ])
+    const voxels = layer.voxels.map((plane, y) =>
+      affectedY.has(y) ? plane.map(row => [...row]) : plane
+    )
+    const materials = { ...(layer.voxelMaterials || {}) }
+    for (const voxel of selection3D.source) {
+      voxels[voxel.y][voxel.x][voxel.z] = 'transparent'
+      delete materials[`${voxel.y},${voxel.x},${voxel.z}`]
+    }
+    for (const voxel of selection3D.voxels) {
+      voxels[voxel.y][voxel.x][voxel.z] = voxel.color
+      const key = `${voxel.y},${voxel.x},${voxel.z}`
+      if (voxel.material && voxel.material !== 'solid') materials[key] = voxel.material
+      else delete materials[key]
+    }
+    const nextLayers = [...layers]
+    nextLayers[layerIdx] = { ...layer, voxels, voxelMaterials: materials }
+    set({ layers: nextLayers, selection3D: null })
+  },
+
+  deleteSelection3D() {
+    const { selection3D, layers } = get()
+    if (!selection3D) return
+    const layerIdx = layers.findIndex(layer => layer.id === selection3D.layerId)
+    if (layerIdx < 0) return
+    get().pushUndo()
+    const layer = layers[layerIdx]
+    const affectedY = new Set(selection3D.source.map(v => v.y))
+    const voxels = layer.voxels.map((plane, y) =>
+      affectedY.has(y) ? plane.map(row => [...row]) : plane
+    )
+    const materials = { ...(layer.voxelMaterials || {}) }
+    for (const voxel of selection3D.source) {
+      voxels[voxel.y][voxel.x][voxel.z] = 'transparent'
+      delete materials[`${voxel.y},${voxel.x},${voxel.z}`]
+    }
+    const nextLayers = [...layers]
+    nextLayers[layerIdx] = { ...layer, voxels, voxelMaterials: materials }
+    set({ layers: nextLayers, selection3D: null })
+  },
+
   selectionMode:   'rect', // 'rect' | 'lasso'
   selection:       null,   // {x1, y1, x2, y2, type, mask, polygon} in canvas 2D coords
   clipboard:       null,   // {w, h, colors: string[][]} visible colors

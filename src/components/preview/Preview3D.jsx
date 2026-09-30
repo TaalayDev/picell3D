@@ -10,13 +10,17 @@ const TOOL_LABELS = {
   eyedropper: { label: 'Pick color',  color: '#00ccff' },
   blend:      { label: 'Blend voxels', color: '#00ff88' },
   material:   { label: 'Apply material', color: '#ffaa00' },
+  select:     { label: 'Select voxels', color: '#22ccff' },
   rect:       { label: 'Draw rectangle', color: '#00ff88' },
   circle:     { label: 'Draw circle', color: '#00ff88' },
   ellipse:    { label: 'Draw ellipse', color: '#00ff88' },
   line:       { label: 'Draw line', color: '#00ff88' },
+  box3d:      { label: 'Create box', color: '#00ff88' },
+  sphere3d:   { label: 'Create sphere', color: '#00ff88' },
+  cylinder3d: { label: 'Create cylinder', color: '#00ff88' },
 }
 
-const SHAPE_TOOLS = new Set(['rect', 'circle', 'ellipse', 'line'])
+const SHAPE_TOOLS = new Set(['rect', 'circle', 'ellipse', 'line', 'box3d', 'sphere3d', 'cylinder3d'])
 
 export default function Preview3D({ onExport }) {
   const containerRef = useRef(null)
@@ -41,6 +45,7 @@ export default function Preview3D({ onExport }) {
   const shapeMode     = useStore(s => s.shapeMode)
   const shapeThickness = useStore(s => s.shapeThickness)
   const brushSize     = useStore(s => s.brushSize)
+  const selection3D   = useStore(s => s.selection3D)
   const is3DEdit      = viewMode === 'preview-only'
 
   useEffect(() => {
@@ -198,6 +203,10 @@ export default function Preview3D({ onExport }) {
           <span className="text-xs opacity-40" style={{ color: '#fff', textShadow: '0 1px 3px #000' }}>
             {activeTool === 'fill'
               ? 'Click a block to fill'
+              : activeTool === 'select'
+                ? selection3D
+                  ? 'Transform selection · Enter apply · Esc cancel'
+                  : 'Drag between blocks to select a volume'
               : SHAPE_TOOLS.has(activeTool)
                 ? isShapeEditing
                   ? 'Edit handles · Enter confirm · Esc cancel'
