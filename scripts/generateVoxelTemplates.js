@@ -325,6 +325,40 @@ const templates = {
     m.sphere(cx, 21, cz, 1, '#ffffff', 'matte')
   }),
 
+  fox: buildTemplate(21, 20, 18, (m) => {
+    const { cx } = m
+    const cz = 8, orange = '#e87528', dark = '#3b2721', cream = '#fff1d0'
+    for (const x of [cx - 4, cx + 4]) m.ellipsoid(x, 2, 10, 2.2, 2.4, 3, dark, 'matte')
+    m.ellipsoid(cx, 6.5, cz, 7, 5.5, 5.5, (x, h) => h < 4 ? '#cf5d1d' : orange, 'matte')
+    m.ellipsoid(cx, 8, 13, 3.2, 4.5, 1.3, cream, 'matte')
+    m.sphere(cx, 13.2, 10, 4.6, orange, 'matte')
+    m.ellipsoid(cx, 11.8, 14.2, 3.2, 2.2, 2.7, cream, 'matte')
+    m.set(cx, 12, 17, dark, 'glossy')
+    for (const ex of [cx - 1.6, cx + 1.6]) m.decalFront(ex, 14, '#17151a', 'glossy')
+    for (const side of [-1, 1]) {
+      m.shard([cx + side * 2.7, 15, 9], [side * 0.2, 1, 0], 5, 2.3, orange, 'matte')
+      m.shard([cx + side * 2.7, 16, 10.5], [side * 0.15, 1, 0], 3.3, 1.1, '#6b3430', 'matte')
+    }
+    m.ellipsoid(cx - 7, 7, 4, 3.3, 6, 3.2, '#cf5d1d', 'matte')
+    m.ellipsoid(cx - 5.5, 3.5, 3.5, 3.3, 3, 3, cream, 'matte')
+  }),
+
+  whale: buildTemplate(25, 15, 16, (m) => {
+    const blue = (x, h, z) => h < 5 ? '#7dc7df' : (m.noise(x, h, z) > 0.78 ? '#398ab8' : '#2b78a6')
+    m.ellipsoid(11.5, 7, 7.5, 10.5, 5.8, 6.5, blue, 'matte')
+    m.fill((x, h, z) => x >= 5 && x <= 18 && h >= 3 && h <= 6 && z >= 13 && m.get(x, h, z),
+      (x, h) => h % 2 ? '#bfe5ec' : '#d8f0f2', 'matte')
+    m.line([2, 7, 7], [0, 11, 3], '#2b78a6', 'matte', 1.6)
+    m.line([2, 7, 8], [0, 11, 12], '#2b78a6', 'matte', 1.6)
+    m.line([12, 5, 12], [9, 1, 15], '#246a95', 'matte', 1.2)
+    m.line([12, 5, 3], [9, 1, 0], '#246a95', 'matte', 1.2)
+    for (const h of [8, 9]) m.set(20, h, 13, '#101820', 'glossy')
+    m.line([18, 5, 14], [22, 6, 13], '#194b6c', 'matte')
+    m.set(16, 12, 8, '#173f59')
+    m.line([16, 13, 8], [14, 14, 6], '#a8ecff', 'glass')
+    m.line([16, 13, 8], [18, 14, 10], '#a8ecff', 'glass')
+  }),
+
   // ─── Fantasy ──────────────────────────────────────────────────────────────────
 
   mushroom: buildTemplate(23, 26, 23, (m) => {
@@ -397,6 +431,54 @@ const templates = {
       const tip = base.map((v, k) => v + (dir[k] / l) * (len - 1))
       m.set(tip[0], tip[1], tip[2], shade(color, 1.5), 'neon')
     }
+  }),
+
+  'wizard-tower': buildTemplate(21, 29, 21, (m) => {
+    const { cx, cz } = m
+    const stone = (x, h, z) => {
+      const mortar = (Math.floor(h / 2) + Math.floor(x / 3) + Math.floor(z / 3)) % 5 === 0
+      return mortar ? '#596078' : (m.noise(x, h, z) > 0.55 ? '#747c98' : '#68708a')
+    }
+    m.cylY(cx, cz, 7, 0, 18, stone, 'matte')
+    m.fill((x, h, z) => z >= 17 && h <= 6 && Math.abs(x - cx) <= 2 && m.get(x, h, z),
+      (x, h, z) => (h === 6 && Math.abs(x - cx) > 1 ? stone(x, h, z) : '#4b2b45'), 'matte')
+    for (const [x, h] of [[cx - 3, 12], [cx + 3, 15]]) {
+      m.decalFront(x, h, '#ffd86b', 'emissive'); m.decalFront(x, h + 1, '#ffd86b', 'emissive')
+    }
+    m.cylY(cx, cz, 7.6, 18, 18, '#a58acb', 'glossy')
+    m.fill((x, h, z) => {
+      if (h < 19 || h > 27) return false
+      const r = 8.8 * (1 - (h - 19) / 9) + 0.35
+      return Math.hypot(x - cx, z - cz) <= r
+    }, (x, h, z) => ((x + z + h) % 3 === 0 ? '#513a83' : '#65479b'), 'glossy')
+    m.set(cx, 28, cz, '#ffd86b', 'emissive')
+    m.shard([cx + 5, 20, cz - 2], [0.4, 1, 0], 5, 1.2, '#ffd86b', 'glossy')
+    m.box(cx - 5, 19, cz - 2, cx - 3, 24, cz, '#555c72', 'matte')
+    m.set(cx - 4, 25, cz, '#c5cce0', 'glass')
+    for (const [x, h] of [[2, 3], [18, 5], [3, 9], [17, 10]]) m.set(x, h, 18, '#b78cff', 'emissive')
+  }),
+
+  mimic: buildTemplate(22, 18, 16, (m) => {
+    const wood = (x, h, z) => (m.noise(x, h, z) > 0.65 ? '#8f542b' : '#6f3d22')
+    m.box(2, 2, 2, 19, 9, 13, wood, 'matte')
+    m.box(2, 11, 3, 19, 15, 12, wood, 'matte')
+    m.cylX(15, 7.5, 4.8, 2, 19, wood, 'matte')
+    for (const x of [2, 10, 19]) {
+      m.box(x, 2, 1, x, 9, 14, '#d6a83f', 'metal')
+      m.box(x, 11, 2, x, 16, 13, '#d6a83f', 'metal')
+    }
+    for (let x = 4; x <= 18; x += 3) {
+      m.shard([x, 10, 13], [0, -1, 0.2], 3, 0.8, '#fff2ce', 'glossy')
+      m.shard([x + 1, 11, 13], [0, 1, 0.1], 2.5, 0.8, '#fff2ce', 'glossy')
+    }
+    m.box(4, 10, 10, 18, 10, 13, '#24131d')
+    m.line([11, 9, 14], [14, 5, 15], '#d84f78', 'glossy', 1.2)
+    for (const x of [7, 15]) {
+      m.line([x, 15, 8], [x, 17, 10], '#7b4b28', 'matte', 0.8)
+      m.sphere(x, 17, 10, 1.5, '#e8d58c', 'glossy')
+      m.set(x, 17, 11, '#17131c', 'glossy')
+    }
+    m.box(9, 5, 14, 12, 8, 15, '#e4b644', 'metal')
   }),
 
   // ─── Sci-Fi ───────────────────────────────────────────────────────────────────
@@ -483,6 +565,40 @@ const templates = {
     m.line([4, 13, cz], [2, 16, cz], '#9aa3ad', 'metal')
   }),
 
+  'moon-rover': buildTemplate(24, 16, 18, (m) => {
+    const metal = (x, h, z) => (m.noise(x, h, z) > 0.7 ? '#dce3e8' : '#aeb9c2')
+    m.box(4, 5, 4, 19, 10, 13, metal, 'metal')
+    m.box(7, 11, 6, 15, 14, 11, '#78cbe8', 'glass')
+    m.box(8, 10, 7, 14, 13, 10, '#20394f', 'glossy')
+    for (const x of [5, 11.5, 18]) for (const z of [2, 15]) {
+      m.cylZ(x, 4, 3, z, z, (xx, h) => ((Math.round(xx + h) % 2) ? '#252932' : '#343b45'), 'matte')
+      m.cylZ(x, 4, 1.2, z, z, '#98a6b3', 'metal')
+    }
+    m.box(2, 8, 3, 21, 8, 14, (x, h, z) => ((x + z) % 3 ? '#244f86' : '#3972b2'), 'glossy')
+    m.box(11, 14, 8, 11, 15, 9, '#aeb9c2', 'metal')
+    m.set(11, 15, 10, '#e639d5', 'neon')
+    for (const x of [6, 17]) m.set(x, 8, 14, '#fff2a8', 'emissive')
+    m.line([19, 10, 8], [23, 14, 8], '#98a6b3', 'metal')
+    m.sphere(23, 14, 8, 1.2, '#d7e0e8', 'metal')
+  }),
+
+  'space-drone': buildTemplate(21, 13, 21, (m) => {
+    const { cx, cz } = m
+    m.ellipsoid(cx, 7, cz, 4.5, 3.5, 4.5, '#e4e8ef', 'metal')
+    m.ellipsoid(cx, 8, cz + 3, 2.6, 2.3, 2.2, '#67d9f4', 'glass')
+    m.set(cx, 8, cz + 5, '#f23bd5', 'neon')
+    const arms = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+    for (const [dx, dz] of arms) {
+      m.line([cx + dx * 3, 7, cz + dz * 3], [cx + dx * 8, 5, cz + dz * 8], '#828da0', 'metal', 0.9)
+      m.cylY(cx + dx * 8, cz + dz * 8, 2.2, 4, 6, '#4d5668', 'metal')
+      m.cylY(cx + dx * 8, cz + dz * 8, 1.4, 3, 3, '#63f5e2', 'neon')
+    }
+    m.line([cx, 10, cz], [cx, 12, cz - 1], '#aab4c2', 'metal')
+    m.set(cx, 12, cz - 1, '#ff526f', 'neon')
+    m.cylY(cx, cz, 2, 3, 4, '#596478', 'metal')
+    m.set(cx, 2, cz, '#ffe55e', 'emissive')
+  }),
+
   // ─── Retro ────────────────────────────────────────────────────────────────────
 
   tv: buildTemplate(22, 26, 18, (m) => {
@@ -558,6 +674,314 @@ const templates = {
     m.box(2, 7, 12, 3, 8, 12, '#e63946', 'glossy')
     // photo sliding out
     m.box(5, 1, 12, 14, 1, 14, '#ffffff', 'matte')
+  }),
+
+  joystick: buildTemplate(18, 18, 16, (m) => {
+    const { cx } = m
+    m.box(1, 0, 1, 16, 3, 14, '#1e1e24', 'glossy')
+    m.box(1, 4, 1, 16, 4, 14, (x, h, z) => (x === 1 || x === 16 || z === 1 || z === 14 ? '#1e1e24' : '#e63946'), 'glossy')
+    m.cylY(6, 7, 2, 5, 5, '#15151a', 'matte')                             // dust boot
+    m.cylY(6, 7, 0.8, 6, 11, '#c9d1dc', 'glossy')                         // shaft
+    m.sphere(6, 13.5, 7, 2.6, (x, h) => (h > 14 && x < 6 ? '#ff7a85' : '#e63946'), 'glossy')
+    for (const [bx, bz, c] of [[11, 9, '#ffd23f'], [14, 9, '#3a86ff'], [11, 5, '#5fd35f'], [14, 5, '#ff9f1c']])
+      m.cylY(bx, bz, 1.2, 5, 5, c, 'glossy')
+    m.box(cx - 2, 2, 15, cx - 1, 2, 15, '#f7f3ea')                        // start/select
+    m.box(cx + 1, 2, 15, cx + 2, 2, 15, '#f7f3ea')
+    m.box(3, 1, 15, 3, 1, 15, '#5fd35f', 'emissive')                      // power LED
+  }),
+
+  floppy: buildTemplate(20, 20, 5, (m) => {
+    m.box(0, 0, 0, 19, 19, 2, '#2d4a8a', 'glossy')
+    m.clear(19, 19, 0); m.clear(19, 19, 1); m.clear(19, 19, 2)
+    // metal shutter
+    m.box(5, 13, 3, 14, 19, 3, '#b8c0cc', 'glossy')
+    m.carve((x, h, z) => x >= 11 && x <= 12 && h >= 14 && h <= 18 && z >= 3)
+    m.box(11, 14, 2, 12, 18, 2, '#101522')
+    // label
+    m.box(3, 1, 3, 16, 10, 3, (x, h) => {
+      if (h === 10) return '#e63946'
+      if ((h === 7 || h === 5 || h === 3) && x >= 4 && x <= 15) return '#9ab8ff'
+      return '#f7f7f2'
+    }, 'matte')
+    m.carve((x, h) => x >= 1 && x <= 2 && h >= 1 && h <= 2)            // write-protect notch
+    m.cylZ(9.5, 6, 0.9, 0, 0, '#b8c0cc', 'glossy')                        // hub on the back
+  }),
+
+  lavalamp: buildTemplate(13, 25, 13, (m) => {
+    const { cx, cz } = m
+    m.cylY(cx, cz, (h) => 4.4 - h * 0.25, 0, 6, (x, h) => (h === 0 ? '#3a3f4c' : '#8a93a3'), 'glossy')
+    m.cylY(cx, cz, (h) => 3.3 - (h - 7) * 0.1, 7, 20, '#ff8ad0', 'glass')
+    for (const [bh, r, dx] of [[8.5, 2.1, 0], [12.5, 1.5, 0.6], [16.5, 1.2, -0.5], [19, 0.9, 0.3]])
+      m.sphere(cx + dx, bh, cz, r, (x, h, z) => (m.noise(x, h, z) > 0.6 ? '#ffb13d' : '#ff6a2a'), 'emissive')
+    m.cylY(cx, cz, (h) => 2.2 - (h - 21) * 0.4, 21, 23, '#8a93a3', 'glossy')
+    m.set(cx, 24, cz, '#3a3f4c', 'glossy')
+  }),
+
+  planet: buildTemplate(25, 21, 25, (m) => {
+    const { cx, cz } = m
+    const ch = 10
+    const bands = ['#e8a25a', '#f4d9a6', '#c9713a', '#f4d9a6', '#e8a25a', '#b35f30']
+    m.sphere(cx, ch, cz, 6.6, (x, h, z) => {
+      const b = bands[Math.floor(h + Math.sin(x * 0.7) * 0.6) % bands.length]
+      return m.noise(x, h, z) > 0.92 ? shade(b, 0.85) : b
+    }, 'glossy')
+    const tilt = 0.35
+    m.fill((x, h, z) => {
+      const y1 = (h - ch) * Math.cos(tilt) - (z - cz) * Math.sin(tilt)
+      const z1 = (h - ch) * Math.sin(tilt) + (z - cz) * Math.cos(tilt)
+      const rr = Math.hypot(x - cx, z1)
+      return Math.abs(y1) < 0.6 && rr >= 8.4 && rr <= 12
+    }, (x, h, z) => {
+      const z1 = (h - ch) * Math.sin(tilt) + (z - cz) * Math.cos(tilt)
+      const rr = Math.hypot(x - cx, z1)
+      return rr < 9.6 ? '#b7a6e0' : rr < 10.6 ? '#e4d9f7' : '#9c8cc8'
+    }, 'glossy')
+    m.sphere(3, 18, 4, 1.6, '#c9ccd6', 'matte')                           // moon
+    for (const [x, h, z] of [[21, 18, 5], [2, 3, 20], [22, 2, 18]]) m.set(x, h, z, '#fff6b0', 'emissive')
+  }),
+
+  helmet: buildTemplate(21, 20, 21, (m) => {
+    const { cx, cz } = m
+    m.cylY(cx, cz, 6.8, 0, 2, (x, h) => (h === 1 ? '#6f7b8e' : '#9aa3ad'), 'glossy')
+    m.sphere(cx, 10.5, cz, 8.2, (x, h, z) => {
+      const nz = (z - cz) / 8.2
+      if (nz > 0.3 && h >= 7 && h <= 13 && Math.abs(x - cx) < 6) {
+        return (x - cx) - (h - 10) === -3 || (x - cx) - (h - 10) === -2 ? ['#9fb4ff', 'glossy'] : ['#243049', 'glossy']
+      }
+      if (Math.abs(x - cx) < 1 && h > 13) return ['#e63946', 'glossy']
+      return [m.noise(x, h, z) > 0.9 ? '#e3e7ee' : '#f2f4f8', 'glossy']
+    }, undefined, (x, h) => h >= 2)
+    for (const side of [-1, 1]) {
+      m.cylX(10, cz, 2, side < 0 ? 0 : cx + 8, side < 0 ? cx - 8 : 20, '#d9dde3', 'glossy')
+      m.set(side < 0 ? 0 : 20, 10, cz, '#5ce1e6', 'emissive')
+    }
+    m.line([cx - 5, 15, cz - 1], [cx - 7, 19, cz - 2], '#9aa3ad', 'glossy')
+    m.set(cx - 7, 19, cz - 2, '#e63946', 'emissive')
+  }),
+
+  drone: buildTemplate(25, 10, 25, (m) => {
+    const { cx, cz } = m
+    const corners = [[-7, -7], [7, -7], [-7, 7], [7, 7]]
+    for (const [dx, dz] of corners) m.line([cx, 5, cz], [cx + dx, 5, cz + dz], '#3a3f4c', 'glossy', 0.6)
+    m.ellipsoid(cx, 5, cz, 4, 2.2, 4.5, (x, h) => (h >= 6 ? '#e8ebf0' : '#2b2f3a'), 'glossy')
+    for (const [dx, dz] of corners) {
+      m.cylY(cx + dx, cz + dz, 1.5, 4, 6, '#2b2f3a', 'glossy')
+      m.cylY(cx + dx, cz + dz, 3.8, 7, 7, (x, h, z) =>
+        (Math.abs((x - cx - dx) - (z - cz - dz)) < 0.8 ? '#e8ebf0' : '#c9d1dc'), 'glass')
+      m.set(cx + dx, 7, cz + dz, '#2b2f3a', 'glossy')
+      m.set(cx + dx, 3, cz + dz, dz > 0 ? '#5fd35f' : '#ff4f4f', 'emissive')
+    }
+    // camera gimbal
+    m.box(cx, 2, cz + 3, cx, 3, cz + 3, '#2b2f3a')
+    m.sphere(cx, 1.5, cz + 3.5, 1.4, '#15151a', 'glossy')
+    m.set(cx, 1, cz + 5, '#3a86ff', 'glass')
+  }),
+
+  wizardhat: buildTemplate(21, 25, 21, (m) => {
+    const { cx, cz } = m
+    const bend = (h) => (h > 12 ? ((h - 12) / 10) ** 2 * 5 : 0)
+    const r = (h) => 6.2 * (1 - (h - 2) / 21)
+    m.cylY(cx, cz, 9.5, 0, 1, (x, h, z) => (Math.hypot(x - cx, z - cz) > 8.6 ? '#2a2980' : '#3b3aa8'), 'matte')
+    m.fill((x, h, z) => h >= 2 && h <= 22 && Math.hypot(x - cx - bend(h), z - cz) <= Math.max(0.6, r(h)),
+      (x, h, z) => {
+        if (h >= 2 && h <= 4) return ['#7b3fbf', 'matte']
+        if (h > 5 && m.noise(x, h, z) > 0.94) return ['#ffd23f', 'glossy']
+        return [h % 4 === 0 ? '#34339a' : '#3b3aa8', 'matte']
+      })
+    m.box(cx - 1.5, 2, cz + 6, cx + 1.5, 4, cz + 6, (x, h) => (h === 3 && Math.abs(x - cx) < 1 ? '#7b3fbf' : '#ffd23f'), 'glossy')
+    const tip = [Math.round(cx + bend(23)), 23, cz]
+    m.set(tip[0], 23, cz, '#ffd23f', 'emissive')
+    m.set(tip[0] + 1, 24, cz, '#fff1a0', 'emissive')
+  }),
+
+  slime: buildTemplate(21, 16, 21, (m) => {
+    const { cx, cz } = m
+    m.sphere(cx, 4, cz, 2.5, '#2f8a3a')                                   // core
+    m.ellipsoid(cx, 5.5, cz, 8.8, 7, 8.8, (x, h, z) =>
+      (h > 9 && x < cx - 1 && z > cz ? '#b8ffb0' : '#5fe07a'), 'crystal', (x, h) => h >= 0)
+    for (const ex of [cx - 3, cx + 3]) {
+      for (const h of [7, 8, 9]) m.decalFront(ex, h, '#15151a', 'glossy')
+      m.decalFront(ex - 1, 8, '#15151a', 'glossy')
+      m.decalFront(ex, 9, '#ffffff', 'glossy')
+    }
+    for (const dx of [-1, 0, 1]) m.decalFront(cx + dx, 5, '#15151a', 'glossy')
+    m.decalFront(cx - 2, 6, '#15151a', 'glossy'); m.decalFront(cx + 2, 6, '#15151a', 'glossy')
+    m.decalFront(cx - 5, 6, '#ff9ab5'); m.decalFront(cx + 5, 6, '#ff9ab5')
+    // tiny leaf on top
+    m.set(cx, 13, cz, '#3d8a2f'); m.set(cx + 1, 14, cz, '#5fb84a'); m.set(cx + 2, 14, cz, '#5fb84a')
+  }),
+
+  ghost: buildTemplate(21, 22, 17, (m) => {
+    const { cx, cz } = m
+    const sheet = (x, h, z) => (h < 5 ? '#ddd8f5' : m.noise(x, h, z) > 0.9 ? '#e9e5fb' : '#f6f4ff')
+    m.ellipsoid(cx, 13, cz, 7, 7, 6, sheet, 'matte', (x, h) => h >= 13)
+    m.fill((x, h, z) => {
+      if (h > 13) return false
+      if (((x - cx) / 7) ** 2 + ((z - cz) / 6) ** 2 > 1) return false
+      if (h >= 3) return true
+      const wave = 1.5 + 1.5 * Math.sin(Math.atan2(z - cz, x - cx) * 5)
+      return 3 - h < wave
+    }, sheet, 'matte')
+    m.ellipsoid(cx - 7.5, 10, cz, 2, 1.4, 1.8, sheet, 'matte')           // arms
+    m.ellipsoid(cx + 7.5, 11, cz, 2, 1.4, 1.8, sheet, 'matte')
+    for (const ex of [cx - 2.5, cx + 2.5]) {
+      m.decalFront(ex, 13, '#1b1830', 'glossy'); m.decalFront(ex, 14, '#1b1830', 'glossy')
+    }
+    for (const [dx, h] of [[0, 9], [-1, 10], [1, 10], [0, 11]]) m.decalFront(cx + dx, h, '#1b1830', 'glossy')
+    m.decalFront(cx - 4, 11, '#ffb3c8'); m.decalFront(cx + 4, 11, '#ffb3c8')
+  }),
+
+  well: buildTemplate(21, 24, 21, (m) => {
+    const { cx, cz } = m
+    m.cylY(cx, cz, 10.4, 0, 0, (x, h, z) => (m.noise(x, h, z) > 0.8 ? '#7cc95b' : '#5fae4a'))
+    m.cylY(cx, cz, 7, 1, 6, (x, h, z) => {
+      const n = m.noise(Math.floor((x + (h % 2) * 2) / 2), h, Math.floor(z / 2))
+      return (h === 6 ? '#9c9aa6' : n > 0.6 ? '#8a8894' : n > 0.25 ? '#767482' : '#62606e')
+    }, 'matte', 4.8)
+    m.cylY(cx, cz, 4.8, 4, 4, '#3e8ed0', 'glass')
+    m.cylY(cx, cz, 4.8, 1, 3, '#1f4f80')
+    for (const px of [cx - 6, cx + 6]) m.box(px, 7, cz, px, 16, cz, '#6b4226', 'matte')
+    m.cylX(13, cz, 0.7, cx - 6, cx + 6, '#8b5a2b', 'matte')                   // crank bar
+    m.box(cx + 7, 11, cz, cx + 7, 13, cz, '#6b4226')                          // handle
+    m.line([cx, 13, cz], [cx, 10, cz], '#d9c7a0')                             // rope
+    m.box(cx - 1, 8, cz - 1, cx + 1, 9, cz + 1, (x, h) => (h === 9 ? '#555a66' : '#8b5a2b'))
+    // gabled roof
+    m.fill((x, h, z) => {
+      if (h < 16 || h > 21 || x < cx - 8 || x > cx + 8) return false
+      const inner = (21 - h) * 1.4
+      return Math.abs(z - cz) >= inner - 0.1 && Math.abs(z - cz) <= inner + 1.4
+    }, (x, h) => ((x + h) % 2 ? '#b5462f' : '#9c3a26'), 'matte')
+    m.box(cx - 8, 22, cz, cx + 8, 22, cz, '#7a2e1e', 'matte')
+  }),
+
+  pumpkin: buildTemplate(21, 19, 21, (m) => {
+    const { cx, cz } = m
+    const ch = 7
+    const inPumpkin = (x, h, z) => {
+      const nd = Math.hypot((x - cx) / 8.5, (h - ch) / 6.8, (z - cz) / 8.5)
+      return nd <= 0.93 + 0.07 * Math.cos(Math.atan2(z - cz, x - cx) * 8)
+    }
+    m.fill(inPumpkin, (x, h, z) => {
+      const g = Math.cos(Math.atan2(z - cz, x - cx) * 8)
+      return g < -0.5 ? '#d9500a' : m.noise(x, h, z) > 0.9 ? '#ff9a3c' : '#ff7518'
+    }, 'glossy')
+    // carved face
+    const face = new Set()
+    const add = (h, x0, x1, skip = []) => { for (let x = x0; x <= x1; x++) if (!skip.includes(x)) face.add(`${x},${h}`) }
+    add(9, 5, 8); add(10, 6, 7); add(11, 6, 6)                  // left eye
+    add(9, 12, 15); add(10, 13, 14); add(11, 14, 14)            // right eye
+    add(7, 9, 11); add(8, 10, 10)                               // nose
+    add(5, 5, 15, [7, 13]); add(4, 5, 15); add(3, 6, 14, [10])   // mouth
+    m.carve((x, h, z) => face.has(`${x},${h}`) && z > cz + 2)
+    for (const key of face) {
+      const [x, h] = key.split(',').map(Number)
+      m.decalFront(x, h, '#ffd23f', 'emissive')
+    }
+    m.cylY(cx, cz, 1.3, 13, 15, '#5b7a2a', 'matte')
+    m.set(cx + 1, 16, cz, '#5b7a2a', 'matte')
+    m.box(cx - 3, 14, cz + 1, cx - 1, 14, cz + 2, '#3d8a2f', 'matte')    // leaf
+  }),
+
+  donut: buildTemplate(21, 10, 21, (m) => {
+    const { cx, cz } = m
+    const ch = 4
+    const sprinkles = ['#ff4f4f', '#ffd23f', '#5ce1e6', '#ffffff', '#9b7bff', '#5fd35f']
+    m.fill((x, h, z) => Math.hypot(Math.hypot(x - cx, z - cz) - 6, h - ch) <= 3.3, (x, h, z) => {
+      const drip = Math.sin(Math.atan2(z - cz, x - cx) * 7) * 0.8
+      if (h < ch + drip - 0.3) return ['#d9a066', 'matte']
+      const isTop = Math.hypot(Math.hypot(x - cx, z - cz) - 6, h + 1 - ch) > 3.3
+      if (isTop && m.noise(x, h, z) > 0.86) return [sprinkles[Math.floor(m.noise(z, x, h) * sprinkles.length)], 'glossy']
+      return ['#ff5fa2', 'glossy']
+    })
+    m.cylY(cx, cz, 9.8, 0, 0, '#f7f3ea', 'glossy', 8.8)                   // plate rim
+    m.cylY(cx, cz, 8.8, 0, 0, '#ffffff', 'glossy')
+  }),
+
+  icecream: buildTemplate(17, 28, 17, (m) => {
+    const { cx, cz } = m
+    m.cylY(cx, cz, (h) => 0.6 + h * 0.3, 0, 12, (x, h, z) =>
+      ((x + h) % 3 === 0 || (z + h) % 3 === 0 ? '#b8793a' : '#e0a458'), 'matte')
+    m.cylY(cx, cz, 5.2, 13, 13, (x, h, z) => (Math.cos(Math.atan2(z - cz, x - cx) * 6) > 0 ? '#ff9ec4' : null), 'glossy')
+    m.sphere(cx, 16, cz, 5, (x, h, z) => (m.noise(x, h, z) > 0.9 ? '#ffc4dc' : '#ff9ec4'), 'glossy')
+    m.sphere(cx, 21.5, cz, 4.3, (x, h, z) => (m.noise(x, h, z) > 0.88 ? '#4a2c1a' : '#9ff0c8'), 'glossy')
+    m.sphere(cx, 26, cz, 1.4, '#e63946', 'glossy')
+    m.line([cx, 27, cz], [cx + 1, 28, cz - 1], '#3d8a2f')
+  }),
+
+  frog: buildTemplate(21, 15, 19, (m) => {
+    const { cx, cz } = m
+    m.cylY(cx, cz, 9.5, 0, 0, (x, h, z) => (Math.abs(Math.atan2(z - cz, x - cx) - 0.4) < 0.3 ? null : '#2f7d3a'), 'matte')
+    const green = '#5fb84a'
+    m.ellipsoid(cx - 6, 3, cz - 2, 2.2, 2, 3.5, '#4ea33c')                // back legs
+    m.ellipsoid(cx + 6, 3, cz - 2, 2.2, 2, 3.5, '#4ea33c')
+    m.ellipsoid(cx, 6, cz, 7.5, 4.5, 7, (x, h, z) => ((z - cz) / 7 > 0.3 && h < 6 ? '#d8f0a0' : green), 'glossy')
+    for (const ex of [cx - 3.5, cx + 3.5]) {
+      m.sphere(ex, 10, cz + 2, 2.3, green, 'glossy')
+      m.decalFront(ex, 10, '#15151a', 'glossy'); m.decalFront(ex, 11, '#15151a', 'glossy')
+      m.decalFront(ex + 1, 11, '#ffffff', 'glossy')
+    }
+    for (let dx = -3; dx <= 3; dx++) m.decalFront(cx + dx, Math.abs(dx) === 3 ? 7 : 6, '#2f6a28')
+    m.decalFront(cx - 5, 7, '#ff9ab5'); m.decalFront(cx + 5, 7, '#ff9ab5')
+    for (const fx of [cx - 4, cx + 4]) m.box(fx - 1, 1, cz + 5, fx + 1, 1, cz + 7, '#4ea33c')   // front feet
+    // lily flower
+    m.box(cx + 7, 1, cz + 6, cx + 8, 1, cz + 7, '#ffb3d9', 'glossy')
+    m.set(cx + 7, 2, cz + 6, '#ffe14d', 'glossy')
+  }),
+
+  balloon: buildTemplate(21, 31, 21, (m) => {
+    const { cx, cz } = m
+    const stripes = ['#e63946', '#fff1d6', '#3a86ff', '#fff1d6']
+    m.fill((x, h, z) => {
+      const d = Math.hypot(x - cx, z - cz)
+      if (h >= 15 && h <= 29) return ((h - 20) / 9.5) ** 2 + (d / 9.2) ** 2 <= 1
+      if (h >= 8 && h < 15) return d <= 2.5 + (h - 8) * 0.9
+      return false
+    }, (x, h, z) => {
+      if (h === 17) return '#ffd23f'
+      const a = Math.atan2(z - cz, x - cx)
+      return stripes[Math.floor(((a + Math.PI) / (2 * Math.PI)) * 12) % 4]
+    }, 'glossy')
+    m.box(cx - 2, 0, cz - 2, cx + 2, 3, cz + 2, (x, h, z) => ((x + h + z) % 2 ? '#a0703a' : '#8a5e30'), 'matte')
+    m.box(cx - 2, 3, cz - 2, cx + 2, 3, cz + 2, '#6b4226', 'matte')
+    m.carve((x, h, z) => h === 3 && Math.abs(x - cx) <= 1 && Math.abs(z - cz) <= 1)
+    for (const [dx, dz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]])
+      m.line([cx + dx, 4, cz + dz], [cx + dx * 1.2, 8, cz + dz * 1.2], '#6b4226')
+    m.cylY(cx, cz, 1, 5, 6, '#ff9f1c', 'magma')                                 // burner flame
+  }),
+
+  jukebox: buildTemplate(20, 26, 12, (m) => {
+    const cx = 9.5
+    m.fill((x, h, z) => {
+      if (z < 2 || z > 9 || h > 24) return false
+      if (h <= 16) return x >= 1 && x <= 18
+      return Math.hypot(x - cx, h - 16) <= 8.5 && h >= 16
+    }, (x) => (x <= 2 || x >= 17 ? '#8b352f' : '#5c2827'), 'glossy')
+    m.fill((x, h, z) => z === 10 && h >= 5 && h <= 23 && (x === 2 || x === 17 || h === 5 ||
+      (h >= 16 && Math.abs(Math.hypot(x - cx, h - 16) - 7.2) < 1.1)), '#f0b84a', 'metal')
+    m.fill((x, h, z) => z === 10 && h >= 16 && Math.hypot(x - cx, h - 16) <= 5.7,
+      (x, h) => ((x + h) % 4 < 2 ? '#38e1db' : '#ef4fc9'), 'neon')
+    m.cylZ(cx, 17, 3.6, 10, 11, '#1b2633', 'glass')
+    m.cylZ(cx, 17, 1.2, 11, 11, '#f04d61', 'glossy')
+    m.fill((x, h, z) => z === 10 && x >= 4 && x <= 15 && h >= 6 && h <= 13,
+      (x, h) => ((x + h) % 2 ? '#31343d' : '#444953'), 'matte')
+    for (const x of [5, 8, 11, 14]) m.set(x, 4, 10, x % 2 ? '#5de86e' : '#ffd95a', 'emissive')
+    m.box(7, 1, 3, 12, 3, 9, '#b9c3cc', 'metal')
+  }),
+
+  typewriter: buildTemplate(24, 15, 16, (m) => {
+    m.fill((x, h, z) => x >= 1 && x <= 22 && z >= 2 && z <= 13 && h >= 1 && h <= 3 + (13 - z) * 0.45,
+      (x, h, z) => (m.noise(x, h, z) > 0.86 ? '#31595a' : '#264849'), 'glossy')
+    m.box(3, 7, 4, 20, 11, 10, '#1d3537', 'metal')
+    m.box(2, 10, 3, 21, 11, 5, '#202a2c', 'metal')
+    m.box(4, 9, 4, 19, 14, 4, '#f3ead7', 'matte')
+    for (const h of [11, 13]) m.box(6, h, 3, h === 11 ? 17 : 14, h, 3, '#73808a', 'matte')
+    const rows = [[4, 19, 5], [5, 18, 3], [6, 17, 1]]
+    for (const [x0, x1, h] of rows) for (let x = x0; x <= x1; x += 2)
+      m.box(x, h, 13, x + 1, h + 1, 14, '#e8dfcb', 'glossy')
+    m.box(8, 1, 14, 15, 2, 15, '#d8cdb8', 'glossy')
+    m.box(1, 9, 6, 22, 9, 7, '#aeb8b8', 'metal')
+    for (const x of [0, 23]) m.cylX(9, 6.5, 1.5, x, x, '#202426', 'matte')
+    m.line([21, 10, 6], [23, 13, 6], '#aeb8b8', 'metal')
   }),
 }
 

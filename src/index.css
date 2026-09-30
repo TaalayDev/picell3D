@@ -1147,6 +1147,33 @@ body {
 /* Modular Structure */
 .preview-column .experiment-preview-shape { width: 18px; height: 46px; border-radius: 3px; transform: rotateY(-10deg); }
 .preview-stairs .experiment-preview-shape { width: 48px; height: 36px; clip-path: polygon(0 100%, 0 75%, 25% 75%, 25% 50%, 50% 50%, 50% 25%, 75% 25%, 75% 0, 100% 0, 100% 100%); border-radius: 0; transform: rotateY(-18deg); }
+
+.experiment-asset-strip.template-strip { gap: 10px; }
+.experiment-template-card { grid-template-rows: 80px auto auto; flex-basis: 142px; width: 142px; }
+.experiment-template-card > small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.experiment-template-preview { perspective: 180px; }
+.experiment-template-preview > svg { color: var(--preview-color); opacity: 0.55; }
+.experiment-template-preview .template-part {
+  position: absolute; z-index: 2; display: block;
+  border: 1px solid color-mix(in srgb, var(--preview-color) 75%, white);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--preview-color) 90%, white), var(--preview-color));
+  box-shadow: 7px 9px 13px rgba(0,0,0,0.28);
+}
+.template-cottage .part-a { left: 31px; top: 31px; width: 54px; height: 31px; transform: skewY(-5deg); }
+.template-cottage .part-b { left: 27px; top: 16px; width: 62px; height: 29px; clip-path: polygon(50% 0,100% 100%,0 100%); background: #b94b55; }
+.template-cottage .part-c { left: 53px; top: 42px; width: 13px; height: 20px; background: #6f422d; }
+.template-modern-house .part-a { left: 24px; top: 28px; width: 70px; height: 36px; background: #dfe5e8; }
+.template-modern-house .part-b { left: 21px; top: 20px; width: 76px; height: 10px; background: #414b59; }
+.template-modern-house .part-c { left: 57px; top: 38px; width: 31px; height: 17px; background: rgba(87,196,230,0.7); }
+.template-watchtower .part-a { left: 36px; top: 33px; width: 8px; height: 34px; background: #876444; box-shadow: 39px 0 0 #876444; }
+.template-watchtower .part-b { left: 29px; top: 27px; width: 61px; height: 12px; background: #a87952; }
+.template-watchtower .part-c { left: 25px; top: 11px; width: 69px; height: 22px; clip-path: polygon(50% 0,100% 100%,0 100%); background: #647157; }
+.template-rover .part-a { left: 31px; top: 31px; width: 57px; height: 25px; border-radius: 6px; background: #ef6388; }
+.template-rover .part-b { left: 25px; top: 49px; width: 20px; height: 20px; border: 5px solid #252b3d; border-radius: 50%; background: #111526; box-shadow: 51px 0 0 -5px #111526, 51px 0 0 0 #252b3d; }
+.template-rover .part-c { left: 51px; top: 18px; width: 20px; height: 20px; border-radius: 50%; background: #82def4; }
+.template-table-set .part-a { left: 38px; top: 28px; width: 45px; height: 17px; border-radius: 50%; background: #ac754f; }
+.template-table-set .part-b { left: 57px; top: 41px; width: 7px; height: 25px; background: #493a35; }
+.template-table-set .part-c { left: 20px; top: 51px; width: 20px; height: 9px; border-radius: 50%; background: #b37b52; box-shadow: 80px 0 0 #b37b52; }
 .preview-railing .experiment-preview-shape { width: 50px; height: 26px; background: repeating-linear-gradient(90deg, var(--preview-color) 0 6px, transparent 6px 12px); border: 2px solid var(--preview-color); transform: rotateY(-10deg); }
 .preview-chimney .experiment-preview-shape { width: 22px; height: 44px; border-radius: 2px; background: linear-gradient(180deg, color-mix(in srgb, var(--preview-color) 60%, black) 0 7px, var(--preview-color) 7px 100%); transform: rotateY(-10deg); }
 

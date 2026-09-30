@@ -27,7 +27,7 @@ const FACE_SHADE = {
 }
 
 /** Adjust base color for a material type */
-function materialColor(rgb, type) {
+export function materialColor(rgb, type) {
   switch (type) {
     case 'emissive':
       return lerp3(rgb, [1, 1, 1], 0.38)   // slightly boosted

@@ -5,7 +5,10 @@ import {
   Rotate3D, RotateCcw, Scaling, Sparkles, Square, Tent, Trash2, Triangle,
 } from 'lucide-react'
 import ExperimentViewport from './ExperimentViewport.jsx'
-import { OBJECT_LIBRARY, createObject, getHouseSet, getStarterObjects, objectGroundHeight } from './objectLibrary.js'
+import {
+  MODEL_TEMPLATES, OBJECT_LIBRARY, createModelTemplate, createObject,
+  getHouseSet, getStarterObjects, objectGroundHeight,
+} from './objectLibrary.js'
 
 const ICONS = {
   // Walls
@@ -50,7 +53,7 @@ const ICONS = {
   capsule: Component,
 }
 
-const FOLDERS = ['Walls', 'Doors & Windows', 'Roofs & Floors', 'Structure', 'Basic']
+const FOLDERS = ['Templates', 'Walls', 'Doors & Windows', 'Roofs & Floors', 'Structure', 'Basic']
 
 const SNAP_STEPS = [0.5, 1.0, 0]
 
@@ -60,7 +63,7 @@ export default function ExperimentPage() {
   const [selectedId, setSelectedId] = useState(starter[0].id)
   const [mode, setMode] = useState('translate')
   const [snap, setSnap] = useState(0.5) // Snap to 0.5m by default for LEGO-like grid alignment
-  const [activeFolder, setActiveFolder] = useState('Walls')
+  const [activeFolder, setActiveFolder] = useState('Templates')
   const selected = objects.find(object => object.id === selectedId) ?? null
 
   useEffect(() => {
@@ -131,6 +134,13 @@ export default function ExperimentPage() {
     setSelectedId(house[house.length - 1].id)
   }
 
+  function addTemplate(templateId, origin = { x: 0, y: 0, z: 0 }) {
+    const templateObjects = createModelTemplate(templateId, origin)
+    if (!templateObjects.length) return
+    setObjects(current => [...current, ...templateObjects])
+    setSelectedId(templateObjects[templateObjects.length - 1].id)
+  }
+
   return (
     <div className="experiment-shell direct-model-lab">
       <header className="experiment-header">
@@ -171,6 +181,7 @@ export default function ExperimentPage() {
             snap={snap}
             onSelect={setSelectedId}
             onAdd={addObject}
+            onAddTemplate={addTemplate}
             onTransform={(id, transform) => updateObject(id, transform)}
           />
           <div className="experiment-stage-label">MODULAR 3D ASSEMBLY · {objects.length} OBJECTS · GRID 0.5M</div>
@@ -217,9 +228,9 @@ export default function ExperimentPage() {
             <div className="experiment-folder-list">
               {FOLDERS.map(folder => (
                 <button key={folder} className={activeFolder === folder ? 'active' : ''} onClick={() => setActiveFolder(folder)}>
-                  <Folder size={14} />
+                  {folder === 'Templates' ? <Sparkles size={14} /> : <Folder size={14} />}
                   <span>{folder}</span>
-                  <small>{OBJECT_LIBRARY.filter(item => item.category === folder).length}</small>
+                  <small>{folder === 'Templates' ? MODEL_TEMPLATES.length : OBJECT_LIBRARY.filter(item => item.category === folder).length}</small>
                 </button>
               ))}
             </div>
@@ -228,10 +239,26 @@ export default function ExperimentPage() {
           <div className="experiment-library-content">
             <div className="experiment-library-content-head">
               <div><strong>{activeFolder}</strong><span>Drag parts into 3D space or double-click to place</span></div>
-              <button className="experiment-add-set" onClick={addHouseSet} title="Construct a complete 4x4 modular house with walls, cutouts, doors & windows"><Home size={13} /> Add modular house</button>
+              {activeFolder !== 'Templates' && <button className="experiment-add-set" onClick={addHouseSet} title="Construct a complete 4x4 modular house with walls, cutouts, doors & windows"><Home size={13} /> Add modular house</button>}
             </div>
-            <div className="experiment-asset-strip">
-              {OBJECT_LIBRARY.filter(item => item.category === activeFolder).map(item => {
+            <div className={`experiment-asset-strip ${activeFolder === 'Templates' ? 'template-strip' : ''}`}>
+              {activeFolder === 'Templates' ? MODEL_TEMPLATES.map(template => (
+                <button
+                  key={template.id}
+                  draggable
+                  onDragStart={event => {
+                    event.dataTransfer.setData('application/picell-template', template.id)
+                    event.dataTransfer.effectAllowed = 'copy'
+                  }}
+                  onDoubleClick={() => addTemplate(template.id)}
+                  className="experiment-asset-card experiment-template-card"
+                  title="Drag this complete template into the scene or double-click to add"
+                >
+                  <TemplatePreview template={template} />
+                  <span>{template.name}</span>
+                  <small>{template.description}</small>
+                </button>
+              )) : OBJECT_LIBRARY.filter(item => item.category === activeFolder).map(item => {
                 const Icon = ICONS[item.type] ?? Box
                 return (
                   <button
@@ -264,6 +291,17 @@ function ObjectPreview({ type, color, Icon }) {
     <span className={`experiment-asset-preview preview-${type}`} style={{ '--preview-color': color }}>
       <span className="experiment-preview-shape" />
       <Icon size={17} />
+    </span>
+  )
+}
+
+function TemplatePreview({ template }) {
+  return (
+    <span className={`experiment-asset-preview experiment-template-preview template-${template.preview}`} style={{ '--preview-color': template.color }}>
+      <span className="template-part part-a" />
+      <span className="template-part part-b" />
+      <span className="template-part part-c" />
+      <Home size={16} />
     </span>
   )
 }

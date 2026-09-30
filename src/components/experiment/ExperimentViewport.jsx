@@ -422,13 +422,13 @@ function materialFor(object) {
   })
 }
 
-export default function ExperimentViewport({ objects, selectedId, mode, snap = 0.5, onSelect, onAdd, onTransform }) {
+export default function ExperimentViewport({ objects, selectedId, mode, snap = 0.5, onSelect, onAdd, onAddTemplate, onTransform }) {
   const containerRef = useRef(null)
   const sceneRef = useRef(null)
   const meshMapRef = useRef(new Map())
   const transformRef = useRef(null)
-  const callbacksRef = useRef({ onSelect, onAdd, onTransform })
-  callbacksRef.current = { onSelect, onAdd, onTransform }
+  const callbacksRef = useRef({ onSelect, onAdd, onAddTemplate, onTransform })
+  callbacksRef.current = { onSelect, onAdd, onAddTemplate, onTransform }
 
   useEffect(() => {
     const container = containerRef.current
@@ -528,14 +528,16 @@ export default function ExperimentViewport({ objects, selectedId, mode, snap = 0
     const onDrop = event => {
       event.preventDefault()
       const type = event.dataTransfer.getData('application/picell-object')
-      if (!type) return
+      const templateId = event.dataTransfer.getData('application/picell-template')
+      if (!type && !templateId) return
       setPointer(event)
       const point = new THREE.Vector3()
       if (!raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), point)) point.set(0, 0, 0)
       // Snap drop point to grid if snapping is enabled
       const finalX = snap > 0 ? Math.round(point.x / snap) * snap : point.x
       const finalZ = snap > 0 ? Math.round(point.z / snap) * snap : point.z
-      callbacksRef.current.onAdd(type, { x: finalX, y: 0, z: finalZ })
+      if (templateId) callbacksRef.current.onAddTemplate?.(templateId, { x: finalX, y: 0, z: finalZ })
+      else callbacksRef.current.onAdd(type, { x: finalX, y: 0, z: finalZ })
     }
     renderer.domElement.addEventListener('pointerdown', onPointerDown)
     renderer.domElement.addEventListener('dragover', onDragOver)

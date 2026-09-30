@@ -13,6 +13,7 @@ import MaterialPanel   from './components/panels/MaterialPanel.jsx'
 import VoxelOptionsPanel from './components/panels/VoxelOptionsPanel.jsx'
 import LayersPanel       from './components/panels/LayersPanel.jsx'
 import RenderPage        from './components/render/RenderPage.jsx'
+import LowPolyPage       from './components/render/LowPolyPage.jsx'
 import StartOverlay      from './components/onboarding/StartOverlay.jsx'
 import ShortcutsPanel    from './components/layout/ShortcutsPanel.jsx'
 
@@ -37,6 +38,7 @@ export default function App() {
   const showShortcutsPanel = useStore(s => s.showShortcutsPanel)
   const exportFn    = useRef(null)
   const [renderOpen, setRenderOpen] = useState(false)
+  const [lowPolyOpen, setLowPolyOpen] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(
     () => !localStorage.getItem(ONBOARDING_KEY)
   )
@@ -165,7 +167,11 @@ export default function App() {
 
       <div className="relative flex flex-col w-full h-full" style={{ zIndex: 10 }}>
 
-        <Toolbar onExport={() => exportFn.current?.()} onRender={() => setRenderOpen(true)} />
+        <Toolbar
+          onExport={() => exportFn.current?.()}
+          onRender={() => setRenderOpen(true)}
+          onLowPoly={() => setLowPolyOpen(true)}
+        />
 
         <div className="flex flex-1 min-h-0">
 
@@ -240,6 +246,7 @@ export default function App() {
       </div>
 
       {renderOpen && <RenderPage onClose={() => setRenderOpen(false)} />}
+      {lowPolyOpen && <LowPolyPage onClose={() => setLowPolyOpen(false)} />}
       {showOnboarding && <StartOverlay onDone={handleOnboardingDone} />}
       {!showOnboarding && <FirstVoxelHint />}
       {showShortcutsPanel && <ShortcutsPanel />}

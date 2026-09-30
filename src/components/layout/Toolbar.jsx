@@ -5,7 +5,7 @@ import {
   Undo2, Redo2, Trash2, Download, Frame, ImagePlus, Settings2, Aperture,
   RectangleHorizontal, Circle, Ellipse, Minus,
   BoxSelect, LassoSelect, Droplets, HelpCircle,
-  Save, FolderOpen, FlaskConical,
+  Save, FolderOpen, FlaskConical, Triangle, Menu,
 } from 'lucide-react'
 import { useStore } from '../../store/index.js'
 import TemplatesDialog from './TemplatesDialog.jsx'
@@ -27,6 +27,12 @@ const TOOLS = [
   { id: 'ellipse',  Icon: Ellipse,             label: 'Ellipse',               group: 'shape' },
   { id: 'line',     Icon: Minus,               label: 'Line (L)',      key: 'L', group: 'shape' },
 ]
+const SHAPE_TOOLS = TOOLS.filter(t => t.group === 'shape')
+
+const SELECT_MODES = [
+  { id: 'rect',  Icon: BoxSelect,   label: 'Rectangle Select' },
+  { id: 'lasso', Icon: LassoSelect, label: 'Lasso Select' },
+]
 
 const VIEW_MODES = [
   { id: 'canvas-only',  Icon: Square,   label: '2D only' },
@@ -34,7 +40,7 @@ const VIEW_MODES = [
   { id: 'preview-only', Icon: Box,      label: '3D only' },
 ]
 
-export default function Toolbar({ onExport, onRender }) {
+export default function Toolbar({ onExport, onRender, onLowPoly }) {
   const {
     activeTool, setActiveTool,
     selectionMode, setSelectionMode,
@@ -51,6 +57,12 @@ export default function Toolbar({ onExport, onRender }) {
   const [showSettingsDialog,  setShowSettingsDialog]  = useState(false)
   const [showExportDialog,    setShowExportDialog]    = useState(false)
   const fileInputRef = useRef(null)
+
+  // The shape button shows the last shape used, so one click re-selects it
+  const [lastShape, setLastShape] = useState('rect')
+  useEffect(() => {
+    if (SHAPE_TOOLS.some(t => t.id === activeTool)) setLastShape(activeTool)
+  }, [activeTool])
 
   function handleSaveProject() {
     const data = getProjectData()
@@ -90,8 +102,8 @@ export default function Toolbar({ onExport, onRender }) {
     <div className="flex items-center gap-1 px-2 py-1 border-b border-border"
       style={{ background: 'var(--color-surfaceAlt)' }}>
 
-      {/* Logo + Settings + Shortcuts */}
-      <div className="flex items-center gap-2 mr-3 pr-3 border-r border-border">
+      {/* Logo + app menu */}
+      <div className="flex items-center gap-1 mr-1 pr-1 xl:mr-2 xl:pr-2 border-r border-border">
         <button
           onClick={() => setShowTemplatesDialog(true)}
           title="Open Templates Library"
@@ -99,27 +111,14 @@ export default function Toolbar({ onExport, onRender }) {
         >
           <span>Picell3D</span>
         </button>
-        <button
-          onClick={() => setShowSettingsDialog(true)}
-          title="Settings"
-          className="flex items-center justify-center w-6 h-6 rounded border border-transparent text-text-muted hover:text-accent hover:border-accent/50 transition-colors"
-        >
-          <Settings2 size={13} />
-        </button>
-        <button
-          onClick={toggleShortcutsPanel}
-          title="Keyboard shortcuts (?)"
-          className="flex items-center justify-center w-6 h-6 rounded border border-transparent text-text-muted hover:text-accent hover:border-accent/50 transition-colors"
-        >
-          <HelpCircle size={13} />
-        </button>
-        <a
-          href={window.electron?.isElectron ? './index.html?page=experiment' : '/experiment'}
-          title="Open Model Lab experiment"
-          className="flex items-center justify-center w-6 h-6 rounded border border-transparent text-text-muted hover:text-accent hover:border-accent/50 transition-colors"
-        >
-          <FlaskConical size={13} />
-        </a>
+        <AppMenu
+          onSettings={() => setShowSettingsDialog(true)}
+          onShortcuts={toggleShortcutsPanel}
+          onSize={() => setShowSizeDialog(true)}
+          onImport={() => setShowImportDialog(true)}
+          onSave={handleSaveProject}
+          onLoad={() => fileInputRef.current?.click()}
+        />
       </div>
 
       {/* Drawing tools */}
@@ -127,15 +126,15 @@ export default function Toolbar({ onExport, onRender }) {
         {TOOLS.filter(t => t.group === 'draw').map(tool => {
           if (tool.id === 'select') {
             return (
-              <SelectToolButton
+              <ToolMenuButton
                 key="select"
+                heading="Selection Tool"
+                options={SELECT_MODES}
+                value={selectionMode}
                 active={activeTool === 'select'}
-                selectionMode={selectionMode}
-                onSelectMode={(mode) => {
-                  setSelectionMode(mode)
-                  setActiveTool('select')
-                }}
+                title={`${SELECT_MODES.find(m => m.id === selectionMode)?.label} (S)`}
                 onActivate={() => setActiveTool('select')}
+                onPick={(mode) => { setSelectionMode(mode); setActiveTool('select') }}
               />
             )
           }
@@ -152,20 +151,20 @@ export default function Toolbar({ onExport, onRender }) {
       </div>
 
       {/* Shape tools */}
-      <div className="flex items-center gap-0.5 mr-2 pr-2 border-r border-border">
-        {TOOLS.filter(t => t.group === 'shape').map(tool => (
-          <ToolButton
-            key={tool.id}
-            Icon={tool.Icon}
-            label={tool.label}
-            active={activeTool === tool.id}
-            onClick={() => setActiveTool(tool.id)}
-          />
-        ))}
+      <div className="flex items-center gap-0.5 mr-1 pr-1 xl:mr-2 xl:pr-2 border-r border-border">
+        <ToolMenuButton
+          heading="Shape Tool"
+          options={SHAPE_TOOLS}
+          value={lastShape}
+          active={SHAPE_TOOLS.some(t => t.id === activeTool)}
+          title={SHAPE_TOOLS.find(t => t.id === lastShape)?.label}
+          onActivate={() => setActiveTool(lastShape)}
+          onPick={(id) => setActiveTool(id)}
+        />
       </div>
 
       {/* Zoom */}
-      <div className="flex items-center gap-1 mr-2 pr-2 border-r border-border">
+      <div className="flex items-center gap-1 mr-1 pr-1 xl:mr-2 xl:pr-2 border-r border-border">
         <button
           className="text-text-muted hover:text-text text-xs px-1.5 py-0.5 rounded border border-border hover:border-accent transition-colors"
           onClick={() => setPixelSize(pixelSize - 2)}
@@ -181,7 +180,7 @@ export default function Toolbar({ onExport, onRender }) {
 
       {/* Grid toggle */}
       <button
-        className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors mr-2 ${
+        className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors mr-1 xl:mr-2 ${
           showGrid
             ? 'border-accent bg-accent/20 text-accent'
             : 'border-border text-text-muted hover:text-text'
@@ -189,11 +188,11 @@ export default function Toolbar({ onExport, onRender }) {
         onClick={toggleGrid}
         title="Toggle grid (G)"
       >
-        <Grid3X3 size={12} /> Grid
+        <Grid3X3 size={12} /> <span className="hidden 2xl:inline">Grid</span>
       </button>
 
       {/* View mode */}
-      <div className="flex items-center gap-0.5 mr-2 pr-2 border-r border-border">
+      <div className="flex items-center gap-0.5 mr-1 pr-1 xl:mr-2 xl:pr-2 border-r border-border">
         {VIEW_MODES.map(({ id, Icon, label }) => (
           <button
             key={id}
@@ -210,14 +209,15 @@ export default function Toolbar({ onExport, onRender }) {
         ))}
       </div>
 
-      {/* Canvas size */}
+      {/* Canvas size, import, save/load — inline on wide screens, in the app menu otherwise */}
+      <div className="hidden xl:flex items-center">
       <button
         className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent transition-colors mr-2"
         onClick={() => setShowSizeDialog(true)}
         title="Canvas size"
       >
         <Frame size={12} />
-        <span>Size</span>
+        <span className="hidden 2xl:inline">Size</span>
       </button>
 
       {/* Import image */}
@@ -227,19 +227,19 @@ export default function Toolbar({ onExport, onRender }) {
         title="Import image"
       >
         <ImagePlus size={12} />
-        <span>Import</span>
+        <span className="hidden 2xl:inline">Import</span>
       </button>
 
       {/* Save / Load project */}
       <input ref={fileInputRef} type="file" accept=".picell3d" className="hidden" onChange={handleLoadProject} />
-      <div className="flex items-center gap-0.5 mr-2 pr-2 border-r border-border">
+      <div className="flex items-center gap-0.5 mr-1 pr-1 xl:mr-2 xl:pr-2 border-r border-border">
         <button
           className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent transition-colors"
           onClick={handleSaveProject}
           title="Save project (Ctrl+S)"
         >
           <Save size={12} />
-          <span>Save</span>
+          <span className="hidden 2xl:inline">Save</span>
         </button>
         <button
           className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent transition-colors"
@@ -247,8 +247,9 @@ export default function Toolbar({ onExport, onRender }) {
           title="Load project"
         >
           <FolderOpen size={12} />
-          <span>Load</span>
+          <span className="hidden 2xl:inline">Load</span>
         </button>
+      </div>
       </div>
 
       {/* Actions */}
@@ -266,7 +267,7 @@ export default function Toolbar({ onExport, onRender }) {
           title="Export as PNG"
         >
           <Download size={14} />
-          <span>Export PNG</span>
+          <span className="hidden xl:inline">Export PNG</span>
         </button>
         <button
           className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition-all"
@@ -279,7 +280,20 @@ export default function Toolbar({ onExport, onRender }) {
           title="Open Render Studio"
         >
           <Aperture size={14} />
-          <span>Render</span>
+          <span className="hidden xl:inline">Render</span>
+        </button>
+        <button
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition-all"
+          style={{
+            borderColor: 'var(--color-accent)',
+            color:       'var(--color-accent)',
+            background:  'color-mix(in srgb, var(--color-accent) 12%, transparent)',
+          }}
+          onClick={onLowPoly}
+          title="Convert to a smooth low poly model"
+        >
+          <Triangle size={14} />
+          <span className="hidden xl:inline">Low Poly</span>
         </button>
       </div>
     </div>
@@ -319,34 +333,75 @@ function ActionButton({ Icon, label, onClick, danger }) {
   )
 }
 
-function SelectToolButton({ active, selectionMode, onSelectMode, onActivate }) {
-  const [showMenu, setShowMenu] = useState(false)
-  const buttonRef = useRef(null)
-  const menuRef   = useRef(null)
-
+/** Closes a popup on outside pointerdown or Escape. */
+function useDismiss(open, setOpen, refs) {
   useEffect(() => {
-    if (!showMenu) return
+    if (!open) return
     const onPointerDown = (e) => {
-      if (
-        menuRef.current && !menuRef.current.contains(e.target) &&
-        buttonRef.current && !buttonRef.current.contains(e.target)
-      ) {
-        setShowMenu(false)
-      }
+      if (refs.every(r => !r.current?.contains(e.target))) setOpen(false)
     }
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape') setShowMenu(false)
-    }
+    const onKeyDown = (e) => { if (e.key === 'Escape') setOpen(false) }
     window.addEventListener('pointerdown', onPointerDown)
     window.addEventListener('keydown', onKeyDown)
     return () => {
       window.removeEventListener('pointerdown', onPointerDown)
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [showMenu])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+}
 
-  const Icon = selectionMode === 'lasso' ? LassoSelect : BoxSelect
-  const label = selectionMode === 'lasso' ? 'Lasso Select (S)' : 'Rectangle Select (S)'
+function MenuPanel({ menuRef, heading, children, align = 'left' }) {
+  return (
+    <div
+      ref={menuRef}
+      className={`absolute top-full ${align === 'left' ? 'left-0' : 'right-0'} mt-1.5 z-50 py-1 rounded-lg border shadow-2xl flex flex-col min-w-[165px]`}
+      style={{
+        background: 'var(--color-surface)',
+        borderColor: 'var(--color-border)',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.85)',
+      }}
+    >
+      {heading && (
+        <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-muted border-b border-border/40 mb-0.5">
+          {heading}
+        </div>
+      )}
+      {children}
+    </div>
+  )
+}
+
+function MenuItem({ Icon, label, hint, selected, onClick, href }) {
+  const className = `flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-left transition-colors ${
+    selected
+      ? 'bg-accent/20 text-accent font-medium'
+      : 'text-text-muted hover:text-text hover:bg-surface-alt'
+  }`
+  const content = (
+    <>
+      <Icon size={14} className={selected ? 'text-accent' : ''} />
+      <span className="flex-1 whitespace-nowrap">{label}</span>
+      {hint && <span className="text-[10px] font-mono opacity-60 whitespace-nowrap">{hint}</span>}
+      {selected && <span className="text-xs font-bold text-accent">✓</span>}
+    </>
+  )
+  if (href) return <a href={href} className={className}>{content}</a>
+  return <button className={className} onClick={onClick}>{content}</button>
+}
+
+/**
+ * Tool button that stands for a family of tools (selection modes, shapes).
+ * Shows the current option's icon; clicking activates it and toggles the picker.
+ */
+function ToolMenuButton({ heading, options, value, active, title, onActivate, onPick }) {
+  const [open, setOpen] = useState(false)
+  const buttonRef = useRef(null)
+  const menuRef   = useRef(null)
+  useDismiss(open, setOpen, [buttonRef, menuRef])
+
+  const current = options.find(o => o.id === value) ?? options[0]
+  const Icon = current.Icon
 
   return (
     <div className="relative">
@@ -357,10 +412,10 @@ function SelectToolButton({ active, selectionMode, onSelectMode, onActivate }) {
             ? 'border-accent bg-accent/20 text-accent shadow-glow-accent'
             : 'border-transparent text-text-muted hover:border-border hover:text-text hover:bg-surface-alt'
         }`}
-        title={`${label} — click to choose tool`}
+        title={`${title} — click to choose tool`}
         onClick={() => {
           onActivate()
-          setShowMenu(prev => !prev)
+          setOpen(prev => !prev)
         }}
       >
         <Icon size={16} />
@@ -376,55 +431,73 @@ function SelectToolButton({ active, selectionMode, onSelectMode, onActivate }) {
         />
       </button>
 
-      {showMenu && (
-        <div
-          ref={menuRef}
-          className="absolute top-full left-0 mt-1.5 z-50 py-1 rounded-lg border shadow-2xl flex flex-col min-w-[165px]"
-          style={{
-            background: 'var(--color-surface)',
-            borderColor: 'var(--color-border)',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.85)',
-          }}
-        >
-          <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-muted border-b border-border/40 mb-0.5">
-            Selection Tool
-          </div>
-          <button
-            className={`flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-left transition-colors ${
-              selectionMode === 'rect'
-                ? 'bg-accent/20 text-accent font-medium'
-                : 'text-text-muted hover:text-text hover:bg-surface-alt'
-            }`}
-            onClick={(e) => {
-              e.stopPropagation()
-              onSelectMode('rect')
-              setShowMenu(false)
-            }}
-          >
-            <BoxSelect size={14} className={selectionMode === 'rect' ? 'text-accent' : ''} />
-            <span className="flex-1">Rectangle Select</span>
-            {selectionMode === 'rect' && <span className="text-xs font-bold text-accent">✓</span>}
-          </button>
-
-          <button
-            className={`flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-left transition-colors ${
-              selectionMode === 'lasso'
-                ? 'bg-accent/20 text-accent font-medium'
-                : 'text-text-muted hover:text-text hover:bg-surface-alt'
-            }`}
-            onClick={(e) => {
-              e.stopPropagation()
-              onSelectMode('lasso')
-              setShowMenu(false)
-            }}
-          >
-            <LassoSelect size={14} className={selectionMode === 'lasso' ? 'text-accent' : ''} />
-            <span className="flex-1">Lasso Select</span>
-            {selectionMode === 'lasso' && <span className="text-xs font-bold text-accent">✓</span>}
-          </button>
-        </div>
+      {open && (
+        <MenuPanel menuRef={menuRef} heading={heading}>
+          {options.map(o => (
+            <MenuItem
+              key={o.id}
+              Icon={o.Icon}
+              label={o.label.replace(/ \(.\)$/, '')}
+              hint={o.key}
+              selected={active && o.id === value}
+              onClick={(e) => {
+                e.stopPropagation()
+                onPick(o.id)
+                setOpen(false)
+              }}
+            />
+          ))}
+        </MenuPanel>
       )}
     </div>
   )
 }
 
+/**
+ * Settings, keyboard shortcuts and the Model Lab behind one menu button.
+ * On narrow screens it also holds the project actions that don't fit in the toolbar.
+ */
+function AppMenu({ onSettings, onShortcuts, onSize, onImport, onSave, onLoad }) {
+  const [open, setOpen] = useState(false)
+  const buttonRef = useRef(null)
+  const menuRef   = useRef(null)
+  useDismiss(open, setOpen, [buttonRef, menuRef])
+
+  const run = (fn) => () => { setOpen(false); fn() }
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        onClick={() => setOpen(prev => !prev)}
+        title="Menu"
+        className={`flex items-center justify-center w-7 h-7 rounded border transition-colors ${
+          open
+            ? 'border-accent/50 text-accent'
+            : 'border-transparent text-text-muted hover:text-accent hover:border-accent/50'
+        }`}
+      >
+        <Menu size={15} />
+      </button>
+      {open && (
+        <MenuPanel menuRef={menuRef}>
+          <div className="flex flex-col xl:hidden">
+            <MenuItem Icon={Save}       label="Save project" hint="Ctrl+S" onClick={run(onSave)} />
+            <MenuItem Icon={FolderOpen} label="Load project"  onClick={run(onLoad)} />
+            <MenuItem Icon={ImagePlus}  label="Import image"  onClick={run(onImport)} />
+            <MenuItem Icon={Frame}      label="Canvas size"   onClick={run(onSize)} />
+            <div className="my-1 border-t border-border/40" />
+          </div>
+          <MenuItem Icon={Settings2}  label="Settings"            onClick={run(onSettings)} />
+          <MenuItem Icon={HelpCircle} label="Keyboard shortcuts" hint="?" onClick={run(onShortcuts)} />
+          <div className="my-1 border-t border-border/40" />
+          <MenuItem
+            Icon={FlaskConical}
+            label="Model Lab"
+            href={window.electron?.isElectron ? './index.html?page=experiment' : '/experiment'}
+          />
+        </MenuPanel>
+      )}
+    </div>
+  )
+}

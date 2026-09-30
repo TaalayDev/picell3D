@@ -127,6 +127,60 @@ function triggerDownload(content, filename, mime) {
   URL.revokeObjectURL(url)
 }
 
+/**
+ * Export a triangle mesh group (e.g. the low poly model) to OBJ + MTL.
+ * Each mesh must be non-indexed; `mesh.userData.faceHex[i]` gives triangle i's colour.
+ */
+export function buildObjMtlFromGroup(group, stem = 'model') {
+  const colorMap = new Map() // hex -> matName
+  const mtlLines = ['# Picell3D low poly export', '']
+  const faces = new Map()    // matName -> [[v, n], ...] per triangle
+  const vLines = [], nLines = []
+  let vi = 1
+
+  function ensureMat(color) {
+    if (colorMap.has(color)) return colorMap.get(color)
+    const name = `c${colorMap.size}`
+    colorMap.set(color, name)
+    const [r, g, b] = [1, 3, 5].map(i => (parseInt(color.slice(i, i + 2), 16) / 255).toFixed(4))
+    mtlLines.push(`newmtl ${name}`, `Kd ${r} ${g} ${b}`, `Ka 0.05 0.05 0.05`, `Ks 0.0 0.0 0.0`, `d 1.0`, '')
+    faces.set(name, [])
+    return name
+  }
+
+  group.traverse(obj => {
+    if (!obj.isMesh) return
+    const pos = obj.geometry.getAttribute('position')
+    const nor = obj.geometry.getAttribute('normal')
+    const faceHex = obj.userData.faceHex || []
+    for (let t = 0; t < pos.count / 3; t++) {
+      const mat = ensureMat(faceHex[t] || '#cccccc')
+      const ids = []
+      for (let c = 0; c < 3; c++) {
+        const i = t * 3 + c
+        vLines.push(`v ${pos.getX(i).toFixed(5)} ${pos.getY(i).toFixed(5)} ${pos.getZ(i).toFixed(5)}`)
+        nLines.push(`vn ${nor.getX(i).toFixed(4)} ${nor.getY(i).toFixed(4)} ${nor.getZ(i).toFixed(4)}`)
+        ids.push(vi++)
+      }
+      faces.get(mat).push(ids)
+    }
+  })
+
+  const objLines = ['# Picell3D low poly export', `mtllib ${stem}.mtl`, '', ...vLines, '', ...nLines, '']
+  for (const [mat, list] of faces) {
+    objLines.push(`usemtl ${mat}`)
+    for (const ids of list) objLines.push(`f ${ids.map(i => `${i}//${i}`).join(' ')}`)
+    objLines.push('')
+  }
+  return { obj: objLines.join('\n'), mtl: mtlLines.join('\n') }
+}
+
+export function downloadGroupObjMtl(group, stem = 'model') {
+  const { obj, mtl } = buildObjMtlFromGroup(group, stem)
+  triggerDownload(obj, `${stem}.obj`, 'text/plain')
+  setTimeout(() => triggerDownload(mtl, `${stem}.mtl`, 'text/plain'), 150)
+}
+
 export function downloadObjMtl(layers, W, H, D, stem = 'model') {
   const { obj, mtl } = buildObjMtl(layers, W, H, D)
   triggerDownload(obj, `${stem}.obj`, 'text/plain')

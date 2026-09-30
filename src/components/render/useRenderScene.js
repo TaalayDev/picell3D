@@ -53,7 +53,11 @@ export const BG_PRESETS = [
   { label: 'Custom',   value: null      },
 ]
 
-export function useRenderScene(containerRef) {
+/**
+ * Shared Render Studio scene. With `autoBuild: false` the caller supplies the
+ * mesh itself through `setMesh(group, dispose)` (used by Low Poly Studio).
+ */
+export function useRenderScene(containerRef, { autoBuild = true } = {}) {
   const rendererRef  = useRef(null)
   const sceneRef     = useRef(null)
   const cameraRef    = useRef(null)
@@ -178,15 +182,10 @@ export function useRenderScene(containerRef) {
     if (sceneRef.current?.fog) sceneRef.current.fog.color.setHex(hex)
   }, [])
 
-  // ── Mesh rebuild — same pipeline as 3D preview ────────────────────────────
-  const rebuild = useCallback(() => {
+  // ── Mesh swap ──────────────────────────────────────────────────────────────
+  const setMesh = useCallback((group, dispose) => {
     const scene = sceneRef.current
-    if (!scene) return
-    const { layers, canvasWidth: W, canvasHeight: H, depthDimension: D } = useStore.getState()
-    const composited   = getCompositedVoxels(layers, W, H, D)
-    const voxelMats    = getCompositedMaterials(layers)
-    const { group, dispose } = buildVoxelMesh(composited, W, H, D, {}, voxelMats)
-
+    if (!scene) { dispose?.(); return }
     if (meshGroupRef.current) {
       scene.remove(meshGroupRef.current)
       disposeRef.current?.()
@@ -196,10 +195,20 @@ export function useRenderScene(containerRef) {
     disposeRef.current   = dispose
   }, [])
 
+  // ── Mesh rebuild — same pipeline as 3D preview ────────────────────────────
+  const rebuild = useCallback(() => {
+    const { layers, canvasWidth: W, canvasHeight: H, depthDimension: D } = useStore.getState()
+    const composited   = getCompositedVoxels(layers, W, H, D)
+    const voxelMats    = getCompositedMaterials(layers)
+    const { group, dispose } = buildVoxelMesh(composited, W, H, D, {}, voxelMats)
+    setMesh(group, dispose)
+  }, [setMesh])
+
   useEffect(() => {
-    rebuild()
+    if (autoBuild) rebuild()
     applyPreset('studio')
-  }, [rebuild, applyPreset])
+    return () => { disposeRef.current?.(); disposeRef.current = null; meshGroupRef.current = null }
+  }, [rebuild, applyPreset, autoBuild])
 
   // ── PNG export ─────────────────────────────────────────────────────────────
   const exportPng = useCallback((size = 2048) => {
@@ -258,5 +267,5 @@ export function useRenderScene(containerRef) {
     }, (err) => console.error('GLB export error:', err), { binary: true })
   }, [])
 
-  return { rebuild, applyPreset, applyBg, exportPng, exportGlb }
+  return { rebuild, setMesh, applyPreset, applyBg, exportPng, exportGlb }
 }
