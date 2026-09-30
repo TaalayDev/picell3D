@@ -1,13 +1,14 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Pencil, Eraser, PaintBucket, Sparkles,
   Grid3X3, Square, Columns2, Box,
   Undo2, Redo2, Trash2, Download, Frame, ImagePlus, Settings2, Aperture,
   RectangleHorizontal, Circle, Ellipse, Minus,
-  BoxSelect, Droplets, HelpCircle,
-  Save, FolderOpen,
+  BoxSelect, LassoSelect, Droplets, HelpCircle,
+  Save, FolderOpen, FlaskConical,
 } from 'lucide-react'
 import { useStore } from '../../store/index.js'
+import TemplatesDialog from './TemplatesDialog.jsx'
 import CanvasSizeDialog from './CanvasSizeDialog.jsx'
 import ImportDialog from '../canvas/ImportDialog.jsx'
 import SettingsDialog from './SettingsDialog.jsx'
@@ -36,6 +37,7 @@ const VIEW_MODES = [
 export default function Toolbar({ onExport, onRender }) {
   const {
     activeTool, setActiveTool,
+    selectionMode, setSelectionMode,
     pixelSize, setPixelSize,
     toggleGrid, showGrid,
     clearCanvas, undo, redo,
@@ -43,10 +45,11 @@ export default function Toolbar({ onExport, onRender }) {
     getProjectData, loadProjectData,
     toggleShortcutsPanel,
   } = useStore()
-  const [showSizeDialog,     setShowSizeDialog]     = useState(false)
-  const [showImportDialog,   setShowImportDialog]   = useState(false)
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false)
-  const [showExportDialog,   setShowExportDialog]   = useState(false)
+  const [showTemplatesDialog, setShowTemplatesDialog] = useState(false)
+  const [showSizeDialog,      setShowSizeDialog]      = useState(false)
+  const [showImportDialog,    setShowImportDialog]    = useState(false)
+  const [showSettingsDialog,  setShowSettingsDialog]  = useState(false)
+  const [showExportDialog,    setShowExportDialog]    = useState(false)
   const fileInputRef = useRef(null)
 
   function handleSaveProject() {
@@ -79,16 +82,23 @@ export default function Toolbar({ onExport, onRender }) {
 
   return (
     <>
-    {showSizeDialog     && <CanvasSizeDialog onClose={() => setShowSizeDialog(false)} />}
-    {showImportDialog   && <ImportDialog     onClose={() => setShowImportDialog(false)} />}
-    {showSettingsDialog && <SettingsDialog   onClose={() => setShowSettingsDialog(false)} />}
-    {showExportDialog   && <ExportDialog     onClose={() => setShowExportDialog(false)} />}
+    {showTemplatesDialog && <TemplatesDialog onClose={() => setShowTemplatesDialog(false)} />}
+    {showSizeDialog      && <CanvasSizeDialog onClose={() => setShowSizeDialog(false)} />}
+    {showImportDialog    && <ImportDialog     onClose={() => setShowImportDialog(false)} />}
+    {showSettingsDialog  && <SettingsDialog   onClose={() => setShowSettingsDialog(false)} />}
+    {showExportDialog    && <ExportDialog     onClose={() => setShowExportDialog(false)} />}
     <div className="flex items-center gap-1 px-2 py-1 border-b border-border"
       style={{ background: 'var(--color-surfaceAlt)' }}>
 
       {/* Logo + Settings + Shortcuts */}
       <div className="flex items-center gap-2 mr-3 pr-3 border-r border-border">
-        <span className="font-theme text-text text-sm tracking-wider">Picell3D</span>
+        <button
+          onClick={() => setShowTemplatesDialog(true)}
+          title="Open Templates Library"
+          className="font-theme text-text text-sm tracking-wider hover:text-accent transition-all flex items-center gap-1 cursor-pointer select-none px-1.5 py-0.5 rounded border border-transparent hover:border-accent/40 hover:bg-surface-alt active:scale-95"
+        >
+          <span>Picell3D</span>
+        </button>
         <button
           onClick={() => setShowSettingsDialog(true)}
           title="Settings"
@@ -103,19 +113,42 @@ export default function Toolbar({ onExport, onRender }) {
         >
           <HelpCircle size={13} />
         </button>
+        <a
+          href={window.electron?.isElectron ? './index.html?page=experiment' : '/experiment'}
+          title="Open Model Lab experiment"
+          className="flex items-center justify-center w-6 h-6 rounded border border-transparent text-text-muted hover:text-accent hover:border-accent/50 transition-colors"
+        >
+          <FlaskConical size={13} />
+        </a>
       </div>
 
       {/* Drawing tools */}
       <div className="flex items-center gap-0.5 mr-1 pr-1 border-r border-border">
-        {TOOLS.filter(t => t.group === 'draw').map(tool => (
-          <ToolButton
-            key={tool.id}
-            Icon={tool.Icon}
-            label={tool.label}
-            active={activeTool === tool.id}
-            onClick={() => setActiveTool(tool.id)}
-          />
-        ))}
+        {TOOLS.filter(t => t.group === 'draw').map(tool => {
+          if (tool.id === 'select') {
+            return (
+              <SelectToolButton
+                key="select"
+                active={activeTool === 'select'}
+                selectionMode={selectionMode}
+                onSelectMode={(mode) => {
+                  setSelectionMode(mode)
+                  setActiveTool('select')
+                }}
+                onActivate={() => setActiveTool('select')}
+              />
+            )
+          }
+          return (
+            <ToolButton
+              key={tool.id}
+              Icon={tool.Icon}
+              label={tool.label}
+              active={activeTool === tool.id}
+              onClick={() => setActiveTool(tool.id)}
+            />
+          )
+        })}
       </div>
 
       {/* Shape tools */}
@@ -285,3 +318,113 @@ function ActionButton({ Icon, label, onClick, danger }) {
     </button>
   )
 }
+
+function SelectToolButton({ active, selectionMode, onSelectMode, onActivate }) {
+  const [showMenu, setShowMenu] = useState(false)
+  const buttonRef = useRef(null)
+  const menuRef   = useRef(null)
+
+  useEffect(() => {
+    if (!showMenu) return
+    const onPointerDown = (e) => {
+      if (
+        menuRef.current && !menuRef.current.contains(e.target) &&
+        buttonRef.current && !buttonRef.current.contains(e.target)
+      ) {
+        setShowMenu(false)
+      }
+    }
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setShowMenu(false)
+    }
+    window.addEventListener('pointerdown', onPointerDown)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [showMenu])
+
+  const Icon = selectionMode === 'lasso' ? LassoSelect : BoxSelect
+  const label = selectionMode === 'lasso' ? 'Lasso Select (S)' : 'Rectangle Select (S)'
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        className={`w-8 h-8 rounded flex items-center justify-center transition-all border relative ${
+          active
+            ? 'border-accent bg-accent/20 text-accent shadow-glow-accent'
+            : 'border-transparent text-text-muted hover:border-border hover:text-text hover:bg-surface-alt'
+        }`}
+        title={`${label} — click to choose tool`}
+        onClick={() => {
+          onActivate()
+          setShowMenu(prev => !prev)
+        }}
+      >
+        <Icon size={16} />
+        {/* Subtle sub-menu indicator caret in bottom-right corner */}
+        <span
+          className="absolute bottom-1 right-1 w-0 h-0 border-solid border-t-transparent border-l-transparent opacity-60"
+          style={{
+            borderRightWidth: '3.5px',
+            borderBottomWidth: '3.5px',
+            borderRightColor: 'transparent',
+            borderBottomColor: 'currentColor',
+          }}
+        />
+      </button>
+
+      {showMenu && (
+        <div
+          ref={menuRef}
+          className="absolute top-full left-0 mt-1.5 z-50 py-1 rounded-lg border shadow-2xl flex flex-col min-w-[165px]"
+          style={{
+            background: 'var(--color-surface)',
+            borderColor: 'var(--color-border)',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.85)',
+          }}
+        >
+          <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-muted border-b border-border/40 mb-0.5">
+            Selection Tool
+          </div>
+          <button
+            className={`flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-left transition-colors ${
+              selectionMode === 'rect'
+                ? 'bg-accent/20 text-accent font-medium'
+                : 'text-text-muted hover:text-text hover:bg-surface-alt'
+            }`}
+            onClick={(e) => {
+              e.stopPropagation()
+              onSelectMode('rect')
+              setShowMenu(false)
+            }}
+          >
+            <BoxSelect size={14} className={selectionMode === 'rect' ? 'text-accent' : ''} />
+            <span className="flex-1">Rectangle Select</span>
+            {selectionMode === 'rect' && <span className="text-xs font-bold text-accent">✓</span>}
+          </button>
+
+          <button
+            className={`flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-left transition-colors ${
+              selectionMode === 'lasso'
+                ? 'bg-accent/20 text-accent font-medium'
+                : 'text-text-muted hover:text-text hover:bg-surface-alt'
+            }`}
+            onClick={(e) => {
+              e.stopPropagation()
+              onSelectMode('lasso')
+              setShowMenu(false)
+            }}
+          >
+            <LassoSelect size={14} className={selectionMode === 'lasso' ? 'text-accent' : ''} />
+            <span className="flex-1">Lasso Select</span>
+            {selectionMode === 'lasso' && <span className="text-xs font-bold text-accent">✓</span>}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+

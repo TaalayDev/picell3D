@@ -1,4 +1,5 @@
 import { useRef, useEffect, useMemo, useCallback } from 'react'
+import { RotateCw, RotateCcw, Layers, Trash2, Check } from 'lucide-react'
 import { useStore, renderView2D, renderDepthMap2D, getViewSize, getCompositedVoxels } from '../../store/index.js'
 import { useCanvasInput } from '../../hooks/useCanvasInput.js'
 import { useShapeInput, SHAPE_TOOLS } from '../../hooks/useShapeInput.js'
@@ -30,7 +31,8 @@ export default function PixelCanvas() {
   const {
     layers, pixelSize, setPixelSize, canvasWidth, canvasHeight, depthDimension,
     showGrid, showDepthText, activeTool, activeView, currentColor,
-    selection, floatingPaste,
+    selection, floatingPaste, lassoPreview, selectionAnchor,
+    rotateSelection, scaleSelection, shiftSelectionDepth, deleteSelection, commitPaste,
   } = useStore()
 
   const D = depthDimension
@@ -268,23 +270,99 @@ export default function PixelCanvas() {
       }
     }
 
-    // Selection rect
-    if (selection) {
-      const sx = selection.x1 * pixelSize
-      const sy = selection.y1 * pixelSize
-      const sw = (selection.x2 - selection.x1 + 1) * pixelSize
-      const sh = (selection.y2 - selection.y1 + 1) * pixelSize
+    // Live lasso drawing preview
+    if (lassoPreview && lassoPreview.length > 0) {
       ctx.save()
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)'
+      const pts = lassoPreview
+      ctx.beginPath()
+      ctx.moveTo((pts[0].col + 0.5) * pixelSize, (pts[0].row + 0.5) * pixelSize)
+      for (let i = 1; i < pts.length; i++) {
+        ctx.lineTo((pts[i].col + 0.5) * pixelSize, (pts[i].row + 0.5) * pixelSize)
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,0.95)'
       ctx.lineWidth   = 1.5
       ctx.setLineDash([4, 3])
-      ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, sh - 1)
-      ctx.strokeStyle = 'rgba(0,100,255,0.6)'
+      ctx.stroke()
+
+      ctx.strokeStyle = 'rgba(0,140,255,0.85)'
       ctx.setLineDash([4, 3])
       ctx.lineDashOffset = 4
-      ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, sh - 1)
-      ctx.fillStyle = 'rgba(100,160,255,0.07)'
-      ctx.fillRect(sx, sy, sw, sh)
+      ctx.stroke()
+
+      // Preview closing segment back to start point
+      if (pts.length >= 3) {
+        ctx.beginPath()
+        ctx.moveTo((pts[pts.length - 1].col + 0.5) * pixelSize, (pts[pts.length - 1].row + 0.5) * pixelSize)
+        ctx.lineTo((pts[0].col + 0.5) * pixelSize, (pts[0].row + 0.5) * pixelSize)
+        ctx.strokeStyle = 'rgba(100,200,255,0.45)'
+        ctx.setLineDash([2, 3])
+        ctx.stroke()
+      }
+
+      // Small starting anchor marker
+      ctx.fillStyle = '#00e5ff'
+      ctx.beginPath()
+      ctx.arc(
+        (pts[0].col + 0.5) * pixelSize,
+        (pts[0].row + 0.5) * pixelSize,
+        Math.max(2, pixelSize * 0.25),
+        0,
+        Math.PI * 2
+      )
+      ctx.fill()
+      ctx.restore()
+    }
+
+    // Selection
+    if (selection) {
+      ctx.save()
+      if (selection.type === 'lasso' && selection.polygon?.length > 1) {
+        // 1. Tint selected pixels inside mask
+        if (selection.mask) {
+          ctx.fillStyle = 'rgba(100,160,255,0.12)'
+          const { x1, y1, mask } = selection
+          for (let r = 0; r < mask.length; r++) {
+            for (let c = 0; c < mask[r].length; c++) {
+              if (mask[r][c]) {
+                ctx.fillRect((x1 + c) * pixelSize, (y1 + r) * pixelSize, pixelSize, pixelSize)
+              }
+            }
+          }
+        }
+        // 2. Stroke lasso polygon outline
+        const poly = selection.polygon
+        ctx.beginPath()
+        ctx.moveTo((poly[0].col + 0.5) * pixelSize, (poly[0].row + 0.5) * pixelSize)
+        for (let i = 1; i < poly.length; i++) {
+          ctx.lineTo((poly[i].col + 0.5) * pixelSize, (poly[i].row + 0.5) * pixelSize)
+        }
+        ctx.closePath()
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)'
+        ctx.lineWidth   = 1.5
+        ctx.setLineDash([4, 3])
+        ctx.stroke()
+
+        ctx.strokeStyle = 'rgba(0,100,255,0.6)'
+        ctx.setLineDash([4, 3])
+        ctx.lineDashOffset = 4
+        ctx.stroke()
+      } else {
+        // Rectangle or single pixel selection
+        const sx = selection.x1 * pixelSize
+        const sy = selection.y1 * pixelSize
+        const sw = (selection.x2 - selection.x1 + 1) * pixelSize
+        const sh = (selection.y2 - selection.y1 + 1) * pixelSize
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)'
+        ctx.lineWidth   = 1.5
+        ctx.setLineDash([4, 3])
+        ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, sh - 1)
+        ctx.strokeStyle = 'rgba(0,100,255,0.6)'
+        ctx.setLineDash([4, 3])
+        ctx.lineDashOffset = 4
+        ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, sh - 1)
+        ctx.fillStyle = 'rgba(100,160,255,0.07)'
+        ctx.fillRect(sx, sy, sw, sh)
+      }
       ctx.setLineDash([])
       ctx.restore()
     }
@@ -308,6 +386,97 @@ export default function PixelCanvas() {
       ctx.strokeRect(fc * pixelSize + 0.5, fr * pixelSize + 0.5, fw * pixelSize - 1, fh * pixelSize - 1)
       ctx.setLineDash([])
       ctx.restore()
+    }
+
+    // Selection transform handles (Scale corners, Rotate handle & stem, Moveable Anchor)
+    if (activeTool === 'select' && (selection || floatingPaste)) {
+      const activeBox = floatingPaste
+        ? { x1: floatingPaste.col, y1: floatingPaste.row, x2: floatingPaste.col + floatingPaste.w - 1, y2: floatingPaste.row + floatingPaste.h - 1 }
+        : selection
+
+      if (activeBox) {
+        const bx1 = activeBox.x1 * pixelSize
+        const by1 = activeBox.y1 * pixelSize
+        const bx2 = (activeBox.x2 + 1) * pixelSize
+        const by2 = (activeBox.y2 + 1) * pixelSize
+        const midX = (bx1 + bx2) / 2
+
+        ctx.save()
+
+        // 1. Rotate stem and handle
+        ctx.strokeStyle = 'rgba(0, 160, 255, 0.85)'
+        ctx.lineWidth   = 1.5
+        ctx.setLineDash([2, 2])
+        ctx.beginPath()
+        ctx.moveTo(midX, by1)
+        ctx.lineTo(midX, by1 - 22)
+        ctx.stroke()
+        ctx.setLineDash([])
+
+        ctx.fillStyle   = '#ffffff'
+        ctx.strokeStyle = '#0070f3'
+        ctx.lineWidth   = 1.5
+        ctx.beginPath()
+        ctx.arc(midX, by1 - 22, 4.5, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.stroke()
+
+        // 2. Corner scale handles (white squares with blue borders)
+        const cornerPts = [
+          [bx1, by1],
+          [bx2, by1],
+          [bx2, by2],
+          [bx1, by2],
+        ]
+        const hs = Math.max(6, Math.min(10, pixelSize * 0.5))
+        ctx.fillStyle   = '#ffffff'
+        ctx.strokeStyle = '#0070f3'
+        ctx.lineWidth   = 1.5
+        for (const [cx, cy] of cornerPts) {
+          ctx.fillRect(cx - hs / 2, cy - hs / 2, hs, hs)
+          ctx.strokeRect(cx - hs / 2, cy - hs / 2, hs, hs)
+        }
+
+        // 3. Moveable Anchor (Crosshair target circle ⊕)
+        const anchor = selectionAnchor || {
+          x: (activeBox.x1 + activeBox.x2 + 1) / 2,
+          y: (activeBox.y1 + activeBox.y2 + 1) / 2,
+        }
+        const ax = anchor.x * pixelSize
+        const ay = anchor.y * pixelSize
+
+        // High-contrast background shadow
+        ctx.strokeStyle = 'rgba(0,0,0,0.65)'
+        ctx.lineWidth   = 3.5
+        ctx.beginPath()
+        ctx.arc(ax, ay, 6.5, 0, Math.PI * 2)
+        ctx.stroke()
+
+        // Anchor ring
+        ctx.strokeStyle = '#00e5ff'
+        ctx.lineWidth   = 1.5
+        ctx.beginPath()
+        ctx.arc(ax, ay, 6.5, 0, Math.PI * 2)
+        ctx.stroke()
+
+        // Crosshair ticks
+        ctx.strokeStyle = '#00e5ff'
+        ctx.lineWidth   = 1.5
+        ctx.beginPath()
+        ctx.moveTo(ax - 10, ay); ctx.lineTo(ax - 3.5, ay)
+        ctx.moveTo(ax + 3.5, ay); ctx.lineTo(ax + 10, ay)
+        ctx.moveTo(ax, ay - 10); ctx.lineTo(ax, ay - 3.5)
+        ctx.moveTo(ax, ay + 3.5); ctx.lineTo(ax, ay + 10)
+        ctx.stroke()
+
+        // Center pivot dot
+        ctx.fillStyle = '#ffffff'
+        ctx.beginPath()
+        ctx.arc(ax, ay, 2, 0, Math.PI * 2)
+        ctx.fill()
+
+        ctx.restore()
+      }
     }
 
     // Line handles (only in editing mode)
@@ -364,7 +533,7 @@ export default function PixelCanvas() {
         ctx.fillText('Enter ↵  commit · Esc  cancel', pw - 4, ph - 4)
       }
     }
-  }, [previewPixels, lineState, pixelSize, viewW, viewH, currentColor, selection, floatingPaste])
+  }, [previewPixels, lineState, pixelSize, viewW, viewH, currentColor, selection, floatingPaste, lassoPreview, selectionAnchor, activeTool])
 
   return (
     <div ref={scrollRef} className="flex items-center justify-center w-full h-full overflow-auto p-4 relative">
@@ -382,7 +551,7 @@ export default function PixelCanvas() {
         className="relative flex-shrink-0"
         style={{
           boxShadow: '0 0 0 2px var(--color-border), 0 0 0 4px var(--color-surface), 0 8px 40px rgba(0,0,0,0.9)',
-          cursor: getCursor(activeTool, shapeInput.isEditing, floatingPaste, isSpaceHeld),
+          cursor: getCursor(activeTool, shapeInput.isEditing, floatingPaste, isSpaceHeld, selectInput.hoverHandle),
         }}
         onPointerDown={routeDown}
         onPointerMove={routeMove}
@@ -413,14 +582,125 @@ export default function PixelCanvas() {
 
         <ReferenceOverlay pixelSize={pixelSize} />
       </div>
+
+      {/* Floating Selection Action Bar */}
+      {activeTool === 'select' && (selection || floatingPaste) && (
+        <div
+          className="absolute bottom-5 z-20 flex items-center gap-1 px-2.5 py-1.5 rounded-xl border shadow-2xl backdrop-blur-md"
+          style={{
+            background: 'color-mix(in srgb, var(--color-surface) 94%, transparent)',
+            borderColor: 'var(--color-border)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.85)',
+          }}
+        >
+          {/* Rotate CCW */}
+          <button
+            onClick={() => rotateSelection(-Math.PI / 2)}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text-muted hover:text-text hover:bg-surface-alt transition-colors"
+            title="Rotate 90° CCW"
+          >
+            <RotateCcw size={13} />
+            <span>-90°</span>
+          </button>
+
+          {/* Rotate CW */}
+          <button
+            onClick={() => rotateSelection(Math.PI / 2)}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text-muted hover:text-text hover:bg-surface-alt transition-colors"
+            title="Rotate 90° CW"
+          >
+            <RotateCw size={13} />
+            <span>+90°</span>
+          </button>
+
+          <div className="w-[1px] h-4 bg-border/60 mx-0.5" />
+
+          {/* Scale 0.5x */}
+          <button
+            onClick={() => scaleSelection(0.5, 0.5)}
+            className="px-2 py-1 rounded text-xs text-text-muted hover:text-text hover:bg-surface-alt transition-colors font-mono"
+            title="Scale 0.5x"
+          >
+            ½×
+          </button>
+
+          {/* Scale 2x */}
+          <button
+            onClick={() => scaleSelection(2, 2)}
+            className="px-2 py-1 rounded text-xs text-text-muted hover:text-text hover:bg-surface-alt transition-colors font-mono"
+            title="Scale 2x"
+          >
+            2×
+          </button>
+
+          <div className="w-[1px] h-4 bg-border/60 mx-0.5" />
+
+          {/* Depth -1 */}
+          <button
+            onClick={() => shiftSelectionDepth(-1)}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text-muted hover:text-text hover:bg-surface-alt transition-colors"
+            title="Shift Depth backward (Z - 1)"
+          >
+            <Layers size={13} />
+            <span>Depth -</span>
+          </button>
+
+          {/* Depth +1 */}
+          <button
+            onClick={() => shiftSelectionDepth(1)}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text-muted hover:text-text hover:bg-surface-alt transition-colors"
+            title="Shift Depth forward (Z + 1)"
+          >
+            <Layers size={13} />
+            <span>Depth +</span>
+          </button>
+
+          <div className="w-[1px] h-4 bg-border/60 mx-0.5" />
+
+          {/* Clear / Delete */}
+          <button
+            onClick={deleteSelection}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text-muted hover:text-red-400 hover:bg-red-950/50 transition-colors"
+            title="Clear / Delete selection (Delete key)"
+          >
+            <Trash2 size={13} />
+            <span>Clear</span>
+          </button>
+
+          {/* Commit if floating */}
+          {floatingPaste && (
+            <>
+              <div className="w-[1px] h-4 bg-border/60 mx-0.5" />
+              <button
+                onClick={commitPaste}
+                className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors"
+                style={{
+                  background: 'var(--color-accent)',
+                  color: 'var(--color-canvasBg, #000)',
+                }}
+                title="Commit paste (Enter)"
+              >
+                <Check size={13} />
+                <span>Commit</span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
-function getCursor(tool, isLineEditing, floatingPaste, isSpaceHeld) {
+function getCursor(tool, isLineEditing, floatingPaste, isSpaceHeld, hoverHandle) {
   if (isSpaceHeld?.current) return isPanning?.current ? 'grabbing' : 'grab'
   if (isLineEditing) return 'default'
-  if (tool === 'select') return floatingPaste ? 'move' : 'crosshair'
+  if (tool === 'select') {
+    if (hoverHandle === 'anchor') return 'all-scroll'
+    if (hoverHandle === 'rotate') return 'grab'
+    if (hoverHandle === 'scale-nw' || hoverHandle === 'scale-se') return 'nwse-resize'
+    if (hoverHandle === 'scale-ne' || hoverHandle === 'scale-sw') return 'nesw-resize'
+    return floatingPaste ? 'move' : 'crosshair'
+  }
   switch (tool) {
     case 'pencil':   return 'crosshair'
     case 'eraser':   return 'cell'

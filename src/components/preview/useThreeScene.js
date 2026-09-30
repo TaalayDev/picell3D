@@ -199,13 +199,14 @@ export function useThreeScene(containerRef) {
       const { activeTool, canvasWidth: W, canvasHeight: H, depthDimension: D } = useStore.getState()
       const hit = getRaycastHit(clientX, clientY)
       if (!hit) { ghost.visible = false; return }
-      const isErase   = activeTool === 'eraser'
-      const isEyedrop = activeTool === 'eyedropper'
-      const adjacent  = !isErase && !isEyedrop
+      const isErase    = activeTool === 'eraser'
+      const isEyedrop  = activeTool === 'eyedropper'
+      const isMaterial = activeTool === 'material'
+      const adjacent   = !isErase && !isEyedrop && !isMaterial
       const vox = getEditVoxel(hit, W, H, D, adjacent)
       ghost.position.copy(voxelCenterWorld(vox.x, vox.y, vox.z, W, H, D))
       ghost.visible = true
-      const col = isErase ? 0xff4444 : isEyedrop ? 0x00ccff : 0x00ff88
+      const col = isErase ? 0xff4444 : isEyedrop ? 0x00ccff : isMaterial ? 0xffaa00 : 0x00ff88
       ghost.material.color.setHex(col)
       ghost.children[0].material.color.setHex(col)
     }
@@ -234,6 +235,16 @@ export function useThreeScene(containerRef) {
         const col = getCompositedVoxels(useStore.getState().layers, W, H, D)[vox.y]?.[vox.x]?.[vox.z]
         if (!col || col === 'transparent') return
         useStore.getState().paintVoxelDirect(vox.x, vox.y, vox.z, 'transparent')
+        return
+      }
+
+      if (activeTool === 'material') {
+        if (isFloor) return
+        const vox = getEditVoxel(hit, W, H, D, false)
+        const key = `${vox.x},${vox.y},${vox.z}`
+        if (key === lastPaintKey) return
+        lastPaintKey = key
+        useStore.getState().paintMaterialDirect(vox.x, vox.y, vox.z)
         return
       }
 

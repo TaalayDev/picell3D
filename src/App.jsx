@@ -173,7 +173,7 @@ export default function App() {
           {showPalette && (
             <div className="flex flex-col border-r border-border flex-shrink-0 overflow-y-auto"
               style={{
-                width: activeTool === 'material' ? '10rem' : '7rem',
+                width: activeTool === 'material' ? '12.5rem' : '7rem',
                 background: 'color-mix(in srgb, var(--color-surface) 90%, transparent)',
                 transition: 'width 0.15s ease',
               }}>

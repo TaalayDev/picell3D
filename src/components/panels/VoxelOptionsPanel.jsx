@@ -1,5 +1,8 @@
 import { useMemo } from 'react'
-import { Box, FlipHorizontal, FlipVertical, Copy, Scissors, Clipboard } from 'lucide-react'
+import {
+  Box, FlipHorizontal, FlipVertical, Copy, Scissors, Clipboard,
+  BoxSelect, LassoSelect, RotateCw, RotateCcw, Crosshair, Layers, Trash2,
+} from 'lucide-react'
 import { useStore, getCompositedVoxels, OPPOSITE_VIEW } from '../../store/index.js'
 
 const DEPTH_PRESETS = [4, 8, 16, 24, 32, 48, 64]
@@ -12,9 +15,11 @@ export default function VoxelOptionsPanel() {
     symmetryX, symmetryY, symmetryOpposite,
     setSymmetryX, setSymmetryY, setSymmetryOpposite,
     activeTool,
-    selection, clipboard, floatingPaste,
+    selectionMode, setSelectionMode,
+    selection, clipboard, floatingPaste, selectionAnchor,
     copySelection, cutSelection, pasteFromClipboard, deleteSelection,
     flipClipboard, commitPaste, cancelPaste,
+    rotateSelection, scaleSelection, shiftSelectionDepth, setAnchorPreset, resetSelectionAnchor,
   } = useStore()
 
   const voxelCount = useMemo(() => {
@@ -45,6 +50,35 @@ export default function VoxelOptionsPanel() {
         {activeTool === 'select' && (
           <div className="flex flex-col gap-2">
             <div className="text-xs text-text-muted uppercase tracking-wide">Selection</div>
+
+            {/* Selection Mode Switcher */}
+            <div className="grid grid-cols-2 gap-1 p-0.5 rounded border border-border bg-surface-alt/40">
+              <button
+                onClick={() => setSelectionMode('rect')}
+                className={`flex items-center justify-center gap-1.5 py-1 rounded text-xs transition-colors ${
+                  selectionMode === 'rect'
+                    ? 'bg-accent/20 text-accent font-medium shadow-glow-accent'
+                    : 'text-text-muted hover:text-text'
+                }`}
+                title="Rectangle selection mode"
+              >
+                <BoxSelect size={13} />
+                Rect
+              </button>
+              <button
+                onClick={() => setSelectionMode('lasso')}
+                className={`flex items-center justify-center gap-1.5 py-1 rounded text-xs transition-colors ${
+                  selectionMode === 'lasso'
+                    ? 'bg-accent/20 text-accent font-medium shadow-glow-accent'
+                    : 'text-text-muted hover:text-text'
+                }`}
+                title="Lasso selection mode"
+              >
+                <LassoSelect size={13} />
+                Lasso
+              </button>
+            </div>
+
             {/* Actions */}
             <div className="grid grid-cols-3 gap-1">
               <button
@@ -94,6 +128,113 @@ export default function VoxelOptionsPanel() {
                 <FlipVertical size={13} /> Flip V
               </button>
             </div>
+
+            {/* Transform Controls (Rotate, Scale, Depth, Anchor) */}
+            {(selection || floatingPaste) && (
+              <div className="flex flex-col gap-2 pt-1 border-t border-border/40">
+                {/* Rotate & Scale */}
+                <div>
+                  <div className="text-[10px] text-text-muted uppercase tracking-wider mb-1">Rotate & Scale</div>
+                  <div className="grid grid-cols-3 gap-1 mb-1">
+                    <button
+                      onClick={() => rotateSelection(-Math.PI / 2)}
+                      className="flex items-center justify-center gap-1 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent/60 transition-colors text-xs"
+                      title="Rotate 90° CCW"
+                    >
+                      <RotateCcw size={12} /> -90°
+                    </button>
+                    <button
+                      onClick={() => rotateSelection(Math.PI / 2)}
+                      className="flex items-center justify-center gap-1 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent/60 transition-colors text-xs"
+                      title="Rotate 90° CW"
+                    >
+                      <RotateCw size={12} /> +90°
+                    </button>
+                    <button
+                      onClick={() => rotateSelection(Math.PI)}
+                      className="flex items-center justify-center gap-1 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent/60 transition-colors text-xs"
+                      title="Rotate 180°"
+                    >
+                      180°
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1">
+                    <button
+                      onClick={() => scaleSelection(0.5, 0.5)}
+                      className="flex items-center justify-center py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent/60 transition-colors text-xs font-mono"
+                      title="Scale 0.5x"
+                    >
+                      Scale 0.5×
+                    </button>
+                    <button
+                      onClick={() => scaleSelection(2, 2)}
+                      className="flex items-center justify-center py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent/60 transition-colors text-xs font-mono"
+                      title="Scale 2x"
+                    >
+                      Scale 2×
+                    </button>
+                  </div>
+                </div>
+
+                {/* Depth Adjustment */}
+                <div>
+                  <div className="text-[10px] text-text-muted uppercase tracking-wider mb-1">Depth (Z-Axis)</div>
+                  <div className="grid grid-cols-2 gap-1">
+                    <button
+                      onClick={() => shiftSelectionDepth(-1)}
+                      className="flex items-center justify-center gap-1 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent/60 transition-colors text-xs"
+                      title="Shift voxels 1 step backward in depth"
+                    >
+                      <Layers size={12} /> Depth -1
+                    </button>
+                    <button
+                      onClick={() => shiftSelectionDepth(1)}
+                      className="flex items-center justify-center gap-1 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent/60 transition-colors text-xs"
+                      title="Shift voxels 1 step forward in depth"
+                    >
+                      <Layers size={12} /> Depth +1
+                    </button>
+                  </div>
+                </div>
+
+                {/* Moveable Anchor (Pivot) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-text-muted uppercase tracking-wider">Pivot Anchor</span>
+                    <button
+                      onClick={resetSelectionAnchor}
+                      className="text-[10px] text-text-muted hover:text-accent transition-colors"
+                      title="Reset anchor to center"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 max-w-[120px] mx-auto p-1 rounded border border-border bg-surface-alt/40">
+                    {[
+                      { id: 'nw', label: '↖' },
+                      { id: 'n',  label: '↑' },
+                      { id: 'ne', label: '↗' },
+                      { id: 'w',  label: '←' },
+                      { id: 'center', label: '⊕' },
+                      { id: 'e',  label: '→' },
+                      { id: 'sw', label: '↙' },
+                      { id: 's',  label: '↓' },
+                      { id: 'se', label: '↘' },
+                    ].map(({ id, label }) => (
+                      <button
+                        key={id}
+                        onClick={() => setAnchorPreset(id)}
+                        className="w-7 h-7 flex items-center justify-center rounded text-xs text-text-muted hover:text-text hover:bg-surface-alt transition-colors font-mono"
+                        title={`Snap anchor to ${id}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Commit / cancel floating paste */}
             {floatingPaste && (
               <div className="flex gap-1">
@@ -114,17 +255,18 @@ export default function VoxelOptionsPanel() {
                 </button>
               </div>
             )}
-            {selection && (
+            {(selection || floatingPaste) && (
               <button
                 onClick={deleteSelection}
-                className="w-full py-1 text-xs rounded border border-border text-text-muted hover:text-red-400 hover:border-red-900 transition-colors"
-                title="Delete selection (Delete)"
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-border text-text-muted hover:text-red-400 hover:border-red-900 hover:bg-red-950/30 transition-colors"
+                title="Clear / Delete selection (Delete key)"
               >
-                Delete
+                <Trash2 size={13} />
+                Clear / Delete
               </button>
             )}
             <div className="text-xs text-text-muted leading-relaxed opacity-60">
-              Drag inside selection to move · Enter to commit paste · Esc to cancel
+              Drag corners to scale · Drag top handle to rotate · Move anchor ⊕ · Enter commit · Esc cancel
             </div>
           </div>
         )}

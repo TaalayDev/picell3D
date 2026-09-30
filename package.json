@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "generate-templates": "node scripts/generateTemplates.js",
+    "generate-voxel-templates": "node scripts/generateVoxelTemplates.js",
     "electron:dev": "concurrently \"vite\" \"wait-on tcp:5173 && electron .\"",
     "electron:build": "vite build && electron-builder",
     "dist:win": "electron-builder --win",

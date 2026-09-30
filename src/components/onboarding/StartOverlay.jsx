@@ -1,14 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../../store/index.js'
-
-// ── Templates config ──────────────────────────────────────────────────────────
-
-const TEMPLATES = [
-  { id: 'coin',      label: 'Coin',       emoji: '🪙', desc: 'Gold coin with shading' },
-  { id: 'character', label: 'Character',  emoji: '🧑', desc: 'Simple pixel character' },
-  { id: 'building',  label: 'Building',   emoji: '🏠', desc: 'Multi-story building'  },
-  { id: 'gem',       label: 'Gem',        emoji: '💎', desc: 'Shiny crystal gem'     },
-]
+import { TEMPLATES } from '../layout/TemplatesDialog.jsx'
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -72,7 +64,7 @@ export default function StartOverlay({ onDone }) {
           <div className="mb-3 text-xs uppercase tracking-widest" style={{ color: 'var(--color-textMuted)' }}>
             Quick start — pick a template
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
             {TEMPLATES.map(t => (
               <button
                 key={t.id}

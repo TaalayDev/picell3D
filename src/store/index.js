@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { rotateBox, scaleBox, shiftVoxelListDepth, getDefaultAnchor, getPresetAnchor } from '../lib/selectionTransform.js'
 
 const DEFAULT_PALETTE = [
   // Blacks & whites
@@ -845,6 +846,33 @@ export const useStore = create((set, get) => ({
     set({ layers: newLayers })
   },
 
+  /** Directly apply or remove material on a single voxel (used by 3D viewport) */
+  paintMaterialDirect(x, y, z) {
+    const { layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D, activeMaterial } = get()
+    if (x < 0 || x >= W || y < 0 || y >= H || z < 0 || z >= D) return
+    const layerIdx = layers.findIndex(l => l.id === activeLayerId)
+    if (layerIdx < 0) return
+    const layer = layers[layerIdx]
+    const composited = getCompositedVoxels(layers, W, H, D)
+    if (!composited[y]?.[x]?.[z] || composited[y][x][z] === 'transparent') return
+    const key = `${y},${x},${z}`
+    const newMaterials = { ...(layer.voxelMaterials || {}) }
+    let changed = false
+    if (activeMaterial === 'solid') {
+      if (key in newMaterials) {
+        delete newMaterials[key]
+        changed = true
+      }
+    } else if (newMaterials[key] !== activeMaterial) {
+      newMaterials[key] = activeMaterial
+      changed = true
+    }
+    if (!changed) return
+    const newLayers = [...layers]
+    newLayers[layerIdx] = { ...layer, voxelMaterials: newMaterials }
+    set({ layers: newLayers })
+  },
+
   // ── Reference image overlay ──────────────────────────────────────────────────
   referenceImage: null, // { src, x, y, width, height, opacity }
 
@@ -891,41 +919,167 @@ export const useStore = create((set, get) => ({
       redoStack:      [],
       selection:      null,
       floatingPaste:  null,
+      lassoPreview:   null,
+      selectionAnchor: null,
     })
     return true
   },
 
   // ── Selection tool ───────────────────────────────────────────────────────────
-  selection:     null,   // {x1, y1, x2, y2} in canvas 2D coords (normalized)
-  clipboard:     null,   // {w, h, colors: string[][]} visible colors
-  floatingPaste: null,   // {col, row, w, h, colors: string[][]}
+  selectionMode:   'rect', // 'rect' | 'lasso'
+  selection:       null,   // {x1, y1, x2, y2, type, mask, polygon} in canvas 2D coords
+  clipboard:       null,   // {w, h, colors: string[][]} visible colors
+  floatingPaste:   null,   // {col, row, w, h, colors: string[][]}
+  lassoPreview:    null,   // [{col, row}, ...] points while dragging lasso
+  selectionAnchor: null,   // {x, y} anchor/pivot point in canvas coordinates
 
-  setSelection(rect) {
-    if (!rect) { set({ selection: null }); return }
-    const { x1, y1, x2, y2 } = rect
+  setSelectionMode(mode) {
+    set({ selectionMode: mode, activeTool: 'select' })
+  },
+
+  setLassoPreview(points) {
+    set({ lassoPreview: points })
+  },
+
+  setFloatingPaste(fp) {
+    set({ floatingPaste: fp })
+  },
+
+  setSelection(sel) {
+    if (!sel) { set({ selection: null, lassoPreview: null, selectionAnchor: null }); return }
+    const { x1, y1, x2, y2, type = 'rect', mask = null, polygon = null } = sel
+    const normalized = {
+      x1: Math.min(x1, x2), y1: Math.min(y1, y2),
+      x2: Math.max(x1, x2), y2: Math.max(y1, y2),
+      type,
+      mask,
+      polygon,
+    }
+    const defaultAnchor = getDefaultAnchor(normalized)
     set({
-      selection: {
-        x1: Math.min(x1, x2), y1: Math.min(y1, y2),
-        x2: Math.max(x1, x2), y2: Math.max(y1, y2),
-      },
+      selection: normalized,
+      selectionAnchor: defaultAnchor,
+      lassoPreview: null,
     })
   },
 
-  clearSelection() { set({ selection: null, floatingPaste: null }) },
+  setSelectionAnchor(anchor) {
+    set({ selectionAnchor: anchor })
+  },
+
+  setAnchorPreset(preset) {
+    const { selection, floatingPaste } = get()
+    let box = null
+    if (floatingPaste) {
+      box = { x1: floatingPaste.col, y1: floatingPaste.row, x2: floatingPaste.col + floatingPaste.w - 1, y2: floatingPaste.row + floatingPaste.h - 1 }
+    } else if (selection) {
+      box = selection
+    }
+    if (!box) return
+    const anchor = getPresetAnchor(box, preset)
+    set({ selectionAnchor: anchor })
+  },
+
+  resetSelectionAnchor() {
+    const { selection, floatingPaste } = get()
+    let box = null
+    if (floatingPaste) {
+      box = { x1: floatingPaste.col, y1: floatingPaste.row, x2: floatingPaste.col + floatingPaste.w - 1, y2: floatingPaste.row + floatingPaste.h - 1 }
+    } else if (selection) {
+      box = selection
+    }
+    if (!box) return
+    set({ selectionAnchor: getDefaultAnchor(box) })
+  },
+
+  liftSelectionToFloating() {
+    const { selection, floatingPaste } = get()
+    if (floatingPaste || !selection) return
+    const { x1, y1 } = selection
+    const savedAnchor = get().selectionAnchor || getDefaultAnchor(selection)
+    get().cutSelection()
+    get().pasteFromClipboard()
+    const fp = get().floatingPaste
+    if (fp) {
+      set({
+        floatingPaste: { ...fp, col: x1, row: y1 },
+        selectionAnchor: savedAnchor,
+      })
+    }
+  },
+
+  rotateSelection(angleRad) {
+    const { selection, floatingPaste } = get()
+    if (!floatingPaste && selection) {
+      get().liftSelectionToFloating()
+    }
+    const fp = get().floatingPaste
+    if (!fp) return
+    const anchor = get().selectionAnchor || { x: fp.col + fp.w / 2, y: fp.row + fp.h / 2 }
+    const rotated = rotateBox(fp, angleRad, anchor.x, anchor.y)
+    set({ floatingPaste: rotated })
+  },
+
+  scaleSelection(scaleX, scaleY) {
+    const { selection, floatingPaste } = get()
+    if (!floatingPaste && selection) {
+      get().liftSelectionToFloating()
+    }
+    const fp = get().floatingPaste
+    if (!fp) return
+    const anchor = get().selectionAnchor || { x: fp.col + fp.w / 2, y: fp.row + fp.h / 2 }
+    const scaled = scaleBox(fp, scaleX, scaleY, anchor.x, anchor.y)
+    set({ floatingPaste: scaled })
+  },
+
+  shiftSelectionDepth(delta) {
+    const { selection, floatingPaste, depthDimension: D } = get()
+    if (!floatingPaste && selection) {
+      get().liftSelectionToFloating()
+    }
+    const fp = get().floatingPaste
+    if (!fp) return
+    let newVoxelList = null
+    if (fp.voxelList && fp.voxelList.length > 0) {
+      newVoxelList = shiftVoxelListDepth(fp.voxelList, delta, D)
+    } else {
+      newVoxelList = []
+      const baseZ = Math.max(0, Math.min(D - 1, Math.floor(D / 2) + delta))
+      for (let r = 0; r < fp.h; r++) {
+        for (let c = 0; c < fp.w; c++) {
+          const color = fp.colors[r]?.[c]
+          if (color && color !== 'transparent') {
+            newVoxelList.push({ dcol: c, drow: r, z: baseZ, color })
+          }
+        }
+      }
+    }
+    set({ floatingPaste: { ...fp, voxelList: newVoxelList } })
+  },
+
+  clearSelection() {
+    set({
+      selection: null,
+      floatingPaste: null,
+      lassoPreview: null,
+      selectionAnchor: null,
+    })
+  },
 
   copySelection() {
     const { selection, layers, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView } = get()
     if (!selection) return
-    const { x1, y1, x2, y2 } = selection
+    const { x1, y1, x2, y2, mask } = selection
     const tw = x2 - x1 + 1, th = y2 - y1 + 1
     const composited = getCompositedVoxels(layers, W, H, D)
     const view2d = renderView2D(composited, activeView, W, H, D)
 
     // 2D visible-face colors (for floating paste overlay display)
     const colors = Array.from({ length: th }, (_, drow) =>
-      Array.from({ length: tw }, (_, dcol) =>
-        view2d[y1 + drow]?.[x1 + dcol] ?? 'transparent'
-      )
+      Array.from({ length: tw }, (_, dcol) => {
+        if (mask && !mask[drow]?.[dcol]) return 'transparent'
+        return view2d[y1 + drow]?.[x1 + dcol] ?? 'transparent'
+      })
     )
 
     // Full 3D voxel list — preserves depth for front/back views.
@@ -934,14 +1088,17 @@ export const useStore = create((set, get) => ({
     const voxelList = []
     if (activeView === 'front') {
       for (let drow = 0; drow < th; drow++)
-        for (let dcol = 0; dcol < tw; dcol++)
+        for (let dcol = 0; dcol < tw; dcol++) {
+          if (mask && !mask[drow]?.[dcol]) continue
           for (let z = 0; z < D; z++) {
             const c = composited[y1 + drow]?.[x1 + dcol]?.[z]
             if (c && c !== 'transparent') voxelList.push({ dcol, drow, z, color: c })
           }
+        }
     } else if (activeView === 'back') {
       for (let drow = 0; drow < th; drow++)
         for (let dcol = 0; dcol < tw; dcol++) {
+          if (mask && !mask[drow]?.[dcol]) continue
           const vx = W - 1 - (x1 + dcol)
           for (let z = 0; z < D; z++) {
             const c = composited[y1 + drow]?.[vx]?.[z]
@@ -958,7 +1115,7 @@ export const useStore = create((set, get) => ({
     const { selection, layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView } = get()
     if (!selection) return
     get().copySelection()
-    const { x1, y1, x2, y2 } = selection
+    const { x1, y1, x2, y2, mask } = selection
     const layerIdx = layers.findIndex(l => l.id === activeLayerId)
     if (layerIdx < 0) return
     const { w: viewW, h: viewH } = getViewSize(activeView, W, H, D)
@@ -968,6 +1125,7 @@ export const useStore = create((set, get) => ({
     for (let row = y1; row <= y2; row++) {
       for (let col = x1; col <= x2; col++) {
         if (col < 0 || col >= viewW || row < 0 || row >= viewH) continue
+        if (mask && !mask[row - y1]?.[col - x1]) continue
         const targets = getVoxelTargets(col, row, activeView, D, W, H, D)
         allTargets.push(...targets)
       }
@@ -1000,9 +1158,16 @@ export const useStore = create((set, get) => ({
   },
 
   moveFloatingPaste(col, row) {
-    const { floatingPaste } = get()
+    const { floatingPaste, selectionAnchor } = get()
     if (!floatingPaste) return
-    set({ floatingPaste: { ...floatingPaste, col, row } })
+    const dcol = col - floatingPaste.col
+    const drow = row - floatingPaste.row
+    set({
+      floatingPaste: { ...floatingPaste, col, row },
+      selectionAnchor: selectionAnchor
+        ? { x: selectionAnchor.x + dcol, y: selectionAnchor.y + drow }
+        : null,
+    })
   },
 
   commitPaste() {
@@ -1053,10 +1218,10 @@ export const useStore = create((set, get) => ({
     for (const { x, y, z, color } of allTargets) newVoxels[y][x][z] = color
     const newLayers = [...layers]
     newLayers[layerIdx] = { ...layers[layerIdx], voxels: newVoxels }
-    set({ layers: newLayers, floatingPaste: null })
+    set({ layers: newLayers, floatingPaste: null, selectionAnchor: null })
   },
 
-  cancelPaste() { set({ floatingPaste: null }) },
+  cancelPaste() { set({ floatingPaste: null, selectionAnchor: null }) },
 
   flipClipboard(axis) {
     const { clipboard } = get()
@@ -1084,9 +1249,14 @@ export const useStore = create((set, get) => ({
   },
 
   deleteSelection() {
+    const { floatingPaste } = get()
+    if (floatingPaste) {
+      set({ floatingPaste: null, selection: null, selectionAnchor: null })
+      return
+    }
     const { selection, layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView } = get()
     if (!selection) return
-    const { x1, y1, x2, y2 } = selection
+    const { x1, y1, x2, y2, mask } = selection
     const layerIdx = layers.findIndex(l => l.id === activeLayerId)
     if (layerIdx < 0) return
     const { w: viewW, h: viewH } = getViewSize(activeView, W, H, D)
@@ -1096,6 +1266,7 @@ export const useStore = create((set, get) => ({
     for (let row = y1; row <= y2; row++) {
       for (let col = x1; col <= x2; col++) {
         if (col < 0 || col >= viewW || row < 0 || row >= viewH) continue
+        if (mask && !mask[row - y1]?.[col - x1]) continue
         allTargets.push(...getVoxelTargets(col, row, activeView, D, W, H, D))
       }
     }
@@ -1105,6 +1276,6 @@ export const useStore = create((set, get) => ({
     for (const { x, y, z } of allTargets) newVoxels[y][x][z] = 'transparent'
     const newLayers = [...layers]
     newLayers[layerIdx] = { ...layers[layerIdx], voxels: newVoxels }
-    set({ layers: newLayers, selection: null })
+    set({ layers: newLayers, selection: null, selectionAnchor: null })
   },
 }))

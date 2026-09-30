@@ -61,7 +61,11 @@ export function useKeyboardShortcuts() {
         if (s.selection) { s.clearSelection(); return }
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (s.selection) { e.preventDefault(); s.deleteSelection(); return }
+        if (s.floatingPaste || s.selection) {
+          e.preventDefault()
+          s.deleteSelection()
+          return
+        }
       }
 
       // ── Tab: cycle view ──
@@ -72,9 +76,25 @@ export function useKeyboardShortcuts() {
         return
       }
 
-      // ── [ ] — paint depth ──
-      if (e.key === '[') { e.preventDefault(); s.setPaintDepth(s.paintDepth - 1); return }
-      if (e.key === ']') { e.preventDefault(); s.setPaintDepth(s.paintDepth + 1); return }
+      // ── [ ] — selection depth or paint depth ──
+      if (e.key === '[') {
+        e.preventDefault()
+        if (s.selection || s.floatingPaste) {
+          s.shiftSelectionDepth(-1)
+        } else {
+          s.setPaintDepth(s.paintDepth - 1)
+        }
+        return
+      }
+      if (e.key === ']') {
+        e.preventDefault()
+        if (s.selection || s.floatingPaste) {
+          s.shiftSelectionDepth(1)
+        } else {
+          s.setPaintDepth(s.paintDepth + 1)
+        }
+        return
+      }
 
       // ── ? — shortcuts panel ──
       if (e.key === '?') { s.toggleShortcutsPanel(); return }
@@ -85,7 +105,13 @@ export function useKeyboardShortcuts() {
         case 'e': setActiveTool('eraser');   break
         case 'f': setActiveTool('fill');     break
         case 'm': setActiveTool('material'); break
-        case 's': setActiveTool('select');   break
+        case 's':
+          if (s.activeTool === 'select' || e.shiftKey) {
+            s.setSelectionMode(s.selectionMode === 'lasso' ? 'rect' : 'lasso')
+          } else {
+            setActiveTool('select')
+          }
+          break
         case 'b': setActiveTool('blend');    break
         case 'r': setActiveTool('rect');     break
         case 'c': setActiveTool('circle');   break
