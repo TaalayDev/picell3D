@@ -983,6 +983,178 @@ const templates = {
     for (const x of [0, 23]) m.cylX(9, 6.5, 1.5, x, x, '#202426', 'matte')
     m.line([21, 10, 6], [23, 13, 6], '#aeb8b8', 'metal')
   }),
+
+  satellite: buildTemplate(25, 18, 17, (m) => {
+    const { cx, cz } = m
+    // Faceted service module and gold thermal wrap.
+    m.cylY(cx, cz, 3.8, 4, 11, (x, h, z) => ((x + h + z) % 3 ? '#c9d1dc' : '#9da8b5'), 'metal')
+    m.cylY(cx, cz, 4.3, 5, 8, (x, h, z) => (m.noise(x, h, z) > 0.5 ? '#d8a72e' : '#f0c94d'), 'glossy')
+    // Twin solar arrays with a bright grid.
+    for (const side of [-1, 1]) {
+      const x0 = side < 0 ? 0 : 16, x1 = side < 0 ? 8 : 24
+      m.box(x0, 6, cz - 1, x1, 10, cz + 1, (x, h) =>
+        ((x + h) % 3 === 0 ? '#5da7e8' : '#174f91'), 'glossy')
+      m.line([cx + side * 4, 8, cz], [cx + side * 8, 8, cz], '#7f8a98', 'metal')
+    }
+    // Communications dish and receiver.
+    m.fill((x, h, z) => {
+      const d = Math.hypot(x - cx, z - cz)
+      return h >= 12 && h <= 16 && d <= (h - 11) * 0.85 && d >= Math.max(0, (h - 11) * 0.85 - 1.2)
+    }, '#e7ebf0', 'metal')
+    m.line([cx, 12, cz], [cx, 16, cz], '#7f8a98', 'metal')
+    m.sphere(cx, 17, cz, 1, '#ff526f', 'emissive')
+    m.cylY(cx, cz, 2.4, 2, 3, '#596270', 'metal')
+    m.set(cx, 1, cz, '#63f5e2', 'neon')
+  }),
+
+  portal: buildTemplate(23, 23, 11, (m) => {
+    const cx = 11, ch = 11
+    // Heavy carved ring in the x-height plane.
+    m.fill((x, h, z) => {
+      if (z < 2 || z > 7) return false
+      const d = Math.hypot(x - cx, h - ch)
+      return d >= 7.2 && d <= 10
+    }, (x, h, z) => (m.noise(x, h, z) > 0.72 ? '#77708f' : '#58536f'), 'matte')
+    // Layered energy surface and bright inner rim.
+    m.fill((x, h, z) => z >= 7 && z <= 9 && Math.hypot(x - cx, h - ch) < 7.2,
+      (x, h, z) => ((x + h + z) % 4 < 2 ? '#3cd8e8' : '#8d4de8'), 'glass')
+    m.fill((x, h, z) => z === 10 && Math.abs(Math.hypot(x - cx, h - ch) - 7.1) < 0.8,
+      (x, h) => ((x + h) % 3 ? '#62f5ff' : '#d284ff'), 'neon')
+    // Plinth, runes and floating motes.
+    m.box(2, 0, 1, 20, 2, 8, (x, h, z) => ((x + z) % 3 ? '#484458' : '#666077'), 'matte')
+    for (const [x, h] of [[3, 5], [19, 5], [2, 12], [20, 12], [5, 18], [17, 18], [11, 21]])
+      m.set(x, h, 8, '#d284ff', 'emissive')
+    for (const [x, h] of [[7, 8], [14, 15], [10, 17]]) m.set(x, h, 10, '#ffffff', 'emissive')
+  }),
+
+  'mars-walker': buildTemplate(21, 22, 19, (m) => {
+    const { cx, cz } = m
+    const rust = (x, h, z) => (m.noise(x, h, z) > 0.75 ? '#c76a3b' : '#9c4930')
+    m.box(4, 11, 4, 16, 16, 14, rust, 'metal')
+    m.ellipsoid(cx, 15, cz, 6.5, 3.8, 5.5, rust, 'metal')
+    m.box(7, 16, 8, 13, 19, 13, '#75c7de', 'glass')
+    m.box(8, 16, 9, 12, 18, 12, '#19384d', 'glossy')
+    // Four reverse-jointed legs with broad feet.
+    for (const [dx, dz] of [[-5, -4], [5, -4], [-5, 4], [5, 4]]) {
+      m.line([cx + dx, 12, cz + dz], [cx + dx * 1.5, 6, cz + dz * 1.45], '#737d88', 'metal', 1)
+      m.line([cx + dx * 1.5, 6, cz + dz * 1.45], [cx + dx * 1.25, 1, cz + dz * 1.8], '#4e5660', 'metal', 1)
+      m.ellipsoid(cx + dx * 1.25, 0, cz + dz * 1.8, 2.2, 0.8, 1.5, '#343940', 'matte')
+    }
+    // Sensor head and mast.
+    m.line([cx, 19, cz], [cx, 21, cz], '#737d88', 'metal')
+    m.box(cx - 2, 20, cz - 1, cx + 2, 21, cz + 1, '#d8dde3', 'metal')
+    for (const x of [cx - 1, cx + 1]) m.set(x, 21, cz + 2, '#ff5b55', 'emissive')
+    m.box(4, 13, 15, 7, 14, 18, '#294f87', 'glossy')
+    m.box(13, 13, 15, 16, 14, 18, '#294f87', 'glossy')
+  }),
+
+  'record-player': buildTemplate(24, 13, 20, (m) => {
+    // Walnut plinth and hinged transparent dust cover.
+    m.box(1, 1, 1, 22, 5, 18, (x, h, z) => ((x + z) % 4 ? '#7a4728' : '#925936'), 'matte')
+    m.box(2, 6, 2, 21, 11, 3, '#b8e3ed', 'glass')
+    m.box(2, 11, 2, 21, 11, 17, '#b8e3ed', 'glass')
+    m.box(2, 6, 17, 21, 11, 17, '#b8e3ed', 'glass')
+    // Platter, vinyl and center label.
+    m.cylY(10, 10, 7.5, 6, 6, '#929ba5', 'metal')
+    m.cylY(10, 10, 6.8, 7, 7, (x, h, z) => (Math.round(Math.hypot(x - 10, z - 10)) % 2 ? '#17171b' : '#29292e'), 'glossy')
+    m.cylY(10, 10, 2, 8, 8, '#ef4f68', 'glossy')
+    m.set(10, 9, 10, '#d9dde3', 'metal')
+    // Tone arm and controls.
+    m.cylY(19, 6, 1.8, 6, 8, '#aeb7c0', 'metal')
+    m.line([19, 9, 6], [17, 10, 12], '#d9dde3', 'metal', 0.7)
+    m.line([17, 10, 12], [14, 9, 14], '#d9dde3', 'metal', 0.7)
+    m.set(14, 9, 14, '#f2c14e', 'glossy')
+    for (const x of [4, 19]) m.cylY(x, 16, 0.9, 6, 7, '#e7ebef', 'metal')
+  }),
+
+  'rotary-phone': buildTemplate(22, 16, 18, (m) => {
+    const red = (x, h, z) => (m.noise(x, h, z) > 0.8 ? '#d9545b' : '#b53a48')
+    // Sloped telephone body.
+    m.fill((x, h, z) => x >= 2 && x <= 19 && z >= 3 && z <= 14 && h >= 1 && h <= 5 + (14 - z) * 0.25,
+      red, 'glossy')
+    // Rotary dial on the front face.
+    m.cylZ(10.5, 7.5, 5, 14, 16, '#ede2ca', 'glossy')
+    m.cylZ(10.5, 7.5, 3.1, 16, 17, '#31333a', 'glossy')
+    m.cylZ(10.5, 7.5, 1.4, 17, 17, '#e8d8bc', 'matte')
+    for (let i = 0; i < 10; i++) {
+      const a = i * Math.PI * 2 / 10
+      m.set(10.5 + Math.cos(a) * 3.8, 7.5 + Math.sin(a) * 3.8, 17, '#27292f', 'glossy')
+    }
+    // Handset with raised earpieces.
+    m.line([4, 13, 8], [18, 13, 8], '#8f2938', 'glossy', 1.7)
+    for (const x of [3, 19]) m.ellipsoid(x, 13, 8, 2.3, 2.3, 3.2, '#a83040', 'glossy')
+    m.line([18, 11, 7], [21, 5, 2], '#27292f', 'matte')
+    m.set(18, 3, 15, '#f0c94d', 'emissive')
+  }),
+
+  cauldron: buildTemplate(21, 20, 21, (m) => {
+    const { cx, cz } = m
+    // Rounded iron pot, hollow top and curled feet.
+    m.ellipsoid(cx, 7, cz, 8, 7, 8, (x, h, z) => (m.noise(x, h, z) > 0.82 ? '#47414f' : '#2d2933'), 'metal',
+      (x, h) => h <= 12)
+    m.carve((x, h, z) => h >= 9 && Math.hypot(x - cx, z - cz) <= 6.2)
+    m.cylY(cx, cz, 7.5, 9, 10, '#4e4658', 'metal', 5.8)
+    m.cylY(cx, cz, 5.8, 9, 9, (x, h, z) => (m.noise(x, h, z) > 0.78 ? '#b7ff6a' : '#62d95f'), 'magma')
+    for (const [dx, dz] of [[-5, -4], [5, -4], [-5, 4], [5, 4]])
+      m.line([cx + dx, 4, cz + dz], [cx + dx * 1.3, 0, cz + dz * 1.3], '#24212a', 'metal', 1.2)
+    // Bubbles, magic sparks and rising smoke curls.
+    for (const [dx, dz, r] of [[-3, 1, 1.2], [2, -2, 0.9], [3, 2, 1.1], [-1, -3, 0.8]])
+      m.sphere(cx + dx, 11, cz + dz, r, '#baff78', 'emissive')
+    m.line([cx - 2, 12, cz], [cx + 1, 15, cz - 1], '#9af4ae', 'glass')
+    m.line([cx + 1, 15, cz - 1], [cx - 1, 18, cz + 1], '#c69aff', 'glass')
+    m.sphere(cx - 1, 19, cz + 1, 1, '#e2c9ff', 'emissive')
+  }),
+
+  spellbook: buildTemplate(22, 16, 14, (m) => {
+    const cx = 10.5, cz = 6.5
+    // Thick leather cover below two fanned page blocks.
+    m.box(1, 2, 1, 20, 4, 12, '#563061', 'matte')
+    m.fill((x, h, z) => h >= 4 && h <= 9 && z >= 2 && z <= 11 &&
+      ((x <= cx && h <= 5 + (cx - x) * 0.35) || (x >= cx && h <= 5 + (x - cx) * 0.35)),
+      (x, h, z) => ((h + z) % 3 ? '#f1dfb2' : '#ddc58d'), 'matte')
+    m.box(cx, 4, 2, cx, 8, 11, '#7b4a34', 'matte')
+    // Glowing runes on the open pages.
+    for (const [x, h, z] of [[4, 7, 11], [6, 8, 11], [8, 6, 11], [13, 6, 11], [15, 8, 11], [17, 7, 11]])
+      m.set(x, h, z, '#5ce8ff', 'emissive')
+    m.line([4, 6, 12], [8, 8, 12], '#89734f', 'matte')
+    m.line([13, 8, 12], [18, 6, 12], '#89734f', 'matte')
+    // Floating bookmark gem and orbiting motes.
+    m.line([cx, 4, 12], [cx, 0, 13], '#e34f75', 'glossy')
+    m.shard([cx, 10, cz], [0, 1, 0], 5, 1.5, '#a970ff', 'crystal')
+    for (const [x, h, z] of [[2, 12, 7], [19, 13, 6], [5, 15, 4], [16, 14, 10]]) m.set(x, h, z, '#ffe76a', 'emissive')
+  }),
+
+  aquarium: buildTemplate(24, 19, 16, (m) => {
+    // Tank base, top frame, corners and translucent panes.
+    m.box(1, 0, 1, 22, 2, 14, '#313842', 'metal')
+    m.box(1, 17, 1, 22, 18, 14, '#313842', 'metal')
+    for (const [x, z] of [[1, 1], [22, 1], [1, 14], [22, 14]]) m.box(x, 2, z, x, 16, z, '#596571', 'metal')
+    m.box(2, 3, 1, 21, 16, 1, '#92e3ef', 'glass')
+    // Keep the front face mostly open so the miniature scene remains readable.
+    m.fill((x, h, z) => z === 14 && x >= 2 && x <= 21 && h >= 3 && h <= 16 &&
+      (x === 2 || x === 21 || h === 3 || h === 16), '#92e3ef', 'glass')
+    m.box(1, 3, 2, 1, 16, 13, '#92e3ef', 'glass')
+    m.box(22, 3, 2, 22, 16, 13, '#92e3ef', 'glass')
+    // Gravel, waving plants and coral.
+    m.box(2, 3, 2, 21, 3, 13, (x, h, z) => (m.noise(x, h, z) > 0.55 ? '#d3b27a' : '#8d7658'), 'matte')
+    for (const [x, z, c] of [[4, 5, '#4fbf62'], [7, 10, '#2d9c73'], [18, 5, '#58c96d'], [20, 11, '#2d9c73']]) {
+      m.line([x, 4, z], [x - 1, 11, z], c, 'matte')
+      m.line([x, 7, z], [x + 2, 10, z + 1], c, 'matte')
+    }
+    m.shard([12, 4, 5], [-0.3, 1, 0.2], 6, 1.2, '#f2777a', 'matte')
+    m.shard([14, 4, 6], [0.4, 1, 0], 5, 1.1, '#f2a45f', 'matte')
+    // Two bright fish, bubbles and a tiny castle ornament.
+    m.ellipsoid(8, 12, 11, 3, 1.8, 1.2, '#ffb13d', 'glossy')
+    m.shard([5, 12, 11], [-1, 0, 0], 2, 1.6, '#ff7d38', 'glossy')
+    m.set(9, 12, 12, '#151922', 'glossy')
+    m.ellipsoid(17, 9, 7, 2.5, 1.5, 1, '#5bc8e8', 'glossy')
+    m.shard([19, 9, 7], [1, 0, 0], 2, 1.3, '#477de0', 'glossy')
+    m.set(16, 9, 8, '#151922', 'glossy')
+    m.box(11, 4, 10, 15, 7, 13, '#8a7b70', 'matte')
+    m.box(12, 7, 11, 12, 9, 12, '#8a7b70', 'matte')
+    m.box(14, 7, 11, 14, 9, 12, '#8a7b70', 'matte')
+    for (const [x, h, z] of [[5, 13, 8], [6, 15, 8], [18, 12, 5], [19, 14, 5]]) m.set(x, h, z, '#e9fbff', 'glass')
+  }),
 }
 
 // ── Write files ────────────────────────────────────────────────────────────────

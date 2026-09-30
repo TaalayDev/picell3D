@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Monitor, RotateCw, PanelLeft, PanelRight, PanelTop, PanelBottom, X } from 'lucide-react'
+import { Monitor, RotateCw, PanelLeft, PanelRight, PanelTop, PanelBottom, X, Gamepad2 } from 'lucide-react'
 import { useStore } from './store/index.js'
 import { getTheme, applyTheme } from './themes/index.js'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js'
@@ -34,6 +34,8 @@ export default function App() {
   const activeTheme = useStore(s => s.activeTheme)
   const viewMode    = useStore(s => s.viewMode)
   const setViewMode = useStore(s => s.setViewMode)
+  const flyMode     = useStore(s => s.flyMode)
+  const toggleFlyMode = useStore(s => s.toggleFlyMode)
   const activeTool  = useStore(s => s.activeTool)
   const showShortcutsPanel = useStore(s => s.showShortcutsPanel)
   const exportFn    = useRef(null)
@@ -219,8 +221,23 @@ export default function App() {
               style={{ background: 'color-mix(in srgb, var(--color-background) 95%, transparent)' }}>
               <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-border flex-shrink-0"
                 style={{ background: 'color-mix(in srgb, var(--color-surfaceAlt) 95%, transparent)', minHeight: 32 }}>
-                <div className="text-xs text-text-muted opacity-60 uppercase tracking-widest">
-                  {is3DEditMode ? '3D Edit Mode' : '3D Preview'}
+                <div className="flex items-center gap-2">
+                  <div className="text-xs text-text-muted opacity-60 uppercase tracking-widest">
+                    {is3DEditMode ? '3D Edit Mode' : '3D Preview'}
+                  </div>
+                  <button
+                    onClick={toggleFlyMode}
+                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium transition-all cursor-pointer ${
+                      flyMode
+                        ? 'bg-accent text-background font-semibold shadow-sm'
+                        : 'text-text-muted hover:text-text hover:bg-surface border border-border/60'
+                    }`}
+                    title="Toggle Minecraft-style Free Flying Mode (X)"
+                  >
+                    <Gamepad2 size={13} className={flyMode ? 'animate-pulse' : ''} />
+                    <span>Fly Mode {flyMode ? 'ON' : ''}</span>
+                    <kbd className="text-[10px] opacity-70 ml-0.5 px-1 py-0.2 rounded bg-black/20 font-mono">X</kbd>
+                  </button>
                 </div>
                 {showCanvas && (
                   <ClosePaneButton label="Close 3D preview" onClick={closePreview} />

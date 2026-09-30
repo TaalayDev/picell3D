@@ -1,5 +1,6 @@
 import { useRef, useCallback, useEffect } from 'react'
 import { useStore, getViewSize, getCompositedVoxels, renderView2D } from '../store/index.js'
+import { getBrushOffsets } from '../lib/brushFootprint.js'
 
 /** Bresenham's line — returns all integer coords between (x0,y0) and (x1,y1) */
 function bresenham(x0, y0, x1, y1) {
@@ -74,7 +75,10 @@ export function useCanvasInput(containerRef) {
 
   const applyTool = useCallback(({ col, row }) => {
     const s = useStore.getState()
-    const { activeTool, currentColor, blendEndColor, activeView, canvasWidth: W, canvasHeight: H, depthDimension: D, sideDrawMode } = s
+    const {
+      activeTool, currentColor, blendEndColor, activeView,
+      canvasWidth: W, canvasHeight: H, depthDimension: D, sideDrawMode, brushSize,
+    } = s
     const { w, h } = getViewSize(activeView, W, H, D)
     if (col < 0 || row < 0 || col >= w || row >= h) return
 
@@ -83,23 +87,32 @@ export function useCanvasInput(containerRef) {
       ? (sideDrawMode === 'edit' ? 'draw' : 'edit')
       : null
 
-    switch (activeTool) {
-      case 'pencil':
-        s.paintAt(col, row, currentColor, { sideDrawModeOverride })
-        break
-      case 'eraser':
-        s.paintAt(col, row, 'transparent', { sideDrawModeOverride, fullDepthErase: isShiftHeld.current })
-        break
-      case 'material':
-        s.paintMaterialAt(col, row)
-        break
-      case 'blend': {
-        const origin = blendDragStart.current ?? { col, row }
-        const dist   = Math.sqrt((col - origin.col) ** 2 + (row - origin.row) ** 2)
-        const maxDist = Math.max(W, H)
-        const t       = Math.min(dist / maxDist, 1)
-        s.paintAt(col, row, lerpColor(currentColor, blendEndColor, t), { sideDrawModeOverride })
-        break
+    const brushPoints = getBrushOffsets(brushSize)
+      .map(({ u, v }) => ({ col: col + u, row: row + v }))
+      .filter(point => point.col >= 0 && point.row >= 0 && point.col < w && point.row < h)
+
+    for (const point of brushPoints) {
+      switch (activeTool) {
+        case 'pencil':
+          s.paintAt(point.col, point.row, currentColor, { sideDrawModeOverride })
+          break
+        case 'eraser':
+          s.paintAt(point.col, point.row, 'transparent', {
+            sideDrawModeOverride,
+            fullDepthErase: isShiftHeld.current,
+          })
+          break
+        case 'material':
+          s.paintMaterialAt(point.col, point.row)
+          break
+        case 'blend': {
+          const origin = blendDragStart.current ?? { col, row }
+          const dist   = Math.sqrt((col - origin.col) ** 2 + (row - origin.row) ** 2)
+          const maxDist = Math.max(W, H)
+          const t       = Math.min(dist / maxDist, 1)
+          s.paintAt(point.col, point.row, lerpColor(currentColor, blendEndColor, t), { sideDrawModeOverride })
+          break
+        }
       }
     }
   }, [])

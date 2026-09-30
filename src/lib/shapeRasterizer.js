@@ -26,6 +26,45 @@ function makeSet() {
   }
 }
 
+function normalizeThickness(value) {
+  return Math.max(1, Math.min(8, Math.round(value || 1)))
+}
+
+function thickenLinePixels(pixels, thickness) {
+  const size = normalizeThickness(thickness)
+  if (size === 1) return pixels
+  const { add, result } = makeSet()
+  const low = -Math.floor((size - 1) / 2)
+  const high = Math.ceil((size - 1) / 2)
+  for (const { col, row } of pixels)
+    for (let dy = low; dy <= high; dy++)
+      for (let dx = low; dx <= high; dx++) add(col + dx, row + dy)
+  return result
+}
+
+function innerOutlinePixels(filledPixels, thickness) {
+  const layers = normalizeThickness(thickness)
+  let remaining = new Set(filledPixels.map(({ col, row }) => `${col},${row}`))
+  const outline = makeSet()
+  for (let layer = 0; layer < layers && remaining.size; layer++) {
+    const boundary = []
+    for (const key of remaining) {
+      const [col, row] = key.split(',').map(Number)
+      if (
+        !remaining.has(`${col - 1},${row}`)
+        || !remaining.has(`${col + 1},${row}`)
+        || !remaining.has(`${col},${row - 1}`)
+        || !remaining.has(`${col},${row + 1}`)
+      ) boundary.push({ col, row, key })
+    }
+    for (const pixel of boundary) {
+      outline.add(pixel.col, pixel.row)
+      remaining.delete(pixel.key)
+    }
+  }
+  return outline.result
+}
+
 /** Polyline through array of [x,y] pairs — returns [{col,row},...] */
 export function rasterizeLine(points) {
   if (points.length < 2) return []
@@ -121,20 +160,25 @@ export function rasterizeEllipse(cx, cy, rx, ry, filled = false) {
  * Compute preview pixels for any shape tool.
  * points: [{col,row}] — at least 2 entries.
  */
-export function computeShapePixels(tool, points, filled = false) {
+export function computeShapePixels(tool, points, filled = false, thickness = 1) {
   if (points.length < 2) return []
   const [a, b] = points
   switch (tool) {
     case 'line':
-      return rasterizeLine(points.map(p => [p.col, p.row]))
-    case 'rect':
-      return rasterizeRect(a.col, a.row, b.col, b.row, filled)
+      return thickenLinePixels(rasterizeLine(points.map(p => [p.col, p.row])), thickness)
+    case 'rect': {
+      const pixels = rasterizeRect(a.col, a.row, b.col, b.row, true)
+      return filled ? pixels : innerOutlinePixels(pixels, thickness)
+    }
     case 'circle': {
       const r = Math.round(Math.hypot(b.col - a.col, b.row - a.row))
-      return rasterizeCircle(a.col, a.row, r, filled)
+      const pixels = rasterizeCircle(a.col, a.row, r, true)
+      return filled ? pixels : innerOutlinePixels(pixels, thickness)
     }
-    case 'ellipse':
-      return rasterizeEllipse(a.col, a.row, Math.abs(b.col - a.col), Math.abs(b.row - a.row), filled)
+    case 'ellipse': {
+      const pixels = rasterizeEllipse(a.col, a.row, Math.abs(b.col - a.col), Math.abs(b.row - a.row), true)
+      return filled ? pixels : innerOutlinePixels(pixels, thickness)
+    }
     default:
       return []
   }

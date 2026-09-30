@@ -52,6 +52,22 @@ const SECTIONS = [
       ['?', 'Toggle this panel'],
     ],
   },
+  {
+    title: '3D Free Fly (Minecraft)',
+    rows: [
+      ['X', 'Toggle Free Fly Mode'],
+      ['W / A / S / D', 'Fly forward / left / back / right'],
+      ['↑ / ← / ↓ / →', 'Fly forward / left / back / right'],
+      ['Space', 'Fly Up (Ascend)'],
+      ['Shift / C', 'Fly Down (Descend)'],
+      ['Ctrl / Alt', 'Sprint / Boost speed'],
+      ['Left Click', 'Draw / place voxel'],
+      ['Right Click', 'Erase voxel (or inverse)'],
+      ['Click Viewport', 'Lock mouse look'],
+      ['Esc', 'Unlock mouse cursor'],
+      ['1 - 6', 'Hotbar tools (Pencil, Eraser, Fill...)'],
+    ],
+  },
 ]
 
 export default function ShortcutsPanel() {

@@ -1,5 +1,5 @@
 import { useRef, useEffect, useMemo, useCallback } from 'react'
-import { RotateCw, RotateCcw, Layers, Trash2, Check } from 'lucide-react'
+import { RotateCw, RotateCcw, Layers, Trash2, Check, X } from 'lucide-react'
 import { useStore, renderView2D, renderDepthMap2D, getViewSize, getCompositedVoxels } from '../../store/index.js'
 import { useCanvasInput } from '../../hooks/useCanvasInput.js'
 import { useShapeInput, SHAPE_TOOLS } from '../../hooks/useShapeInput.js'
@@ -479,7 +479,7 @@ export default function PixelCanvas() {
       }
     }
 
-    // Line handles (only in editing mode)
+    // Shape anchor handles (only in editing mode)
     if (lineState.isEditing && lineState.points.length >= 2) {
       const pts = lineState.points
       const hs  = Math.max(5, Math.round(pixelSize * 0.55)) // handle size
@@ -496,20 +496,22 @@ export default function PixelCanvas() {
       ctx.stroke()
       ctx.setLineDash([])
 
-      // Midpoint handles (hollow diamonds)
-      ctx.strokeStyle = 'rgba(255,255,255,0.7)'
-      ctx.fillStyle   = 'rgba(30,30,60,0.75)'
-      ctx.lineWidth   = 1
-      for (let i = 0; i < pts.length - 1; i++) {
-        const mx = (pts[i].col + pts[i + 1].col + 1) / 2 * pixelSize
-        const my = (pts[i].row + pts[i + 1].row + 1) / 2 * pixelSize
-        ctx.beginPath()
-        ctx.moveTo(mx, my - mhs)
-        ctx.lineTo(mx + mhs, my)
-        ctx.lineTo(mx, my + mhs)
-        ctx.lineTo(mx - mhs, my)
-        ctx.closePath()
-        ctx.fill(); ctx.stroke()
+      // Midpoint handles (hollow diamonds) let lines gain bend points.
+      if (lineState.allowMidpoints) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)'
+        ctx.fillStyle   = 'rgba(30,30,60,0.75)'
+        ctx.lineWidth   = 1
+        for (let i = 0; i < pts.length - 1; i++) {
+          const mx = (pts[i].col + pts[i + 1].col + 1) / 2 * pixelSize
+          const my = (pts[i].row + pts[i + 1].row + 1) / 2 * pixelSize
+          ctx.beginPath()
+          ctx.moveTo(mx, my - mhs)
+          ctx.lineTo(mx + mhs, my)
+          ctx.lineTo(mx, my + mhs)
+          ctx.lineTo(mx - mhs, my)
+          ctx.closePath()
+          ctx.fill(); ctx.stroke()
+        }
       }
 
       // Vertex handles (solid squares — start/end bigger)
@@ -582,6 +584,35 @@ export default function PixelCanvas() {
 
         <ReferenceOverlay pixelSize={pixelSize} />
       </div>
+
+      {/* Pending shape confirmation */}
+      {isShape && shapeInput.isEditing && (
+        <div
+          className="absolute bottom-5 z-20 flex items-center gap-1 px-2.5 py-1.5 rounded-xl border shadow-2xl backdrop-blur-md"
+          style={{
+            background: 'color-mix(in srgb, var(--color-surface) 94%, transparent)',
+            borderColor: 'var(--color-border)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.85)',
+          }}
+        >
+          <span className="px-1.5 text-xs text-text-muted">Drag handles to edit</span>
+          <button
+            onClick={shapeInput.cancel}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text-muted hover:text-red-400 hover:bg-red-950/40 transition-colors"
+            title="Cancel shape (Esc)"
+          >
+            <X size={13} /> Cancel
+          </button>
+          <button
+            onClick={shapeInput.commit}
+            className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium"
+            style={{ background: 'var(--color-accent)', color: 'var(--color-canvasBg, #000)' }}
+            title="Confirm shape (Enter)"
+          >
+            <Check size={13} /> Confirm
+          </button>
+        </div>
+      )}
 
       {/* Floating Selection Action Bar */}
       {activeTool === 'select' && (selection || floatingPaste) && (

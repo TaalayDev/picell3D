@@ -65,6 +65,14 @@ export const TEMPLATES = [
   { id: 'building',   label: 'City Building',   emoji: '🏠', desc: 'Multi-story isometric tower',    size: '32×32×32', category: 'world' },
   { id: 'jukebox',    label: 'Neon Jukebox',    emoji: '🎵', desc: 'Chrome diner music machine',       size: '20×26×12', category: 'retro' },
   { id: 'typewriter', label: 'Typewriter',      emoji: '⌨️', desc: 'Classic keys with paper loaded',   size: '24×15×16', category: 'retro' },
+  { id: 'satellite',  label: 'Orbital Satellite', emoji: '🛰️', desc: 'Solar craft with a glowing dish', size: '25×18×17', category: 'scifi' },
+  { id: 'portal',     label: 'Energy Portal',   emoji: '🌀', desc: 'Ancient ring with a neon gateway', size: '23×23×11', category: 'scifi' },
+  { id: 'mars-walker', label: 'Mars Walker',    emoji: '🤖', desc: 'Four-legged planetary scout',      size: '21×22×19', category: 'scifi' },
+  { id: 'record-player', label: 'Record Player', emoji: '💿', desc: 'Turntable spinning a vinyl record', size: '24×13×20', category: 'retro' },
+  { id: 'rotary-phone', label: 'Rotary Phone',  emoji: '☎️', desc: 'Colorful dial telephone',           size: '22×16×18', category: 'retro' },
+  { id: 'cauldron',   label: 'Magic Cauldron',  emoji: '🫕', desc: 'Bubbling brew with ghostly smoke',  size: '21×20×21', category: 'fantasy' },
+  { id: 'spellbook',  label: 'Enchanted Book',  emoji: '📖', desc: 'Open spellbook with glowing runes', size: '22×16×14', category: 'fantasy' },
+  { id: 'aquarium',   label: 'Planted Aquarium', emoji: '🐠', desc: 'Glass tank with coral and fish',    size: '24×19×16', category: 'world' },
 ]
 
 const CATEGORIES = [

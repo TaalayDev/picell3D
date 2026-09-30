@@ -96,6 +96,28 @@ export function useKeyboardShortcuts() {
         return
       }
 
+      // ── X — toggle 3D Fly Mode ──
+      if (e.key.toLowerCase() === 'x' && !e.ctrlKey && !e.metaKey) {
+        if (s.viewMode !== 'canvas-only' || s.flyMode) {
+          e.preventDefault()
+          s.toggleFlyMode()
+          return
+        }
+      }
+
+      // If Fly Mode is active, skip WASD/movement keys from activating 2D tools
+      if (s.flyMode) {
+        if (['w', 'a', 's', 'd', 'c', 'e', ' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(e.key.toLowerCase())) {
+          return
+        }
+        if (['1', '2', '3', '4', '5', '6'].includes(e.key)) {
+          const tools = ['pencil', 'eraser', 'fill', 'blend', 'material', 'eyedropper']
+          const idx = parseInt(e.key, 10) - 1
+          if (tools[idx]) setActiveTool(tools[idx])
+          return
+        }
+      }
+
       // ── ? — shortcuts panel ──
       if (e.key === '?') { s.toggleShortcutsPanel(); return }
 

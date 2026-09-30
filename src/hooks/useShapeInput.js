@@ -22,9 +22,9 @@ function getCoords(e, containerRef, pixelSize) {
 /**
  * Manages state for shape drawing tools: rect, circle, ellipse, line.
  *
- * The line tool has an extra "editing" phase — after initial drag the user
- * can drag vertex handles (solid squares) or midpoint handles (hollow
- * diamonds) to bend the line. Pressing Enter or clicking outside commits.
+ * After the initial drag every shape enters an editing phase. The user can
+ * drag its two anchor handles before confirming with Enter. Lines additionally
+ * expose midpoint handles for inserting bend points.
  *
  * Returns:
  *   previewPixels  — pixels to draw as a ghost on the overlay canvas
@@ -41,32 +41,43 @@ export function useShapeInput(containerRef) {
 
   const [previewPixels, setPreviewPixels] = useState([])
   const [lineState, setLineState]         = useState({ points: [], isEditing: false })
-  const [shapeFilled, setShapeFilled]     = useState(false)
+  const shapeMode = useStore(s => s.shapeMode)
+  const shapeThickness = useStore(s => s.shapeThickness)
+  const activeTool = useStore(s => s.activeTool)
+  const shapeFilled = shapeMode === 'fill'
+  const previousTool = useRef(activeTool)
 
-  const toggleFilled = useCallback(() => setShapeFilled(v => !v), [])
+  const toggleFilled = useCallback(() => {
+    const s = useStore.getState()
+    s.setShapeMode(s.shapeMode === 'fill' ? 'outline' : 'fill')
+  }, [])
 
   // ── Internal helpers ────────────────────────────────────────────────────────
 
   function refresh() {
     const tool = useStore.getState().activeTool
     const pts  = points.current
-    setPreviewPixels(pts.length >= 2 ? computeShapePixels(tool, pts, filledRef.current) : [])
-    if (tool === 'line') {
-      setLineState({ points: [...pts], isEditing: phase.current === 'editing' })
-    } else {
-      setLineState({ points: [], isEditing: false })
-    }
+    setPreviewPixels(pts.length >= 2
+      ? computeShapePixels(tool, pts, filledRef.current, thicknessRef.current)
+      : [])
+    setLineState({
+      points: [...pts],
+      isEditing: phase.current === 'editing',
+      allowMidpoints: tool === 'line',
+    })
   }
 
   // We need shapeFilled to be accessible inside refresh without stale closure.
   // Use a ref so we can always read the latest value.
   const filledRef = useRef(shapeFilled)
   useEffect(() => { filledRef.current = shapeFilled }, [shapeFilled])
+  const thicknessRef = useRef(shapeThickness)
+  useEffect(() => { thicknessRef.current = shapeThickness }, [shapeThickness])
 
-  function refreshWithFilled(filled) {
+  function refreshWithSettings(filled, thickness) {
     const tool = useStore.getState().activeTool
     const pts  = points.current
-    setPreviewPixels(pts.length >= 2 ? computeShapePixels(tool, pts, filled) : [])
+    setPreviewPixels(pts.length >= 2 ? computeShapePixels(tool, pts, filled, thickness) : [])
   }
 
   function findHandle(px, py, pixelSize) {
@@ -81,12 +92,14 @@ export function useShapeInput(containerRef) {
         return { type: 'vertex', index: i }
     }
 
-    // Midpoint handles (hollow diamonds)
-    for (let i = 0; i < pts.length - 1; i++) {
-      const mx = (pts[i].col + pts[i + 1].col + 1) / 2 * pixelSize
-      const my = (pts[i].row + pts[i + 1].row + 1) / 2 * pixelSize
-      if (Math.abs(px - mx) <= HIT_PX && Math.abs(py - my) <= HIT_PX)
-        return { type: 'midpoint', index: i }
+    // Midpoint handles are specific to editable poly-lines.
+    if (useStore.getState().activeTool === 'line') {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const mx = (pts[i].col + pts[i + 1].col + 1) / 2 * pixelSize
+        const my = (pts[i].row + pts[i + 1].row + 1) / 2 * pixelSize
+        if (Math.abs(px - mx) <= HIT_PX && Math.abs(py - my) <= HIT_PX)
+          return { type: 'midpoint', index: i }
+      }
     }
 
     return null
@@ -103,7 +116,12 @@ export function useShapeInput(containerRef) {
       setLineState({ points: [], isEditing: false })
       return
     }
-    const pixels = computeShapePixels(s.activeTool, pts, filledRef.current)
+    const pixels = computeShapePixels(
+      s.activeTool,
+      pts,
+      s.activeTool !== 'line' && filledRef.current,
+      thicknessRef.current,
+    )
     s.pushUndo()
     for (const { col, row } of pixels) s.paintAt(col, row, s.currentColor)
     phase.current  = 'idle'
@@ -120,6 +138,11 @@ export function useShapeInput(containerRef) {
     setPreviewPixels([])
     setLineState({ points: [], isEditing: false })
   }, [])
+
+  useEffect(() => {
+    if (previousTool.current !== activeTool && phase.current !== 'idle') cancel()
+    previousTool.current = activeTool
+  }, [activeTool, cancel])
 
   // ── Keyboard: Enter = commit, Escape = cancel ────────────────────────────────
   useEffect(() => {
@@ -145,7 +168,7 @@ export function useShapeInput(containerRef) {
 
     const { col, row, px, py } = getCoords(e, containerRef, pixelSize)
 
-    // ── Line editing mode ──
+    // ── Shape editing mode ──
     if (phase.current === 'editing') {
       const handle = findHandle(px, py, pixelSize)
       if (handle) {
@@ -166,9 +189,8 @@ export function useShapeInput(containerRef) {
         refresh()
         return
       }
-      // Clicked outside → commit current line, then start fresh
-      doCommit()
-      // Fall through to start new drawing
+      // Keep the pending shape until it is explicitly confirmed or cancelled.
+      return
     }
 
     // ── Start drawing ──
@@ -202,30 +224,23 @@ export function useShapeInput(containerRef) {
   }, [containerRef])
 
   const onPointerUp = useCallback((e) => {
-    const { activeTool } = useStore.getState()
-
     if (phase.current === 'drawing') {
-      if (activeTool === 'line') {
-        // Enter line-edit mode instead of committing immediately
-        phase.current    = 'editing'
-        dragging.current = null
-        refresh()
-      } else {
-        doCommit()
-      }
+      phase.current    = 'editing'
+      dragging.current = null
+      refresh()
       return
     }
 
     if (phase.current === 'editing') {
       dragging.current = null
     }
-  }, [doCommit])
+  }, [])
 
-  // Re-run preview when shapeFilled changes
+  // Re-run preview when shape style changes.
   useEffect(() => {
-    if (phase.current !== 'idle') refreshWithFilled(shapeFilled)
+    if (phase.current !== 'idle') refreshWithSettings(shapeFilled, shapeThickness)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shapeFilled])
+  }, [shapeFilled, shapeThickness])
 
   return {
     previewPixels,

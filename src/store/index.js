@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { rotateBox, scaleBox, shiftVoxelListDepth, getDefaultAnchor, getPresetAnchor } from '../lib/selectionTransform.js'
+import { clampBrushSize } from '../lib/brushFootprint.js'
 
 const DEFAULT_PALETTE = [
   // Blacks & whites
@@ -606,7 +607,10 @@ export const useStore = create((set, get) => ({
   resizeCanvas(newW, newH) {
     newW = Math.max(4, Math.min(256, Math.round(newW)))
     newH = Math.max(4, Math.min(256, Math.round(newH)))
-    const { layers, canvasWidth: W, canvasHeight: H, depthDimension: D } = get()
+    const {
+      layers, canvasWidth: W, canvasHeight: H, depthDimension: D,
+      planeAxis, planeDepth,
+    } = get()
     get().pushUndo()
 
     const offX = newW > W ? Math.floor((newW - W) / 2) : 0
@@ -624,12 +628,21 @@ export const useStore = create((set, get) => ({
       return { ...layer, voxels: next }
     })
 
-    set({ canvasWidth: newW, canvasHeight: newH, layers: newLayers })
+    const planeSize = planeAxis === 'x' ? newW : planeAxis === 'y' ? newH : D
+    set({
+      canvasWidth: newW,
+      canvasHeight: newH,
+      layers: newLayers,
+      planeDepth: Math.max(0, Math.min(planeSize - 1, planeDepth)),
+    })
   },
 
   setDepthDimension(newD) {
     newD = Math.max(4, Math.min(256, Math.round(newD)))
-    const { layers, canvasWidth: W, canvasHeight: H, depthDimension: D, paintDepth } = get()
+    const {
+      layers, canvasWidth: W, canvasHeight: H, depthDimension: D, paintDepth,
+      planeAxis, planeDepth,
+    } = get()
     get().pushUndo()
 
     const offZ = newD > D ? Math.floor((newD - D) / 2) : 0
@@ -648,6 +661,9 @@ export const useStore = create((set, get) => ({
       depthDimension: newD,
       layers: newLayers,
       paintDepth: Math.min(paintDepth, newD),
+      planeDepth: planeAxis === 'z'
+        ? Math.max(0, Math.min(newD - 1, planeDepth))
+        : planeDepth,
     })
   },
 
@@ -680,20 +696,100 @@ export const useStore = create((set, get) => ({
 
   /** Directly set a single voxel in the active layer (used by 3D editor). Does NOT push undo. */
   paintVoxelDirect(x, y, z, color) {
+    get().paintVoxelsDirect([{ x, y, z }], color)
+  },
+
+  /** Set a batch of voxels in one immutable layer update (used by 3D shapes). */
+  paintVoxelsDirect(targets, color) {
     const { layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D } = get()
-    if (x < 0 || x >= W || y < 0 || y >= H || z < 0 || z >= D) return
     const layerIdx = layers.findIndex(l => l.id === activeLayerId)
     if (layerIdx < 0) return
     const layer = layers[layerIdx]
-    const newVoxels = layer.voxels.map((plane, iy) => {
-      if (iy !== y) return plane
-      return plane.map((xRow, ix) => {
-        if (ix !== x) return xRow
-        const row = [...xRow]
-        row[z] = color
-        return row
-      })
-    })
+    const unique = new Map()
+    for (const voxel of targets || []) {
+      const x = Math.round(voxel.x), y = Math.round(voxel.y), z = Math.round(voxel.z)
+      if (x < 0 || x >= W || y < 0 || y >= H || z < 0 || z >= D) continue
+      unique.set(`${x},${y},${z}`, { x, y, z })
+    }
+    if (!unique.size) return
+    const affectedY = new Set([...unique.values()].map(v => v.y))
+    const newVoxels = layer.voxels.map((plane, iy) =>
+      affectedY.has(iy) ? plane.map(xRow => [...xRow]) : plane
+    )
+    for (const { x, y, z } of unique.values()) newVoxels[y][x][z] = color
+    const newLayers = [...layers]
+    newLayers[layerIdx] = { ...layer, voxels: newVoxels }
+    set({ layers: newLayers })
+  },
+
+  /** Flood-fill existing voxels from a picked face in the 3D editor.
+   *  `side` fills the connected coplanar surface under the clicked face.
+   *  `all` fills the full 6-connected component of the picked color.
+   *  Does NOT push undo; the 3D pointer handler owns the stroke snapshot.
+   */
+  floodFillVoxel3D(x, y, z, newColor, faceNormal) {
+    const {
+      layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D,
+      fillScope,
+    } = get()
+    if (x < 0 || x >= W || y < 0 || y >= H || z < 0 || z >= D) return
+    const layerIdx = layers.findIndex(l => l.id === activeLayerId)
+    if (layerIdx < 0) return
+
+    const composited = getCompositedVoxels(layers, W, H, D)
+    const targetColor = composited[y]?.[x]?.[z]
+    if (!targetColor || targetColor === 'transparent' || targetColor === newColor) return
+
+    const inside = (vx, vy, vz) => vx >= 0 && vx < W && vy >= 0 && vy < H && vz >= 0 && vz < D
+    const colorAt = (vx, vy, vz) => inside(vx, vy, vz) ? composited[vy][vx][vz] : 'transparent'
+    const targets = []
+    const visited = new Set()
+    const stack = [[x, y, z]]
+
+    if (fillScope === 'all') {
+      const neighbors = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]]
+      while (stack.length) {
+        const [vx, vy, vz] = stack.pop()
+        const key = `${vx},${vy},${vz}`
+        if (visited.has(key) || colorAt(vx, vy, vz) !== targetColor) continue
+        visited.add(key)
+        targets.push({ x: vx, y: vy, z: vz })
+        for (const [dx, dy, dz] of neighbors) stack.push([vx + dx, vy + dy, vz + dz])
+      }
+    } else {
+      const normal = faceNormal || { x: 0, y: 0, z: 1 }
+      const abs = [Math.abs(normal.x || 0), Math.abs(normal.y || 0), Math.abs(normal.z || 0)]
+      const axis = abs[0] >= abs[1] && abs[0] >= abs[2] ? 'x' : abs[1] >= abs[2] ? 'y' : 'z'
+      const sign = (normal[axis] || 0) >= 0 ? 1 : -1
+      // World +Y points toward decreasing voxel Y.
+      const outward = axis === 'x' ? [sign, 0, 0] : axis === 'y' ? [0, -sign, 0] : [0, 0, sign]
+      const planeNeighbors = axis === 'x'
+        ? [[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]]
+        : axis === 'y'
+          ? [[1,0,0],[-1,0,0],[0,0,1],[0,0,-1]]
+          : [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0]]
+      const planeValue = axis === 'x' ? x : axis === 'y' ? y : z
+
+      while (stack.length) {
+        const [vx, vy, vz] = stack.pop()
+        const key = `${vx},${vy},${vz}`
+        if (visited.has(key)) continue
+        visited.add(key)
+        if ((axis === 'x' ? vx : axis === 'y' ? vy : vz) !== planeValue) continue
+        if (colorAt(vx, vy, vz) !== targetColor) continue
+        if (colorAt(vx + outward[0], vy + outward[1], vz + outward[2]) !== 'transparent') continue
+        targets.push({ x: vx, y: vy, z: vz })
+        for (const [dx, dy, dz] of planeNeighbors) stack.push([vx + dx, vy + dy, vz + dz])
+      }
+    }
+
+    if (!targets.length) return
+    const layer = layers[layerIdx]
+    const affectedY = new Set(targets.map(v => v.y))
+    const newVoxels = layer.voxels.map((plane, iy) =>
+      affectedY.has(iy) ? plane.map(xRow => [...xRow]) : plane
+    )
+    for (const vox of targets) newVoxels[vox.y][vox.x][vox.z] = newColor
     const newLayers = [...layers]
     newLayers[layerIdx] = { ...layer, voxels: newVoxels }
     set({ layers: newLayers })
@@ -801,6 +897,20 @@ export const useStore = create((set, get) => ({
   // 'draw' = freely place new voxels
   sideDrawMode: 'edit',
 
+  // 3D fill: one picked planar face, or the whole connected color volume.
+  fillScope: 'side',
+
+  // Optional 3D drawing plane. Depth is a zero-based voxel coordinate on its axis.
+  planeLock:  false,
+  planeAxis:  'z',
+  planeDepth: DEPTH_D - 1,
+
+  // Shape rendering shared by the 2D canvas and the 3D editor.
+  shapeMode:      'outline',
+  shapeThickness: 1,
+
+  brushSize: 1,
+
   // Symmetry flags
   symmetryX:        false,
   symmetryY:        false,
@@ -812,6 +922,27 @@ export const useStore = create((set, get) => ({
   })),
   setPaintDirection:  (dir)  => set({ paintDirection: dir }),
   setSideDrawMode:    (mode) => set({ sideDrawMode: mode }),
+  setFillScope:       (scope) => set({ fillScope: scope === 'all' ? 'all' : 'side' }),
+  setPlaneLock:       (locked) => set({ planeLock: Boolean(locked) }),
+  setPlaneAxis:       (axis) => set(s => {
+    const nextAxis = axis === 'x' || axis === 'y' ? axis : 'z'
+    const size = nextAxis === 'x' ? s.canvasWidth : nextAxis === 'y' ? s.canvasHeight : s.depthDimension
+    return {
+      planeAxis: nextAxis,
+      planeDepth: Math.max(0, Math.min(size - 1, s.planeDepth)),
+    }
+  }),
+  setPlaneDepth:      (depth) => set(s => {
+    const size = s.planeAxis === 'x'
+      ? s.canvasWidth
+      : s.planeAxis === 'y' ? s.canvasHeight : s.depthDimension
+    return { planeDepth: Math.max(0, Math.min(size - 1, Math.round(depth))) }
+  }),
+  setShapeMode:       (mode) => set({ shapeMode: mode === 'fill' ? 'fill' : 'outline' }),
+  setShapeThickness:  (value) => set({
+    shapeThickness: Math.max(1, Math.min(8, Math.round(value))),
+  }),
+  setBrushSize:       (value) => set({ brushSize: clampBrushSize(value) }),
   setSymmetryX:       (v)    => set({ symmetryX: v }),
   setSymmetryY:       (v)    => set({ symmetryY: v }),
   setSymmetryOpposite:(v)    => set({ symmetryOpposite: v }),
@@ -848,24 +979,36 @@ export const useStore = create((set, get) => ({
 
   /** Directly apply or remove material on a single voxel (used by 3D viewport) */
   paintMaterialDirect(x, y, z) {
+    get().paintMaterialsDirect([{ x, y, z }])
+  },
+
+  /** Apply the active material to a batch of existing voxels in one update. */
+  paintMaterialsDirect(targets) {
     const { layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D, activeMaterial } = get()
-    if (x < 0 || x >= W || y < 0 || y >= H || z < 0 || z >= D) return
     const layerIdx = layers.findIndex(l => l.id === activeLayerId)
     if (layerIdx < 0) return
     const layer = layers[layerIdx]
     const composited = getCompositedVoxels(layers, W, H, D)
-    if (!composited[y]?.[x]?.[z] || composited[y][x][z] === 'transparent') return
-    const key = `${y},${x},${z}`
     const newMaterials = { ...(layer.voxelMaterials || {}) }
     let changed = false
-    if (activeMaterial === 'solid') {
-      if (key in newMaterials) {
-        delete newMaterials[key]
+    const visited = new Set()
+    for (const voxel of targets || []) {
+      const x = Math.round(voxel.x), y = Math.round(voxel.y), z = Math.round(voxel.z)
+      if (x < 0 || x >= W || y < 0 || y >= H || z < 0 || z >= D) continue
+      const voxelKey = `${x},${y},${z}`
+      if (visited.has(voxelKey)) continue
+      visited.add(voxelKey)
+      if (!composited[y]?.[x]?.[z] || composited[y][x][z] === 'transparent') continue
+      const materialKey = `${y},${x},${z}`
+      if (activeMaterial === 'solid') {
+        if (materialKey in newMaterials) {
+          delete newMaterials[materialKey]
+          changed = true
+        }
+      } else if (newMaterials[materialKey] !== activeMaterial) {
+        newMaterials[materialKey] = activeMaterial
         changed = true
       }
-    } else if (newMaterials[key] !== activeMaterial) {
-      newMaterials[key] = activeMaterial
-      changed = true
     }
     if (!changed) return
     const newLayers = [...layers]
@@ -881,11 +1024,14 @@ export const useStore = create((set, get) => ({
 
   // ── UI ───────────────────────────────────────────────────────────────────────
   viewMode:          'split',
+  flyMode:           false,
   activeTheme:       'synthwave',
   showDepthText:     true,
   showShortcutsPanel: false,
 
-  setViewMode:           (mode)  => set({ viewMode: mode }),
+  setViewMode:           (mode)  => set(s => ({ viewMode: mode, flyMode: mode === 'canvas-only' ? false : s.flyMode })),
+  setFlyMode:            (v)     => set({ flyMode: Boolean(v) }),
+  toggleFlyMode:         ()      => set(s => ({ flyMode: !s.flyMode })),
   setActiveTheme:        (theme) => set({ activeTheme: theme }),
   setShowDepthText:      (v)     => set({ showDepthText: v }),
   setBlendEndColor:      (c)     => set({ blendEndColor: c }),

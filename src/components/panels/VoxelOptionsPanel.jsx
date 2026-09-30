@@ -12,6 +12,10 @@ export default function VoxelOptionsPanel() {
     canvasWidth, canvasHeight, depthDimension, setDepthDimension,
     paintDepth, setPaintDepth, layers, activeView,
     sideDrawMode, setSideDrawMode,
+    fillScope, setFillScope, viewMode,
+    planeLock, setPlaneLock, planeAxis, setPlaneAxis, planeDepth, setPlaneDepth,
+    shapeMode, setShapeMode, shapeThickness, setShapeThickness,
+    brushSize, setBrushSize,
     symmetryX, symmetryY, symmetryOpposite,
     setSymmetryX, setSymmetryY, setSymmetryOpposite,
     activeTool,
@@ -35,6 +39,14 @@ export default function VoxelOptionsPanel() {
   const isFront    = activeView === 'front'
   const isFrontBack = activeView === 'front' || activeView === 'back'
   const oppLabel   = OPPOSITE_VIEW[activeView]
+  const planeToolActive = ['pencil', 'eraser', 'material', 'blend', 'rect', 'circle', 'ellipse', 'line'].includes(activeTool)
+  const isShapeTool = ['rect', 'circle', 'ellipse', 'line'].includes(activeTool)
+  const isBrushTool = ['pencil', 'eraser', 'material', 'blend'].includes(activeTool)
+  const effectiveShapeMode = activeTool === 'line' ? 'outline' : shapeMode
+  const planeSize = planeAxis === 'x'
+    ? canvasWidth
+    : planeAxis === 'y' ? canvasHeight : depthDimension
+  const visiblePlaneDepth = Math.max(0, Math.min(planeSize - 1, planeDepth))
 
   return (
     <div className="flex flex-col h-full">
@@ -45,6 +57,191 @@ export default function VoxelOptionsPanel() {
       </div>
 
       <div className="flex flex-col gap-4 p-3">
+
+        {/* ── Brush size ───────────────────────────────────────────────────── */}
+        {isBrushTool && (
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-center">
+              <div className="text-xs text-text-muted uppercase tracking-wide">Brush Size</div>
+              <span className="text-xs font-mono text-accent">{brushSize}×{brushSize}</span>
+            </div>
+            <div className="grid grid-cols-5 gap-1">
+              {[1, 2, 3, 5, 8].map(size => (
+                <button
+                  key={size}
+                  onClick={() => setBrushSize(size)}
+                  className={`py-1 rounded border text-xs font-mono transition-colors ${
+                    brushSize === size
+                      ? 'border-accent bg-accent/20 text-accent'
+                      : 'border-border text-text-muted hover:text-text hover:border-accent/50'
+                  }`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={8}
+              value={brushSize}
+              onChange={e => setBrushSize(parseInt(e.target.value))}
+              className="w-full cursor-pointer"
+              style={{ accentColor: 'var(--color-accent)' }}
+            />
+            <p className="text-xs text-text-muted leading-tight">
+              {viewMode === 'preview-only'
+                ? 'The brush expands across the active face or locked plane.'
+                : 'The brush paints a square area around the cursor.'}
+            </p>
+          </div>
+        )}
+
+        {/* ── 3D fill options ─────────────────────────────────────────────── */}
+        {activeTool === 'fill' && viewMode === 'preview-only' && (
+          <div className="flex flex-col gap-2">
+            <div className="text-xs text-text-muted uppercase tracking-wide">3D Fill Scope</div>
+            <div className="grid grid-cols-2 gap-1 p-0.5 rounded border border-border bg-surface-alt/40">
+              {[
+                ['side', 'One side'],
+                ['all', 'All sides'],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setFillScope(id)}
+                  className={`py-1 rounded text-xs transition-colors ${
+                    fillScope === id
+                      ? 'bg-accent/20 text-accent font-medium shadow-glow-accent'
+                      : 'text-text-muted hover:text-text'
+                  }`}
+                  title={id === 'side'
+                    ? 'Fill only the connected surface on the clicked side'
+                    : 'Fill the entire connected volume of the picked color'}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-text-muted leading-tight">
+              {fillScope === 'side'
+                ? 'Recolors the connected flat surface under the clicked face.'
+                : 'Recolors every connected block with the picked color.'}
+            </p>
+          </div>
+        )}
+
+        {/* ── Shape style ──────────────────────────────────────────────────── */}
+        {isShapeTool && (
+          <div className="flex flex-col gap-2">
+            <div className="text-xs text-text-muted uppercase tracking-wide">Shape Style</div>
+            <div className="grid grid-cols-2 gap-1 p-0.5 rounded border border-border bg-surface-alt/40">
+              <button
+                disabled={activeTool === 'line'}
+                onClick={() => setShapeMode('fill')}
+                className={`py-1 rounded text-xs transition-colors disabled:opacity-35 disabled:cursor-not-allowed ${
+                  effectiveShapeMode === 'fill'
+                    ? 'bg-accent/20 text-accent font-medium shadow-glow-accent'
+                    : 'text-text-muted hover:text-text'
+                }`}
+                title={activeTool === 'line' ? 'Fill is not available for lines' : 'Draw a solid filled shape'}
+              >
+                Fill
+              </button>
+              <button
+                onClick={() => setShapeMode('outline')}
+                className={`py-1 rounded text-xs transition-colors ${
+                  effectiveShapeMode === 'outline'
+                    ? 'bg-accent/20 text-accent font-medium shadow-glow-accent'
+                    : 'text-text-muted hover:text-text'
+                }`}
+                title="Draw only the shape outline"
+              >
+                Outline
+              </button>
+            </div>
+
+            <div className={effectiveShapeMode === 'fill' ? 'opacity-45' : ''}>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-xs text-text-muted">Thickness</label>
+                <span className="text-xs font-mono text-accent">{shapeThickness}</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={8}
+                value={shapeThickness}
+                disabled={effectiveShapeMode === 'fill'}
+                onChange={e => setShapeThickness(parseInt(e.target.value))}
+                className="w-full cursor-pointer disabled:cursor-default"
+                style={{ accentColor: 'var(--color-accent)' }}
+              />
+            </div>
+            <p className="text-xs text-text-muted leading-tight">
+              {activeTool === 'line'
+                ? 'Thickness controls the width of the line.'
+                : effectiveShapeMode === 'fill'
+                  ? 'Fills the entire shape.'
+                  : 'Thickness grows inward without changing the outer size.'}
+            </p>
+          </div>
+        )}
+
+        {/* ── 3D drawing plane ────────────────────────────────────────────── */}
+        {viewMode === 'preview-only' && planeToolActive && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs text-text-muted uppercase tracking-wide">
+                <Crosshair size={12} /> Drawing Plane
+              </div>
+              <SymToggle label="Lock" value={planeLock} onChange={setPlaneLock} />
+            </div>
+
+            <div className={`flex flex-col gap-2 transition-opacity ${planeLock ? 'opacity-100' : 'opacity-45'}`}>
+              <div className="grid grid-cols-3 gap-1 p-0.5 rounded border border-border bg-surface-alt/40">
+                {['x', 'y', 'z'].map(axis => (
+                  <button
+                    key={axis}
+                    disabled={!planeLock}
+                    onClick={() => setPlaneAxis(axis)}
+                    className={`py-1 rounded text-xs font-mono uppercase transition-colors disabled:cursor-default ${
+                      planeAxis === axis
+                        ? 'bg-accent/20 text-accent font-medium shadow-glow-accent'
+                        : 'text-text-muted hover:text-text'
+                    }`}
+                    title={`Lock drawing to the ${axis.toUpperCase()} axis`}
+                  >
+                    {axis}
+                  </button>
+                ))}
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-xs text-text-muted">Layer depth</label>
+                  <span className="text-xs font-mono text-accent">
+                    {planeAxis.toUpperCase()} {visiblePlaneDepth + 1}/{planeSize}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.max(0, planeSize - 1)}
+                  value={visiblePlaneDepth}
+                  disabled={!planeLock}
+                  onChange={e => setPlaneDepth(parseInt(e.target.value))}
+                  className="w-full cursor-pointer disabled:cursor-default"
+                  style={{ accentColor: 'var(--color-accent)' }}
+                />
+              </div>
+            </div>
+
+            <p className="text-xs text-text-muted leading-tight">
+              {planeLock
+                ? 'Strokes and shapes are projected onto this layer, including empty space.'
+                : 'Enable to draw on a fixed layer instead of the model surface.'}
+            </p>
+          </div>
+        )}
 
         {/* ── Selection tool options ───────────────────────────────────────── */}
         {activeTool === 'select' && (
