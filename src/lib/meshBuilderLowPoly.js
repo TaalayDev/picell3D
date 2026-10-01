@@ -37,13 +37,15 @@ export function buildLowPolyGroup(result, { wireframe = false } = {}) {
   for (const g of result.groups) {
     if (!g.positions.length) continue
     const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(g.positions, 3))
-    geo.setAttribute('normal',   new THREE.Float32BufferAttribute(g.normals, 3))
-    geo.setAttribute('color',    new THREE.Float32BufferAttribute(g.colors, 3))
+    // BufferAttribute (not Float32BufferAttribute) shares the typed arrays, so manual edits show up live
+    geo.setAttribute('position', new THREE.BufferAttribute(g.positions, 3))
+    geo.setAttribute('normal',   new THREE.BufferAttribute(g.normals, 3))
+    geo.setAttribute('color',    new THREE.BufferAttribute(g.colors, 3))
     const mat = createMaterial(g.mat)
     const mesh = new THREE.Mesh(geo, mat)
     mesh.name = g.mat
     mesh.userData.faceHex = g.faceHex
+    mesh.userData.groupIndex = result.groups.indexOf(g)
     disposables.push(geo, mat)
 
     if (wireframe) {
@@ -59,4 +61,12 @@ export function buildLowPolyGroup(result, { wireframe = false } = {}) {
   }
 
   return { group, dispose: () => disposables.forEach(d => d.dispose()) }
+}
+
+/** Rebuild a mesh's edge overlay after its vertices were edited. */
+export function refreshWireframe(mesh) {
+  const lines = mesh.children.find(c => c.name === 'wireframe')
+  if (!lines) return
+  lines.geometry.dispose()
+  lines.geometry = new THREE.WireframeGeometry(mesh.geometry)
 }

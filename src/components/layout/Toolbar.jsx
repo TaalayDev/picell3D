@@ -21,6 +21,7 @@ const TOOLS = [
   { id: 'blend',    Icon: Droplets,            label: 'Blend (B)',     key: 'B', group: 'draw' },
   { id: 'material', Icon: Sparkles,            label: 'Material (M)', key: 'M', group: 'draw' },
   { id: 'select',   Icon: BoxSelect,           label: 'Select (S)',   key: 'S', group: 'draw' },
+  { id: 'bounds',   Icon: Frame,               label: 'Edit bounds (Q)', key: 'Q', group: 'draw' },
   // shapes
   { id: 'rect',     Icon: RectangleHorizontal, label: 'Rectangle (R)', key: 'R', group: 'shape' },
   { id: 'circle',   Icon: Circle,              label: 'Circle (C)',    key: 'C', group: 'shape' },

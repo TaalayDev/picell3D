@@ -3,10 +3,14 @@ import { X, Image, Box, Download, ChevronRight, Triangle, Eye, Grid3X3, Loader2 
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js'
 import { useStore, getCompositedVoxels, getCompositedMaterials } from '../../store/index.js'
 import { useRenderScene, LIGHT_PRESETS } from './useRenderScene.js'
-import { buildLowPolyGroup } from '../../lib/meshBuilderLowPoly.js'
+import { buildLowPolyGroup, refreshWireframe } from '../../lib/meshBuilderLowPoly.js'
 import { DEFAULT_LOWPOLY_PARAMS, LOWPOLY_PRESETS } from '../../lib/lowpoly/index.js'
 import { downloadGroupObjMtl } from '../../lib/exportObj.js'
 import LowPolyPanel, { SectionLabel } from './LowPolyPanel.jsx'
+import LowPolyTools from './LowPolyTools.jsx'
+import { useMeshEditor } from './useMeshEditor.js'
+
+const DEFAULT_BRUSH = { radius: 0.2, strength: 0.5, color: '#e0a040' }
 
 const PARAMS_KEY = 'picell3d-lowpoly-params'
 
@@ -72,7 +76,7 @@ function ViewToggle({ Icon, label, active, onClick, ...rest }) {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function LowPolyPage({ onClose }) {
   const containerRef = useRef(null)
-  const { rebuild: showVoxels, setMesh, applyPreset, exportPng } = useRenderScene(containerRef, { autoBuild: false })
+  const { rebuild: showVoxels, setMesh, applyPreset, exportPng, getContext } = useRenderScene(containerRef, { autoBuild: false })
 
   const [params, setParams]           = useState(loadParams)
   const [activePreset, setActivePreset] = useState(null)
@@ -82,13 +86,19 @@ export default function LowPolyPage({ onClose }) {
   const [stats, setStats]             = useState(null)
   const [busy, setBusy]               = useState(true)
   const [error, setError]             = useState(null)
+  const [stale, setStale]             = useState(false)   // settings or voxels changed since the last generate
+  const [tool, setTool]               = useState('orbit')
+  const [brush, setBrush]             = useState(DEFAULT_BRUSH)
 
   const workerRef     = useRef(null)
   const requestIdRef  = useRef(0)
   const resultRef     = useRef(null)
   const groupRef      = useRef(null)
   const wireframeRef  = useRef(wireframe)
+  const paramsRef     = useRef(params)
+  paramsRef.current = params
   const originalRef   = useRef(showOriginal)
+  const editorRef     = useRef(null)
   wireframeRef.current = wireframe
   originalRef.current  = showOriginal
 
@@ -115,40 +125,60 @@ export default function LowPolyPage({ onClose }) {
       setBusy(false)
       if (err) { setError(err); return }
       setError(null)
+      // Keep the previous mesh (with the user's edits) on the undo stack
+      if (resultRef.current) editorRef.current?.pushHistory()
       resultRef.current = result
+      editorRef.current?.invalidate()
       setStats(result.stats)
       if (!originalRef.current) showLowPoly()
     }
     worker.onerror = (e) => { setBusy(false); setError(e.message || 'Worker failed') }
     workerRef.current = worker
+    requestIdRef.current++
+    worker.postMessage({ id: requestIdRef.current, input: getInput(), params: paramsRef.current, mode: 'voxels' })   // start from the model exactly as drawn
     return () => worker.terminate()
   }, [showLowPoly])
 
-  const convert = useCallback((p) => {
+  const generate = useCallback((mode = 'lowpoly') => {
     const worker = workerRef.current
     if (!worker) return
     const id = ++requestIdRef.current
     setBusy(true)
-    worker.postMessage({ id, input: getInput(), params: p })
+    setStale(false)
+    worker.postMessage({ id, input: getInput(), params: paramsRef.current, mode })
   }, [])
 
-  // Re-run (debounced) whenever the settings change
+  // Nothing is rebuilt automatically: setting changes only remember themselves…
   useEffect(() => {
     try { localStorage.setItem(PARAMS_KEY, JSON.stringify(params)) } catch { /* ignore */ }
-    const t = setTimeout(() => convert(params), 200)
-    return () => clearTimeout(t)
-  }, [params, convert])
+  }, [params])
 
-  // …or the model itself changes
+  // …and so do changes to the voxel model, so manual edits are never overwritten behind the user's back
   useEffect(() => {
     const unsub = useStore.subscribe((s, prev) => {
       if (s.layers !== prev.layers || s.canvasWidth !== prev.canvasWidth ||
-          s.canvasHeight !== prev.canvasHeight || s.depthDimension !== prev.depthDimension) convert(params)
+          s.canvasHeight !== prev.canvasHeight || s.depthDimension !== prev.depthDimension) setStale(true)
     })
     return unsub
-  }, [convert, params])
+  }, [])
 
-  useEffect(() => { applyWireframe(groupRef.current, wireframe) }, [wireframe, applyWireframe])
+  const handleEdited = useCallback(() => {
+    const r = resultRef.current
+    if (!r) return
+    const triangles = r.groups.reduce((n, g) => n + g.positions.length / 9, 0)
+    setStats(s => s && { ...s, triangles })
+  }, [])
+
+  const editor = useMeshEditor({
+    containerRef, getContext, resultRef, groupRef, tool, brush,
+    enabled: !showOriginal, rebuildMesh: showLowPoly, onEdited: handleEdited,
+  })
+  editorRef.current = editor
+
+  useEffect(() => {
+    if (wireframe) groupRef.current?.children.forEach(m => m.isMesh && refreshWireframe(m))   // catch up with edits
+    applyWireframe(groupRef.current, wireframe)
+  }, [wireframe, applyWireframe])
 
   useEffect(() => {
     if (showOriginal) { groupRef.current = null; showVoxels() }
@@ -156,9 +186,19 @@ export default function LowPolyPage({ onClose }) {
   }, [showOriginal, showVoxels, showLowPoly])
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    const onKey = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      if (e.key === 'Escape') { onClose(); return }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        // Mesh history, not the voxel editor's: keep the app-wide shortcut from also firing
+        e.preventDefault(); e.stopImmediatePropagation()
+        if (e.shiftKey) editorRef.current?.redo(); else editorRef.current?.undo()
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault(); e.stopImmediatePropagation(); editorRef.current?.redo()
+      }
+    }
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
   }, [onClose])
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -234,6 +274,12 @@ export default function LowPolyPage({ onClose }) {
           className="w-64 flex-shrink-0 border-r flex flex-col overflow-y-auto pb-2"
           style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
         >
+          <LowPolyTools
+            tool={tool} onTool={setTool} brush={brush} onBrush={setBrush}
+            canUndo={editor.canUndo} canRedo={editor.canRedo} onUndo={editor.undo} onRedo={editor.redo}
+            stale={stale} busy={busy} onImport={() => generate('voxels')} onGenerate={() => generate('lowpoly')}
+          />
+          <div className="border-t mx-4 mt-3" style={{ borderColor: 'var(--color-border)' }} />
           <LowPolyPanel params={params} onChange={handleParams} activePreset={activePreset} onPreset={handlePreset} />
 
           <SectionLabel>Lighting</SectionLabel>
@@ -261,7 +307,7 @@ export default function LowPolyPage({ onClose }) {
 
         {/* ── 3D Viewport ─────────────────────────────────────────────── */}
         <div className="flex-1 relative min-w-0" style={{ background: '#111' }}>
-          <div ref={containerRef} className="w-full h-full" />
+          <div ref={containerRef} className="w-full h-full" style={{ cursor: tool === 'orbit' ? 'grab' : 'crosshair' }} />
 
           <div className="absolute top-3 left-3 flex gap-1.5">
             <ViewToggle Icon={Grid3X3} label="Wireframe" active={wireframe} onClick={() => setWireframe(w => !w)} />
@@ -276,7 +322,7 @@ export default function LowPolyPage({ onClose }) {
           {(error || empty) && (
             <div className="absolute inset-x-0 top-14 flex justify-center pointer-events-none">
               <div className="px-3 py-2 rounded text-xs" style={{ background: 'rgba(0,0,0,0.7)', color: '#ffb3b3' }}>
-                {error ? `Conversion failed: ${error}` : 'Nothing left to show — try more Thickness or turn on Keep thin parts.'}
+                {error ? `Conversion failed: ${error}` : 'Nothing left to show — undo, or regenerate with more Thickness / Keep thin parts.'}
               </div>
             </div>
           )}
@@ -285,7 +331,9 @@ export default function LowPolyPage({ onClose }) {
             className="absolute bottom-3 left-1/2 -translate-x-1/2 text-xs pointer-events-none opacity-40 select-none"
             style={{ color: '#fff' }}
           >
-            Drag to orbit · Scroll to zoom · Right-drag to pan
+            {tool === 'orbit'
+              ? 'Drag to orbit · Scroll to zoom · Right-drag to pan'
+              : 'Drag on the model to edit · Drag empty space or right-drag to orbit · Ctrl+Z to undo'}
           </div>
         </div>
       </div>

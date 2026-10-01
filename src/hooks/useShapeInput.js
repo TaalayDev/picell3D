@@ -122,8 +122,9 @@ export function useShapeInput(containerRef) {
       s.activeTool !== 'line' && filledRef.current,
       thicknessRef.current,
     )
-    s.pushUndo()
+    const undoTransaction = s.beginUndoTransaction()
     for (const { col, row } of pixels) s.paintAt(col, row, s.currentColor)
+    s.finishUndoTransaction(undoTransaction)
     phase.current  = 'idle'
     points.current = []
     dragging.current = null

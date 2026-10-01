@@ -267,5 +267,11 @@ export function useRenderScene(containerRef, { autoBuild = true } = {}) {
     }, (err) => console.error('GLB export error:', err), { binary: true })
   }, [])
 
-  return { rebuild, setMesh, applyPreset, applyBg, exportPng, exportGlb }
+  /** Live three.js objects, for tools that need to raycast or take over the camera controls. */
+  const getContext = useCallback(() => ({
+    scene: sceneRef.current, camera: cameraRef.current,
+    controls: controlsRef.current, renderer: rendererRef.current,
+  }), [])
+
+  return { rebuild, setMesh, applyPreset, applyBg, exportPng, exportGlb, getContext }
 }

@@ -3,7 +3,7 @@ import {
   X, Monitor, LayoutTemplate, Pencil, RotateCcw,
   Grid3X3, Tag, Columns2, Square, Box, SlidersHorizontal,
 } from 'lucide-react'
-import { useStore } from '../../store/index.js'
+import { getViewDepthSize, useStore } from '../../store/index.js'
 
 // ── Primitive controls ────────────────────────────────────────────────────────
 
@@ -202,38 +202,61 @@ function CanvasSection() {
 
 function PaintingSection() {
   const {
-    paintDepth, setPaintDepth,
+    paintDepthStart, paintDepthEnd, setPaintDepthStart, setPaintDepthEnd,
     paintDirection, setPaintDirection,
-    depthDimension,
+    activeView, canvasWidth, canvasHeight, depthDimension,
+    confirmLargeOperations, setConfirmLargeOperations,
+    largeOperationThreshold, setLargeOperationThreshold,
   } = useStore()
 
-  const maxDepth = Math.ceil(depthDimension / 2)
+  const maxDepth = getViewDepthSize(activeView, canvasWidth, canvasHeight, depthDimension)
 
   return (
     <>
       <Section title="Brush">
-        <Row label="Paint depth" hint="Number of voxel layers painted per stroke from front/back view">
-          <div className="flex flex-col gap-1" style={{ minWidth: 180 }}>
-            <div className="flex items-center gap-2">
-              <input
-                type="range" min={1} max={maxDepth} value={paintDepth}
-                onChange={e => setPaintDepth(parseInt(e.target.value))}
-                className="flex-1 cursor-pointer"
-                style={{ accentColor: 'var(--color-accent)' }}
-              />
-              <span className="text-xs font-mono text-accent w-5 text-right">{paintDepth}</span>
-            </div>
+        <Row label="Depth range" hint="First and last voxel layer affected along the active view ray">
+          <div className="flex flex-col gap-2" style={{ minWidth: 180 }}>
+            {[
+              ['Start', paintDepthStart, setPaintDepthStart],
+              ['End', paintDepthEnd, setPaintDepthEnd],
+            ].map(([label, value, setter]) => (
+              <label key={label} className="flex items-center gap-2 text-xs text-text-muted">
+                <span className="w-8">{label}</span>
+                <input
+                  type="range" min={1} max={maxDepth} value={value}
+                  onChange={e => setter(parseInt(e.target.value))}
+                  className="flex-1 cursor-pointer"
+                  style={{ accentColor: 'var(--color-accent)' }}
+                />
+                <span className="w-5 text-right font-mono text-accent">{value}</span>
+              </label>
+            ))}
           </div>
         </Row>
-        <Row label="Paint direction" hint="Which direction from center to extend the brush">
+        <Row label="Paint direction" hint="Apply the range from the active face, opposite face, or both">
           <SegControl
             value={paintDirection}
             onChange={setPaintDirection}
             options={[
-              { id: 'front', Icon: SlidersHorizontal, label: '← Front' },
-              { id: 'both',  Icon: SlidersHorizontal, label: '↔ Both'  },
-              { id: 'back',  Icon: SlidersHorizontal, label: 'Back →'  },
+              { id: 'inward',  Icon: SlidersHorizontal, label: 'Inward' },
+              { id: 'outward', Icon: SlidersHorizontal, label: 'Outward' },
+              { id: 'both',    Icon: SlidersHorizontal, label: 'Both' },
             ]}
+          />
+        </Row>
+      </Section>
+      <Section title="Operation safety">
+        <Row label="Confirm large operations" hint="Show the affected voxel count before applying large clears, deletes, pastes, or transforms">
+          <Toggle value={confirmLargeOperations} onChange={setConfirmLargeOperations} />
+        </Row>
+        <Row label="Large operation threshold" hint="Minimum affected voxel count that triggers confirmation">
+          <input
+            type="number"
+            min={1}
+            max={1000000}
+            value={largeOperationThreshold}
+            onChange={e => setLargeOperationThreshold(Number(e.target.value))}
+            className="w-24 rounded border border-border bg-surface-alt px-2 py-1 text-right text-xs font-mono text-text"
           />
         </Row>
       </Section>
@@ -242,7 +265,7 @@ function PaintingSection() {
 }
 
 function ResetSection({ onClose }) {
-  const { clearCanvas, resizeCanvas, setDepthDimension, setPaintDepth, setPaintDirection,
+  const { clearCanvas, resizeCanvas, setDepthDimension, setPaintDepthStart, setPaintDepthEnd, setPaintDirection,
           setViewMode, setPixelSize, toggleGrid, showGrid, setShowDepthText } = useStore()
   const [confirming, setConfirming] = useState(null)
 
@@ -254,8 +277,9 @@ function ResetSection({ onClose }) {
   function resetAll() {
     resizeCanvas(32, 32)
     setDepthDimension(5)
-    setPaintDepth(1)
-    setPaintDirection('both')
+    setPaintDepthStart(1)
+    setPaintDepthEnd(1)
+    setPaintDirection('inward')
     setViewMode('split')
     setPixelSize(14)
     if (!showGrid) toggleGrid()

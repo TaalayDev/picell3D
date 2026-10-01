@@ -1,9 +1,10 @@
 import { useRef, useEffect, useMemo, useCallback } from 'react'
 import { RotateCw, RotateCcw, Layers, Trash2, Check, X } from 'lucide-react'
-import { useStore, renderView2D, renderDepthMap2D, getViewSize, getCompositedVoxels } from '../../store/index.js'
+import { useStore, renderView2D, renderDepthMap2D, getViewSize, getViewDepthSize, getCompositedVoxels, projectEditBoundsToView } from '../../store/index.js'
 import { useCanvasInput } from '../../hooks/useCanvasInput.js'
 import { useShapeInput, SHAPE_TOOLS } from '../../hooks/useShapeInput.js'
 import { useSelectionInput } from '../../hooks/useSelectionInput.js'
+import { useEditBoundsInput } from '../../hooks/useEditBoundsInput.js'
 import ReferenceOverlay from './ReferenceOverlay.jsx'
 
 function getCSSVar(name) {
@@ -32,6 +33,9 @@ export default function PixelCanvas() {
     layers, pixelSize, setPixelSize, canvasWidth, canvasHeight, depthDimension,
     showGrid, showDepthText, activeTool, activeView, currentColor,
     selection, floatingPaste, lassoPreview, selectionAnchor,
+    editBoundsEnabled, editBounds,
+    showLockedVoxels,
+    paintDepthStart, paintDepthEnd, paintDirection,
     rotateSelection, scaleSelection, shiftSelectionDepth, deleteSelection, commitPaste,
   } = useStore()
 
@@ -53,6 +57,9 @@ export default function PixelCanvas() {
   }, [layers, activeView, canvasWidth, canvasHeight, D])
 
   const { w: viewW, h: viewH } = getViewSize(activeView, canvasWidth, canvasHeight, D)
+  const viewDepth = getViewDepthSize(activeView, canvasWidth, canvasHeight, D)
+  const depthStartPct = ((paintDepthStart - 1) / viewDepth) * 100
+  const depthWidthPct = ((paintDepthEnd - paintDepthStart + 1) / viewDepth) * 100
 
   // ── Space+drag pan ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -110,22 +117,27 @@ export default function PixelCanvas() {
   const canvasInput   = useCanvasInput(containerRef)
   const shapeInput    = useShapeInput(containerRef)
   const selectInput   = useSelectionInput(containerRef)
+  const boundsInput   = useEditBoundsInput(containerRef)
 
   const isShape  = SHAPE_TOOLS.has(activeTool)
   const isSelect = activeTool === 'select'
+  const isBounds = activeTool === 'bounds'
 
   function routeDown(e)  {
     if (isSpaceHeld.current) { handlePanDown(e); return }
+    if (isBounds) return boundsInput.onPointerDown(e)
     if (isSelect) return selectInput.onPointerDown(e)
     isShape ? shapeInput.handlers.onPointerDown(e)  : canvasInput.onPointerDown(e)
   }
   function routeMove(e)  {
     if (isPanning.current) { handlePanMove(e); return }
+    if (isBounds) return boundsInput.onPointerMove(e)
     if (isSelect) return selectInput.onPointerMove(e)
     isShape ? shapeInput.handlers.onPointerMove(e)  : canvasInput.onPointerMove(e)
   }
   function routeUp(e)    {
     handlePanUp()
+    if (isBounds) return boundsInput.onPointerUp(e)
     if (isSelect) return selectInput.onPointerUp(e)
     isShape ? shapeInput.handlers.onPointerUp(e)    : canvasInput.onPointerUp(e)
   }
@@ -261,6 +273,63 @@ export default function PixelCanvas() {
     overlay.height = ph
     const ctx = overlay.getContext('2d')
     ctx.clearRect(0, 0, pw, ph)
+
+    // Shared 3D edit volume projected into the active orthographic view.
+    if (editBoundsEnabled) {
+      const boundsRect = projectEditBoundsToView(editBounds, activeView, canvasWidth, canvasHeight, D)
+      const bx = boundsRect.x1 * pixelSize
+      const by = boundsRect.y1 * pixelSize
+      const bw = (boundsRect.x2 - boundsRect.x1 + 1) * pixelSize
+      const bh = (boundsRect.y2 - boundsRect.y1 + 1) * pixelSize
+
+      ctx.save()
+      ctx.fillStyle = activeTool === 'bounds' ? 'rgba(0,0,0,0.48)' : 'rgba(0,0,0,0.28)'
+      ctx.beginPath()
+      ctx.rect(0, 0, pw, ph)
+      ctx.rect(bx, by, bw, bh)
+      ctx.fill('evenodd')
+      ctx.strokeStyle = activeTool === 'bounds' ? '#00e5ff' : 'rgba(0,229,255,0.72)'
+      ctx.lineWidth = activeTool === 'bounds' ? 2 : 1
+      ctx.setLineDash(activeTool === 'bounds' ? [] : [5, 4])
+      ctx.strokeRect(bx + 0.5, by + 0.5, Math.max(0, bw - 1), Math.max(0, bh - 1))
+      if (showLockedVoxels) {
+        ctx.fillStyle = 'rgba(255, 106, 32, 0.58)'
+        ctx.strokeStyle = 'rgba(255, 210, 120, 0.9)'
+        ctx.lineWidth = 1
+        for (let row = 0; row < viewH; row++) {
+          for (let col = 0; col < viewW; col++) {
+            const outside = col < boundsRect.x1 || col > boundsRect.x2 || row < boundsRect.y1 || row > boundsRect.y2
+            if (!outside || !view2d[row]?.[col] || view2d[row][col] === 'transparent') continue
+            const x = col * pixelSize, y = row * pixelSize
+            ctx.fillRect(x, y, pixelSize, pixelSize)
+            ctx.beginPath()
+            ctx.moveTo(x + 2, y + pixelSize - 2)
+            ctx.lineTo(x + pixelSize - 2, y + 2)
+            ctx.stroke()
+          }
+        }
+      }
+      if (activeTool === 'bounds') {
+        const handle = Math.max(5, Math.min(9, pixelSize * 0.55))
+        ctx.setLineDash([])
+        const handles = [
+          ['nw', bx, by], ['n', bx + bw / 2, by], ['ne', bx + bw, by],
+          ['e', bx + bw, by + bh / 2], ['se', bx + bw, by + bh],
+          ['s', bx + bw / 2, by + bh], ['sw', bx, by + bh], ['w', bx, by + bh / 2],
+        ]
+        for (const [name, x, y] of handles) {
+          ctx.fillStyle = boundsInput.hoverHandle === name ? '#00e5ff' : '#ffffff'
+          ctx.strokeStyle = '#00a8d8'
+          ctx.fillRect(x - handle / 2, y - handle / 2, handle, handle)
+          ctx.strokeRect(x - handle / 2, y - handle / 2, handle, handle)
+        }
+        ctx.beginPath()
+        ctx.arc(bx + bw / 2, by + bh / 2, Math.max(2.5, handle * 0.35), 0, Math.PI * 2)
+        ctx.fillStyle = boundsInput.hoverHandle === 'move' ? '#00e5ff' : 'rgba(255,255,255,0.85)'
+        ctx.fill()
+      }
+      ctx.restore()
+    }
 
     // Ghost preview pixels (shape tools)
     if (previewPixels.length > 0) {
@@ -535,7 +604,7 @@ export default function PixelCanvas() {
         ctx.fillText('Enter ↵  commit · Esc  cancel', pw - 4, ph - 4)
       }
     }
-  }, [previewPixels, lineState, pixelSize, viewW, viewH, currentColor, selection, floatingPaste, lassoPreview, selectionAnchor, activeTool])
+  }, [previewPixels, lineState, pixelSize, viewW, viewH, view2d, currentColor, selection, floatingPaste, lassoPreview, selectionAnchor, activeTool, activeView, canvasWidth, canvasHeight, D, editBoundsEnabled, editBounds, showLockedVoxels, boundsInput.hoverHandle])
 
   return (
     <div ref={scrollRef} className="flex items-center justify-center w-full h-full overflow-auto p-4 relative">
@@ -553,7 +622,7 @@ export default function PixelCanvas() {
         className="relative flex-shrink-0"
         style={{
           boxShadow: '0 0 0 2px var(--color-border), 0 0 0 4px var(--color-surface), 0 8px 40px rgba(0,0,0,0.9)',
-          cursor: getCursor(activeTool, shapeInput.isEditing, floatingPaste, isSpaceHeld, selectInput.hoverHandle),
+          cursor: getCursor(activeTool, shapeInput.isEditing, floatingPaste, isSpaceHeld, selectInput.hoverHandle, boundsInput.hoverHandle),
         }}
         onPointerDown={routeDown}
         onPointerMove={routeMove}
@@ -561,6 +630,7 @@ export default function PixelCanvas() {
         onPointerLeave={(e) => {
           handlePanUp()
           if (isSelect) selectInput.onPointerUp(e)
+          else if (isBounds) boundsInput.onPointerUp(e)
           else if (!isShape) canvasInput.onPointerUp(e)
         }}
         onContextMenu={canvasInput.onContextMenu}
@@ -581,6 +651,37 @@ export default function PixelCanvas() {
             imageRendering: 'pixelated', pointerEvents: 'none',
           }}
         />
+
+        {/* Visual depth ruler: active view face is left, opposite face is right. */}
+        <div
+          className="pointer-events-none absolute bottom-2 left-2 z-10 w-44 max-w-[calc(100%-1rem)] rounded border border-border/80 px-2 py-1.5 text-[9px] shadow-lg"
+          style={{ background: 'color-mix(in srgb, var(--color-surface) 88%, transparent)' }}
+          aria-label={`Depth ${paintDepthStart} to ${paintDepthEnd}, ${paintDirection}`}
+        >
+          <div className="mb-1 flex items-center justify-between uppercase tracking-wide text-text-muted">
+            <span>Depth ruler</span>
+            <span className="font-mono text-accent">{paintDepthStart}–{paintDepthEnd} · {paintDirection}</span>
+          </div>
+          <div className="relative h-2 overflow-hidden rounded-sm border border-border bg-background/80">
+            {(paintDirection === 'inward' || paintDirection === 'both') && (
+              <span
+                className="absolute inset-y-0 bg-accent/90"
+                style={{ left: `${depthStartPct}%`, width: `${depthWidthPct}%` }}
+              />
+            )}
+            {(paintDirection === 'outward' || paintDirection === 'both') && (
+              <span
+                className="absolute inset-y-0 bg-fuchsia-400/80"
+                style={{ right: `${depthStartPct}%`, width: `${depthWidthPct}%` }}
+              />
+            )}
+            <span className="absolute inset-y-0 left-1/2 w-px bg-white/30" />
+          </div>
+          <div className="mt-0.5 flex justify-between font-mono text-text-muted">
+            <span>active · 1</span>
+            <span>{viewDepth} · opposite</span>
+          </div>
+        </div>
 
         <ReferenceOverlay pixelSize={pixelSize} />
       </div>
@@ -722,9 +823,17 @@ export default function PixelCanvas() {
   )
 }
 
-function getCursor(tool, isLineEditing, floatingPaste, isSpaceHeld, hoverHandle) {
-  if (isSpaceHeld?.current) return isPanning?.current ? 'grabbing' : 'grab'
+function getCursor(tool, isLineEditing, floatingPaste, isSpaceHeld, hoverHandle, boundsHandle) {
+  if (isSpaceHeld?.current) return 'grab'
   if (isLineEditing) return 'default'
+  if (tool === 'bounds') {
+    if (boundsHandle === 'move') return 'move'
+    if (boundsHandle === 'n' || boundsHandle === 's') return 'ns-resize'
+    if (boundsHandle === 'e' || boundsHandle === 'w') return 'ew-resize'
+    if (boundsHandle === 'nw' || boundsHandle === 'se') return 'nwse-resize'
+    if (boundsHandle === 'ne' || boundsHandle === 'sw') return 'nesw-resize'
+    return 'crosshair'
+  }
   if (tool === 'select') {
     if (hoverHandle === 'anchor') return 'all-scroll'
     if (hoverHandle === 'rotate') return 'grab'

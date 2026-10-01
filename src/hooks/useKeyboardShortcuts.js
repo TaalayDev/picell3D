@@ -82,7 +82,7 @@ export function useKeyboardShortcuts() {
         if (s.selection || s.floatingPaste) {
           s.shiftSelectionDepth(-1)
         } else {
-          s.setPaintDepth(s.paintDepth - 1)
+          s.setPaintDepthEnd(s.paintDepthEnd - 1)
         }
         return
       }
@@ -91,7 +91,7 @@ export function useKeyboardShortcuts() {
         if (s.selection || s.floatingPaste) {
           s.shiftSelectionDepth(1)
         } else {
-          s.setPaintDepth(s.paintDepth + 1)
+          s.setPaintDepthEnd(s.paintDepthEnd + 1)
         }
         return
       }
@@ -118,13 +118,36 @@ export function useKeyboardShortcuts() {
         }
       }
 
+      // ── Contextual brush behavior: number keys never change the active tool ──
+      const numberKey = !e.altKey && !e.shiftKey
+        ? (/^Digit[1-3]$/.test(e.code) ? Number(e.code.slice(-1))
+          : /^[1-3]$/.test(e.key) ? Number(e.key) : null)
+        : null
+      if (numberKey && s.activeTool === 'pencil') {
+        const modes = { 1: 'surface', 2: 'visible', 3: 'through' }
+        e.preventDefault()
+        s.setPencilMode(modes[numberKey])
+        return
+      }
+      if (numberKey && s.activeTool === 'eraser' && numberKey <= 2) {
+        e.preventDefault()
+        s.setEraserMode(numberKey === 1 ? 'visible' : 'through')
+        return
+      }
+
       // ── ? — shortcuts panel ──
       if (e.key === '?') { s.toggleShortcutsPanel(); return }
 
       // ── Tool shortcuts ──
       switch (e.key.toLowerCase()) {
         case 'p': setActiveTool('pencil');   break
-        case 'e': setActiveTool('eraser');   break
+        case 'e':
+          if (e.shiftKey) {
+            e.preventDefault()
+            s.setEraserMode(s.eraserMode === 'through' ? 'visible' : 'through')
+          }
+          setActiveTool('eraser')
+          break
         case 'f': setActiveTool('fill');     break
         case 'm': setActiveTool('material'); break
         case 's':
@@ -138,6 +161,15 @@ export function useKeyboardShortcuts() {
         case 'r': setActiveTool('rect');     break
         case 'c': setActiveTool('circle');   break
         case 'l': setActiveTool('line');     break
+        case 'q': setActiveTool('bounds');   break
+        case 'a':
+          s.setPencilMode('surface')
+          setActiveTool('pencil')
+          break
+        case 'v':
+          s.setPencilMode(e.shiftKey ? 'through' : 'visible')
+          setActiveTool('pencil')
+          break
         case 'g': toggleGrid(); break
       }
     }

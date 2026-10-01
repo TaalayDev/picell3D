@@ -247,6 +247,35 @@ export function useThreeScene(containerRef) {
     drawingPlane.visible = false
     scene.add(drawingPlane)
 
+    // Shared edit bounds are visible in 3D as a non-destructive wireframe box.
+    const editBoundsGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1))
+    const editBoundsMat = new THREE.LineBasicMaterial({
+      color: 0x00e5ff, transparent: true, opacity: 0.82, depthTest: false,
+    })
+    const editBoundsWire = new THREE.LineSegments(editBoundsGeo, editBoundsMat)
+    editBoundsWire.renderOrder = 30
+    scene.add(editBoundsWire)
+
+    function updateEditBoundsWire(state = useStore.getState()) {
+      editBoundsWire.visible = Boolean(state.editBoundsEnabled)
+      if (!editBoundsWire.visible) return
+      const { minX, maxX, minY, maxY, minZ, maxZ } = state.editBounds
+      editBoundsWire.position.copy(voxelCenterWorld(
+        (minX + maxX) / 2,
+        (minY + maxY) / 2,
+        (minZ + maxZ) / 2,
+        state.canvasWidth,
+        state.canvasHeight,
+        state.depthDimension,
+      ))
+      editBoundsWire.scale.set(
+        (maxX - minX + 1) * EDIT_UNIT,
+        (maxY - minY + 1) * EDIT_UNIT,
+        (maxZ - minZ + 1) * EDIT_UNIT,
+      )
+    }
+    updateEditBoundsWire()
+
     // Shape tools use a lightweight instanced ghost preview until confirmation.
     const shapePreviewMat = new THREE.MeshBasicMaterial({
       color: 0x00ff88, transparent: true, opacity: 0.38, depthWrite: false,
@@ -308,10 +337,12 @@ export function useThreeScene(containerRef) {
     // ── Edit: 3D interaction (active when viewMode === 'preview-only') ──
     const raycaster = new THREE.Raycaster()
     let spaceHeld    = false
+    let shiftHeld    = false
     let isPainting   = false
     let lastPaintKey = null  // deduplicate voxels during drag
     let lastPointerPoint = null
     let strokePaintedKeys = new Set()
+    let strokeUndoTransaction = null
     let shapeDrag    = null  // { tool, start, end, axis, plane, voxels }
     let selectionDrag = null
 
@@ -575,8 +606,9 @@ export function useThreeScene(containerRef) {
       const voxels = shapeDrag.voxels || []
       if (commit && voxels.length) {
         const store = useStore.getState()
-        store.pushUndo()
+        const undoTransaction = store.beginUndoTransaction()
         store.paintVoxelsDirect(voxels, store.currentColor)
+        store.finishUndoTransaction(undoTransaction)
       }
       shapeDrag = null
       clearShapePreview()
@@ -586,6 +618,52 @@ export function useThreeScene(containerRef) {
     }
     shapeActionRef.current = finishShapeDrag
 
+    function inwardVoxelStep(normal, axis) {
+      const sign = Math.sign(normal?.[axis] || 0) || 1
+      return axis === 'y' ? sign : -sign
+    }
+
+    function expandTargetsThroughRay(targets, axis, state, step = 1) {
+      const layer = state.layers.find(item => item.id === state.activeLayerId)
+      if (!layer) return []
+      const sourceVoxels = state.operationLayerScope === 'active'
+        ? layer.voxels
+        : getCompositedVoxels(state.layers, state.canvasWidth, state.canvasHeight, state.depthDimension)
+      const limits = state.editBoundsEnabled ? state.editBounds : {
+        minX: 0, maxX: state.canvasWidth - 1,
+        minY: 0, maxY: state.canvasHeight - 1,
+        minZ: 0, maxZ: state.depthDimension - 1,
+      }
+      const min = axis === 'x' ? limits.minX : axis === 'y' ? limits.minY : limits.minZ
+      const max = axis === 'x' ? limits.maxX : axis === 'y' ? limits.maxY : limits.maxZ
+      const result = []
+      const seen = new Set()
+      for (const seed of targets) {
+        if (state.editBoundsEnabled && (
+          seed.x < limits.minX || seed.x > limits.maxX
+          || seed.y < limits.minY || seed.y > limits.maxY
+          || seed.z < limits.minZ || seed.z > limits.maxZ
+        )) continue
+        const variant = state.throughMode || 'occupied'
+        const positions = variant === 'contiguous'
+          ? Array.from(
+              { length: step > 0 ? max - seed[axis] + 1 : seed[axis] - min + 1 },
+              (_, index) => seed[axis] + index * step,
+            )
+          : Array.from({ length: max - min + 1 }, (_, index) => min + index)
+        for (const i of positions) {
+          const voxel = { ...seed, [axis]: i }
+          const color = sourceVoxels[voxel.y]?.[voxel.x]?.[voxel.z]
+          const occupied = Boolean(color && color !== 'transparent')
+          if (variant === 'contiguous' && !occupied) break
+          if (variant !== 'solid' && !occupied) continue
+          const key = `${voxel.x},${voxel.y},${voxel.z}`
+          if (!seen.has(key)) { seen.add(key); result.push(voxel) }
+        }
+      }
+      return result
+    }
+
     function updateGhost(clientX, clientY) {
       if (clientX !== undefined && clientY !== undefined) {
         lastMousePos = { x: clientX, y: clientY }
@@ -594,6 +672,12 @@ export function useThreeScene(containerRef) {
       if (!ghost) return
       const state = useStore.getState()
       const { activeTool, canvasWidth: W, canvasHeight: H, depthDimension: D } = state
+      if (activeTool === 'bounds') {
+        ghost.visible = false
+        hideBrushPreview()
+        faceMesh.visible = false
+        return
+      }
       const isErase    = isPaintingRight ? activeTool === 'pencil' : activeTool === 'eraser'
       const isEyedrop  = activeTool === 'eyedropper'
       const isMaterial = activeTool === 'material'
@@ -640,13 +724,17 @@ export function useThreeScene(containerRef) {
         faceMesh.visible = false
         return
       }
-      const adjacent   = !isErase && !isEyedrop && !isMaterial && !isFill && !isSelect
+      const adjacent   = !isErase && !isEyedrop && !isMaterial && !isFill && !isSelect && state.pencilMode === 'surface'
       const vox = getEditVoxel(hit, W, H, D, adjacent)
       if (isBrush) {
         ghost.visible = false
-        const axis = dominantAxis(getHitWorldNormal(hit))
+        const hitNormal = getHitWorldNormal(hit)
+        const axis = dominantAxis(hitNormal)
+        let previewTargets = expandVoxelBrush(vox, axis, state.brushSize, W, H, D)
+        const mode = isErase ? (shiftHeld ? 'through' : state.eraserMode) : state.pencilMode
+        if (mode === 'through') previewTargets = expandTargetsThroughRay(previewTargets, axis, state, inwardVoxelStep(hitNormal, axis))
         updateBrushPreview(
-          expandVoxelBrush(vox, axis, state.brushSize, W, H, D),
+          previewTargets,
           W, H, D, col,
         )
       } else {
@@ -710,10 +798,13 @@ export function useThreeScene(containerRef) {
 
       if (isFloor && (isErase || isMaterial)) return
 
-      const adjacent = isPaint
+      const mode = isErase ? (shiftHeld ? 'through' : store.eraserMode) : store.pencilMode
+      const adjacent = isPaint && mode === 'surface'
       const baseVoxel = getEditVoxel(hit, W, H, D, adjacent)
-      const axis = dominantAxis(getHitWorldNormal(hit))
-      const targets = expandVoxelBrush(baseVoxel, axis, brushSize, W, H, D)
+      const hitNormal = getHitWorldNormal(hit)
+      const axis = dominantAxis(hitNormal)
+      let targets = expandVoxelBrush(baseVoxel, axis, brushSize, W, H, D)
+      if (mode === 'through') targets = expandTargetsThroughRay(targets, axis, store, inwardVoxelStep(hitNormal, axis))
 
       const newTargets = []
       for (const t of targets) {
@@ -805,7 +896,7 @@ export function useThreeScene(containerRef) {
       const targets = []
       for (const point of samplePointerSegment(from, to, 2, 256)) {
         const lockedTarget = getLockedPlaneTarget(point.x, point.y, store)
-        let voxel, axis
+        let voxel, axis, rayStep = 1
         if (lockedTarget) {
           voxel = lockedTarget.voxel
           axis = lockedTarget.axis
@@ -814,10 +905,16 @@ export function useThreeScene(containerRef) {
         } else {
           const hit = getRaycastHit(point.x, point.y)
           if (!hit || ((isErase || isMaterial) && hit.object === floorPick)) continue
-          voxel = getEditVoxel(hit, W, H, D, isPaint)
-          axis = dominantAxis(getHitWorldNormal(hit))
+          const mode = isErase ? (shiftHeld ? 'through' : store.eraserMode) : store.pencilMode
+          voxel = getEditVoxel(hit, W, H, D, isPaint && mode === 'surface')
+          const hitNormal = getHitWorldNormal(hit)
+          axis = dominantAxis(hitNormal)
+          rayStep = inwardVoxelStep(hitNormal, axis)
         }
-        for (const target of expandVoxelBrush(voxel, axis, store.brushSize, W, H, D)) {
+        let brushTargets = expandVoxelBrush(voxel, axis, store.brushSize, W, H, D)
+        const mode = isErase ? (shiftHeld ? 'through' : store.eraserMode) : store.pencilMode
+        if (!lockedTarget && mode === 'through') brushTargets = expandTargetsThroughRay(brushTargets, axis, store, rayStep)
+        for (const target of brushTargets) {
           const key = `${target.x},${target.y},${target.z}`
           if (strokePaintedKeys.has(key)) continue
           strokePaintedKeys.add(key)
@@ -832,6 +929,7 @@ export function useThreeScene(containerRef) {
     // ── Keyboard: Space toggles between paint-drag and orbit-drag ─────
     const onKeyDown = (e) => {
       if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(e.target?.tagName)) return
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') shiftHeld = true
       if (isFlyMode) {
         if (e.code === 'KeyW' || e.key === 'ArrowUp') {
           e.preventDefault()
@@ -926,6 +1024,7 @@ export function useThreeScene(containerRef) {
     }
 
     const onKeyUp = (e) => {
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') shiftHeld = false
       if (isFlyMode) {
         if (e.code === 'KeyW' || e.key === 'ArrowUp')    flyKeys.forward = false
         if (e.code === 'KeyS' || e.key === 'ArrowDown')  flyKeys.backward = false
@@ -956,7 +1055,7 @@ export function useThreeScene(containerRef) {
           strokePaintedKeys = new Set()
           lastPaintKey = null
           if (useStore.getState().activeTool !== 'eyedropper') {
-            useStore.getState().pushUndo()
+            strokeUndoTransaction = useStore.getState().beginUndoTransaction()
           }
           paintFlyVoxel(false)
           updateGhost()
@@ -968,7 +1067,7 @@ export function useThreeScene(containerRef) {
           isPainting = false
           strokePaintedKeys = new Set()
           lastPaintKey = null
-          useStore.getState().pushUndo()
+          strokeUndoTransaction = useStore.getState().beginUndoTransaction()
           paintFlyVoxel(true)
           updateGhost()
           return
@@ -985,6 +1084,8 @@ export function useThreeScene(containerRef) {
       if (e.button !== 0) return
       const store = useStore.getState()
       const { activeTool, canvasWidth: W, canvasHeight: H, depthDimension: D } = store
+
+      if (activeTool === 'bounds') return
 
       if (activeTool === 'select') {
         const hit = getRaycastHit(e.clientX, e.clientY)
@@ -1060,11 +1161,15 @@ export function useThreeScene(containerRef) {
       strokePaintedKeys = new Set()
       if (!clickOnly) renderer.domElement.setPointerCapture(e.pointerId)
       setCursor('crosshair')
-      if (activeTool !== 'eyedropper') useStore.getState().pushUndo()
+      if (activeTool !== 'eyedropper') strokeUndoTransaction = useStore.getState().beginUndoTransaction()
       if (stableStroke) paintStableStroke(null, lastPointerPoint)
       else paintAtIfNew(e.clientX, e.clientY)
       updateGhost(e.clientX, e.clientY)
       if (clickOnly) {
+        if (strokeUndoTransaction) {
+          useStore.getState().finishUndoTransaction(strokeUndoTransaction)
+          strokeUndoTransaction = null
+        }
         lastPaintKey = null
         lastPointerPoint = null
         syncControls()
@@ -1151,6 +1256,10 @@ export function useThreeScene(containerRef) {
 
     const onPointerUp = (e) => {
       if (isFlyMode) {
+        if ((e.button === 0 || e.button === 2) && strokeUndoTransaction) {
+          useStore.getState().finishUndoTransaction(strokeUndoTransaction)
+          strokeUndoTransaction = null
+        }
         if (e.button === 0) isPainting = false
         if (e.button === 2) isPaintingRight = false
         if (e.button === 1) isRightDragLooking = false
@@ -1185,6 +1294,10 @@ export function useThreeScene(containerRef) {
         return
       }
       if (!isPainting) return
+      if (strokeUndoTransaction) {
+        useStore.getState().finishUndoTransaction(strokeUndoTransaction)
+        strokeUndoTransaction = null
+      }
       isPainting = false
       lastPaintKey = null
       lastPointerPoint = null
@@ -1288,6 +1401,13 @@ export function useThreeScene(containerRef) {
         || state.canvasHeight !== previous.canvasHeight
         || state.depthDimension !== previous.depthDimension
       ) updateSelectionPreview(state)
+      if (
+        state.editBoundsEnabled !== previous.editBoundsEnabled
+        || state.editBounds !== previous.editBounds
+        || state.canvasWidth !== previous.canvasWidth
+        || state.canvasHeight !== previous.canvasHeight
+        || state.depthDimension !== previous.depthDimension
+      ) updateEditBoundsWire(state)
     })
 
     window.addEventListener('keydown', onKeyDown)
@@ -1394,6 +1514,8 @@ export function useThreeScene(containerRef) {
       drawingPlaneMat.dispose()
       drawingPlaneEdgeGeo.dispose()
       drawingPlaneEdgeMat.dispose()
+      editBoundsGeo.dispose()
+      editBoundsMat.dispose()
       clearShapePreview()
       shapePreviewMat.dispose()
       shapeHandleGeo.dispose()

@@ -33,6 +33,7 @@ export function useCanvasInput(containerRef) {
   const isDrawing      = useRef(false)
   const lastPixel      = useRef(null)
   const blendDragStart = useRef(null) // {col, row} where blend stroke started
+  const undoTransaction = useRef(null)
   // Track Alt key for temporary draw-mode override on non-front views
   const isAltHeld   = useRef(false)
   // Track Shift key for full-depth erase
@@ -78,6 +79,7 @@ export function useCanvasInput(containerRef) {
     const {
       activeTool, currentColor, blendEndColor, activeView,
       canvasWidth: W, canvasHeight: H, depthDimension: D, sideDrawMode, brushSize,
+      pencilMode, eraserMode,
     } = s
     const { w, h } = getViewSize(activeView, W, H, D)
     if (col < 0 || row < 0 || col >= w || row >= h) return
@@ -86,6 +88,12 @@ export function useCanvasInput(containerRef) {
     const sideDrawModeOverride = (isAltHeld.current && activeView !== 'front')
       ? (sideDrawMode === 'edit' ? 'draw' : 'edit')
       : null
+    const pencilModeOverride = isAltHeld.current && pencilMode !== 'through'
+      ? (pencilMode === 'surface' ? 'visible' : 'surface')
+      : pencilMode
+    const eraseModeOverride = isAltHeld.current
+      ? (eraserMode === 'through' ? 'visible' : 'through')
+      : isShiftHeld.current ? 'through' : eraserMode
 
     const brushPoints = getBrushOffsets(brushSize)
       .map(({ u, v }) => ({ col: col + u, row: row + v }))
@@ -94,12 +102,16 @@ export function useCanvasInput(containerRef) {
     for (const point of brushPoints) {
       switch (activeTool) {
         case 'pencil':
-          s.paintAt(point.col, point.row, currentColor, { sideDrawModeOverride })
+          s.paintAt(point.col, point.row, currentColor, {
+            sideDrawModeOverride,
+            operationMode: pencilModeOverride,
+          })
           break
         case 'eraser':
           s.paintAt(point.col, point.row, 'transparent', {
             sideDrawModeOverride,
             fullDepthErase: isShiftHeld.current,
+            operationMode: eraseModeOverride,
           })
           break
         case 'material':
@@ -110,7 +122,10 @@ export function useCanvasInput(containerRef) {
           const dist   = Math.sqrt((col - origin.col) ** 2 + (row - origin.row) ** 2)
           const maxDist = Math.max(W, H)
           const t       = Math.min(dist / maxDist, 1)
-          s.paintAt(point.col, point.row, lerpColor(currentColor, blendEndColor, t), { sideDrawModeOverride })
+          s.paintAt(point.col, point.row, lerpColor(currentColor, blendEndColor, t), {
+            sideDrawModeOverride,
+            operationMode: pencilModeOverride,
+          })
           break
         }
       }
@@ -140,7 +155,7 @@ export function useCanvasInput(containerRef) {
     if (s.activeTool === 'blend') blendDragStart.current = coords
 
     if (['pencil', 'eraser', 'material', 'blend'].includes(s.activeTool)) {
-      s.pushUndo()
+      undoTransaction.current = s.beginUndoTransaction()
     }
 
     applyTool(coords)
@@ -158,6 +173,10 @@ export function useCanvasInput(containerRef) {
   }, [getPixelCoords, applyTool])
 
   const onPointerUp = useCallback(() => {
+    if (undoTransaction.current) {
+      useStore.getState().finishUndoTransaction(undoTransaction.current)
+      undoTransaction.current = null
+    }
     isDrawing.current      = false
     lastPixel.current      = null
     blendDragStart.current = null

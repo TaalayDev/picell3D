@@ -124,7 +124,7 @@ export default function TemplatesDialog({ onClose }) {
   }
 
   function handleStartBlank() {
-    clearCanvas()
+    clearCanvas({ skipConfirmation: true })
     onClose()
   }
 

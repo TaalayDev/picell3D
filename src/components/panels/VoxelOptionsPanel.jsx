@@ -3,15 +3,19 @@ import {
   Box, FlipHorizontal, FlipVertical, Copy, Scissors, Clipboard,
   BoxSelect, LassoSelect, RotateCw, RotateCcw, Crosshair, Layers, Trash2,
 } from 'lucide-react'
-import { useStore, getCompositedVoxels, OPPOSITE_VIEW } from '../../store/index.js'
+import { useStore, getCompositedVoxels, getViewDepthSize, OPPOSITE_VIEW } from '../../store/index.js'
 
 const DEPTH_PRESETS = [4, 8, 16, 24, 32, 48, 64]
 
 export default function VoxelOptionsPanel() {
   const {
     canvasWidth, canvasHeight, depthDimension, setDepthDimension,
-    paintDepth, setPaintDepth, layers, activeView,
+    paintDepthStart, paintDepthEnd, paintDirection,
+    setPaintDepthStart, setPaintDepthEnd, setPaintDirection, layers, activeView,
     sideDrawMode, setSideDrawMode,
+    pencilMode, setPencilMode, eraserMode, setEraserMode,
+    throughMode, setThroughMode,
+    operationLayerScope, setOperationLayerScope,
     fillScope, setFillScope, viewMode,
     planeLock, setPlaneLock, planeAxis, setPlaneAxis, planeDepth, setPlaneDepth,
     shapeMode, setShapeMode, shapeThickness, setShapeThickness,
@@ -20,6 +24,9 @@ export default function VoxelOptionsPanel() {
     symmetryX, symmetryY, symmetryOpposite,
     setSymmetryX, setSymmetryY, setSymmetryOpposite,
     activeTool,
+    editBoundsEnabled, editBounds, editBoundsAxisLocks,
+    setEditBoundsEnabled, setEditBounds, resetEditBounds, setEditBoundsAxisLock,
+    fitEditBoundsToModel, fitEditBoundsToSelection, showLockedVoxels, setShowLockedVoxels, pushUndo,
     selection3D, moveSelection3D, rotateSelection3D, flipSelection3D,
     applySelection3D, clearSelection3D, deleteSelection3D,
     selectionMode, setSelectionMode,
@@ -52,6 +59,7 @@ export default function VoxelOptionsPanel() {
     ? canvasWidth
     : planeAxis === 'y' ? canvasHeight : depthDimension
   const visiblePlaneDepth = Math.max(0, Math.min(planeSize - 1, planeDepth))
+  const maxPaintDepth = getViewDepthSize(activeView, canvasWidth, canvasHeight, depthDimension)
 
   return (
     <div className="flex flex-col h-full">
@@ -62,6 +70,97 @@ export default function VoxelOptionsPanel() {
       </div>
 
       <div className="flex flex-col gap-4 p-3">
+
+        {/* ── Shared 3D edit bounds ──────────────────────────────────────── */}
+        {(activeTool === 'bounds' || editBoundsEnabled) && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs text-text-muted uppercase tracking-wide">
+                <BoxSelect size={12} /> Edit Bounds
+              </div>
+              <SymToggle label="Active" value={editBoundsEnabled} onChange={setEditBoundsEnabled} />
+            </div>
+            <p className="text-xs text-text-muted leading-tight">
+              Drag edges or corners to resize; drag inside to move. Hold Alt to resize from center or Shift to preserve proportions.
+            </p>
+            <button
+              onPointerDown={() => setShowLockedVoxels(true)}
+              onPointerUp={() => setShowLockedVoxels(false)}
+              onPointerCancel={() => setShowLockedVoxels(false)}
+              onPointerLeave={() => setShowLockedVoxels(false)}
+              className={`rounded border py-1 text-[10px] transition-colors ${
+                showLockedVoxels
+                  ? 'border-orange-400 bg-orange-400/20 text-orange-300'
+                  : 'border-border text-text-muted hover:border-orange-400/60 hover:text-text'
+              }`}
+            >
+              Hold to show locked voxels
+            </button>
+            <div className="flex items-center gap-1">
+              <span className="mr-auto text-[10px] uppercase tracking-wide text-text-muted">Axis locks</span>
+              {['x', 'y', 'z'].map(axis => (
+                <button
+                  key={axis}
+                  onClick={() => setEditBoundsAxisLock(axis, !editBoundsAxisLocks[axis])}
+                  className={`h-6 min-w-6 rounded border px-1.5 text-[10px] font-mono uppercase transition-colors ${
+                    editBoundsAxisLocks[axis]
+                      ? 'border-accent bg-accent/15 text-accent'
+                      : 'border-border text-text-muted hover:text-text'
+                  }`}
+                  aria-pressed={editBoundsAxisLocks[axis]}
+                  title={`Lock ${axis.toUpperCase()} bounds`}
+                >
+                  {axis}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-[18px_1fr_1fr] gap-1 items-center text-xs">
+              {[
+                ['X', 'x', 'minX', 'maxX', canvasWidth],
+                ['Y', 'y', 'minY', 'maxY', canvasHeight],
+                ['Z', 'z', 'minZ', 'maxZ', depthDimension],
+              ].map(([axis, axisKey, minKey, maxKey, size]) => (
+                <div key={axis} className="contents">
+                  <span className="font-mono text-accent">{axis}</span>
+                  <input
+                    type="number" min={1} max={size} value={editBounds[minKey] + 1}
+                    disabled={editBoundsAxisLocks[axisKey]}
+                    onFocus={pushUndo}
+                    onChange={e => setEditBounds({ ...editBounds, [minKey]: Number(e.target.value) - 1 })}
+                    className="w-full min-w-0 rounded border border-border bg-surface-alt px-1 py-1 font-mono text-text disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label={`${axis} minimum`}
+                  />
+                  <input
+                    type="number" min={1} max={size} value={editBounds[maxKey] + 1}
+                    disabled={editBoundsAxisLocks[axisKey]}
+                    onFocus={pushUndo}
+                    onChange={e => setEditBounds({ ...editBounds, [maxKey]: Number(e.target.value) - 1 })}
+                    className="w-full min-w-0 rounded border border-border bg-surface-alt px-1 py-1 font-mono text-text disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label={`${axis} maximum`}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-1 text-[10px] text-text-muted">
+              <span /> <span className="grid grid-cols-2 text-center"><span>Min</span><span>Max</span></span>
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              <button onClick={fitEditBoundsToModel} className="py-1 rounded border border-border text-xs text-text-muted hover:text-text hover:border-accent/60 transition-colors">
+                Fit to model
+              </button>
+              <button
+                onClick={fitEditBoundsToSelection}
+                disabled={!selection3D?.voxels?.length && !selection && !floatingPaste}
+                className="py-1 rounded border border-border text-xs text-text-muted hover:text-text hover:border-accent/60 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Fit to selection
+              </button>
+            </div>
+            <button onClick={resetEditBounds} className="py-1 rounded border border-border text-xs text-text-muted hover:text-text hover:border-accent/60 transition-colors">
+              Reset to full canvas
+            </button>
+          </div>
+        )}
 
         {/* ── Brush size ───────────────────────────────────────────────────── */}
         {isBrushTool && (
@@ -100,6 +199,125 @@ export default function VoxelOptionsPanel() {
                 : 'The brush paints a square area around the cursor.'}
             </p>
 
+          </div>
+        )}
+
+        {/* ── Brush ray behavior ────────────────────────────────────────── */}
+        {(activeTool === 'pencil' || activeTool === 'blend') && (
+          <div className="flex flex-col gap-2">
+            <div className="text-xs text-text-muted uppercase tracking-wide">Drawing Behavior</div>
+            <div className="grid grid-cols-1 gap-1">
+              {[
+                ['surface', 'Add on top', '1 / A', 'Place new voxels just above the visible surface.'],
+                ['visible', 'Replace visible', '2 / V', 'Recolor only the nearest visible voxel.'],
+                ['through', 'Replace through', '3 / ⇧V', 'Recolor all occupied voxels through to the other side.'],
+              ].map(([id, label, shortcut, description]) => (
+                <button
+                  key={id}
+                  onClick={() => setPencilMode(id)}
+                  title={description}
+                  className={`flex items-center justify-between px-2 py-1.5 rounded border text-xs transition-colors ${
+                    pencilMode === id
+                      ? 'border-accent bg-accent/20 text-accent'
+                      : 'border-border text-text-muted hover:text-text hover:border-accent/50'
+                  }`}
+                >
+                  <span>{label}</span>
+                  <kbd className="font-mono opacity-70">{shortcut}</kbd>
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-text-muted leading-tight">
+              Hold <kbd className="text-text font-mono px-0.5 border border-border rounded">Alt</kbd> for the temporary alternate mode.
+            </p>
+          </div>
+        )}
+
+        {activeTool === 'eraser' && (
+          <div className="flex flex-col gap-2">
+            <div className="text-xs text-text-muted uppercase tracking-wide">Erase Behavior</div>
+            <div className="grid grid-cols-2 gap-1">
+              {[
+                ['visible', 'Visible only', '1'],
+                ['through', 'Whole ray', '2'],
+              ].map(([id, label, shortcut]) => (
+                <button
+                  key={id}
+                  onClick={() => setEraserMode(id)}
+                  className={`py-1.5 rounded border text-xs transition-colors ${
+                    eraserMode === id
+                      ? 'border-accent bg-accent/20 text-accent'
+                      : 'border-border text-text-muted hover:text-text hover:border-accent/50'
+                  }`}
+                >
+                  <span>{label}</span>
+                  <kbd className="ml-1 font-mono opacity-70">{shortcut}</kbd>
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-text-muted leading-tight">
+              <kbd className="text-text font-mono px-0.5 border border-border rounded">Shift+E</kbd> toggles this setting. Hold Alt for its temporary alternate.
+            </p>
+          </div>
+        )}
+
+        {(
+          ((activeTool === 'pencil' || activeTool === 'blend') && pencilMode === 'through')
+          || (activeTool === 'eraser' && eraserMode === 'through')
+        ) && (
+          <div className="flex flex-col gap-2">
+            <div className="text-xs text-text-muted uppercase tracking-wide">Through Variant</div>
+            <div className="grid grid-cols-1 gap-1">
+              {[
+                ['occupied', 'Occupied only', 'Skip gaps and affect every existing voxel to the opposite side.'],
+                ['solid', 'Solid column', 'Affect every position in the ray, filling empty positions while painting.'],
+                ['contiguous', 'Until first gap', 'Affect the connected run from the visible surface and stop at the first empty position.'],
+              ].map(([id, label, description]) => (
+                <button
+                  key={id}
+                  onClick={() => setThroughMode(id)}
+                  title={description}
+                  className={`px-2 py-1.5 rounded border text-left text-xs transition-colors ${
+                    throughMode === id
+                      ? 'border-accent bg-accent/20 text-accent'
+                      : 'border-border text-text-muted hover:text-text hover:border-accent/50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {['pencil', 'eraser', 'blend', 'material', 'fill'].includes(activeTool) && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1.5 text-xs text-text-muted uppercase tracking-wide">
+              <Layers size={12} /> Layer Scope
+            </div>
+            <div className="grid grid-cols-1 gap-1">
+              {[
+                ['active', 'Active layer only', 'Always edit the currently selected layer.'],
+                ['all-visible', 'All visible layers', 'Edit every visible layer containing a voxel at the target.'],
+                ['topmost', 'Topmost visible voxel', 'Edit only the highest visible layer that owns the target voxel.'],
+              ].map(([id, label, description]) => (
+                <button
+                  key={id}
+                  onClick={() => setOperationLayerScope(id)}
+                  title={description}
+                  className={`px-2 py-1.5 rounded border text-left text-xs transition-colors ${
+                    operationLayerScope === id
+                      ? 'border-accent bg-accent/20 text-accent'
+                      : 'border-border text-text-muted hover:text-text hover:border-accent/50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-text-muted leading-tight">
+              New voxels in empty space are always created on the active layer.
+            </p>
           </div>
         )}
 
@@ -619,29 +837,58 @@ export default function VoxelOptionsPanel() {
           </div>
         )}
 
-        {/* Paint depth */}
-        {!isVolumeTool && !(activeTool === 'select' && viewMode === 'preview-only') && <div>
-          <div className="flex justify-between items-center mb-1.5">
-            <label className="text-xs text-text-muted uppercase tracking-wide">Paint Depth</label>
-            <span className="text-xs font-mono text-accent">{paintDepth}</span>
+        {/* Paint depth range */}
+        {!isVolumeTool && !(activeTool === 'select' && viewMode === 'preview-only') && (
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-center">
+              <label className="text-xs text-text-muted uppercase tracking-wide">Depth Range</label>
+              <span className="text-xs font-mono text-accent">{paintDepthStart}–{paintDepthEnd}</span>
+            </div>
+            {[
+              ['Start depth', paintDepthStart, setPaintDepthStart],
+              ['End depth', paintDepthEnd, setPaintDepthEnd],
+            ].map(([label, value, setter]) => (
+              <label key={label} className="grid grid-cols-[62px_1fr_24px] items-center gap-2 text-[10px] text-text-muted">
+                <span>{label}</span>
+                <input
+                  type="range" min={1} max={maxPaintDepth} value={value}
+                  onChange={e => setter(parseInt(e.target.value))}
+                  className="w-full cursor-pointer"
+                  style={{ accentColor: 'var(--color-accent)' }}
+                />
+                <span className="text-right font-mono text-text">{value}</span>
+              </label>
+            ))}
+            <div>
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-text-muted">Direction</div>
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  ['inward', 'Inward'],
+                  ['outward', 'Outward'],
+                  ['both', 'Both'],
+                ].map(([id, label]) => (
+                  <button
+                    key={id}
+                    onClick={() => setPaintDirection(id)}
+                    className={`rounded border py-1 text-[10px] transition-colors ${
+                      paintDirection === id
+                        ? 'border-accent bg-accent/20 text-accent'
+                        : 'border-border text-text-muted hover:text-text hover:border-accent/50'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="text-[10px] leading-tight text-text-muted">
+              Inward measures from the active view face; Outward mirrors the range from the opposite face.
+            </p>
           </div>
-          <input
-            type="range"
-            min={1}
-            max={isFrontBack ? Math.ceil(depthDimension / 2) : depthDimension}
-            value={paintDepth}
-            onChange={e => setPaintDepth(parseInt(e.target.value))}
-            className="w-full cursor-pointer"
-            style={{ accentColor: 'var(--color-accent)' }}
-          />
-          <div className="flex justify-between text-xs text-text-muted mt-0.5">
-            <span>1</span>
-            <span>{isFrontBack ? Math.ceil(depthDimension / 2) : depthDimension}</span>
-          </div>
-        </div>}
+        )}
 
-        {/* Draw / Edit mode — all views except front */}
-        {!isFront && (
+        {/* Legacy side behavior for fill/material tools. */}
+        {!isFront && ['fill', 'material'].includes(activeTool) && (
           <div>
             <div className="mb-1.5">
               <label className="text-xs text-text-muted uppercase tracking-wide">Side Mode</label>
@@ -662,8 +909,7 @@ export default function VoxelOptionsPanel() {
               ))}
             </div>
             <p className="text-xs text-text-muted mt-1 leading-tight">
-              Hold <kbd className="text-text font-mono px-0.5 border border-border rounded">Alt</kbd> to temporarily use the other mode.<br />
-              Hold <kbd className="text-text font-mono px-0.5 border border-border rounded">Shift</kbd> + Eraser to erase full depth.
+              Choose whether side operations affect existing voxels or draw from the surface.
             </p>
           </div>
         )}

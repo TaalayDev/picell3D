@@ -154,7 +154,7 @@ export function computeLowPoly(input, params = {}) {
   }))
   const triangles = out.reduce((n, g) => n + g.positions.length / 9, 0)
 
-  return { groups: out, stats: { rawTriangles, triangles, vertices: positions.length / 3 } }
+  return { groups: out, shading: p.shading, stats: { rawTriangles, triangles, vertices: positions.length / 3 } }
 }
 
 function faceNormal(pos, a, b, c, normalize) {

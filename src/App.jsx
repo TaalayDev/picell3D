@@ -60,9 +60,24 @@ export default function App() {
         if (typeof p.showGrid === 'boolean' && p.showGrid !== api.showGrid) api.toggleGrid()
         if (typeof p.showDepthText === 'boolean')   api.setShowDepthText(p.showDepthText)
         if (typeof p.pixelSize === 'number')        api.setPixelSize(p.pixelSize)
-        if (typeof p.paintDepth === 'number')       api.setPaintDepth(p.paintDepth)
-        if (p.paintDirection)                       api.setPaintDirection(p.paintDirection)
+        if (typeof p.paintDepthStart === 'number') api.setPaintDepthStart(p.paintDepthStart)
+        if (typeof p.paintDepthEnd === 'number') api.setPaintDepthEnd(p.paintDepthEnd)
+        else if (typeof p.paintDepth === 'number') api.setPaintDepth(p.paintDepth)
+        if (p.paintDirection) {
+          const direction = p.paintDirection === 'front' ? 'outward'
+            : p.paintDirection === 'back' ? 'inward' : p.paintDirection
+          api.setPaintDirection(direction)
+        }
         if (p.sideDrawMode)                         api.setSideDrawMode(p.sideDrawMode)
+        if (p.pencilMode)                           api.setPencilMode(p.pencilMode)
+        if (p.eraserMode)                           api.setEraserMode(p.eraserMode)
+        if (p.throughMode)                          api.setThroughMode(p.throughMode)
+        if (p.operationLayerScope)                  api.setOperationLayerScope(p.operationLayerScope)
+        if (p.editBoundsAxisLocks) {
+          for (const axis of ['x', 'y', 'z']) api.setEditBoundsAxisLock(axis, p.editBoundsAxisLocks[axis])
+        }
+        if (typeof p.confirmLargeOperations === 'boolean') api.setConfirmLargeOperations(p.confirmLargeOperations)
+        if (typeof p.largeOperationThreshold === 'number') api.setLargeOperationThreshold(p.largeOperationThreshold)
         if (typeof p.symmetryX === 'boolean')       api.setSymmetryX(p.symmetryX)
         if (typeof p.symmetryY === 'boolean')       api.setSymmetryY(p.symmetryY)
         if (typeof p.symmetryOpposite === 'boolean') api.setSymmetryOpposite(p.symmetryOpposite)
@@ -83,8 +98,17 @@ export default function App() {
             viewMode:         state.viewMode,
             pixelSize:        state.pixelSize,
             paintDepth:       state.paintDepth,
+            paintDepthStart:  state.paintDepthStart,
+            paintDepthEnd:    state.paintDepthEnd,
             paintDirection:   state.paintDirection,
             sideDrawMode:     state.sideDrawMode,
+            pencilMode:       state.pencilMode,
+            eraserMode:       state.eraserMode,
+            throughMode:      state.throughMode,
+            operationLayerScope: state.operationLayerScope,
+            editBoundsAxisLocks: state.editBoundsAxisLocks,
+            confirmLargeOperations: state.confirmLargeOperations,
+            largeOperationThreshold: state.largeOperationThreshold,
             symmetryX:        state.symmetryX,
             symmetryY:        state.symmetryY,
             symmetryOpposite: state.symmetryOpposite,
