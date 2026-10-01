@@ -845,6 +845,7 @@ function getCursor(tool, isLineEditing, floatingPaste, isSpaceHeld, hoverHandle,
     case 'pencil':   return 'crosshair'
     case 'eraser':   return 'cell'
     case 'fill':     return 'copy'
+    case 'eyedropper': return 'copy'
     case 'blend':    return 'crosshair'
     case 'rect':
     case 'circle':

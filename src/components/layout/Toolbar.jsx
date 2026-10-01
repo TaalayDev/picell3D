@@ -5,7 +5,7 @@ import {
   Undo2, Redo2, Trash2, Download, Frame, ImagePlus, Settings2, Aperture,
   RectangleHorizontal, Circle, Ellipse, Minus,
   BoxSelect, LassoSelect, Droplets, HelpCircle,
-  Save, FolderOpen, FlaskConical, Triangle, Menu,
+  Save, FolderOpen, FlaskConical, Triangle, Menu, Pipette,
 } from 'lucide-react'
 import { useStore } from '../../store/index.js'
 import TemplatesDialog from './TemplatesDialog.jsx'
@@ -20,6 +20,7 @@ const TOOLS = [
   { id: 'fill',     Icon: PaintBucket,         label: 'Fill (F)',      key: 'F', group: 'draw' },
   { id: 'blend',    Icon: Droplets,            label: 'Blend (B)',     key: 'B', group: 'draw' },
   { id: 'material', Icon: Sparkles,            label: 'Material (M)', key: 'M', group: 'draw' },
+  { id: 'eyedropper', Icon: Pipette,            label: 'Pipette (I)', key: 'I', group: 'draw' },
   { id: 'select',   Icon: BoxSelect,           label: 'Select (S)',   key: 'S', group: 'draw' },
   { id: 'bounds',   Icon: Frame,               label: 'Edit bounds (Q)', key: 'Q', group: 'draw' },
   // shapes

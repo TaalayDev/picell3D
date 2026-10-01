@@ -150,6 +150,7 @@ export function useKeyboardShortcuts() {
           break
         case 'f': setActiveTool('fill');     break
         case 'm': setActiveTool('material'); break
+        case 'i': setActiveTool('eyedropper'); break
         case 's':
           if (s.activeTool === 'select' || e.shiftKey) {
             s.setSelectionMode(s.selectionMode === 'lasso' ? 'rect' : 'lasso')

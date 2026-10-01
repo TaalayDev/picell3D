@@ -228,7 +228,7 @@ export default function VoxelOptionsPanel() {
               ))}
             </div>
             <p className="text-xs text-text-muted leading-tight">
-              Hold <kbd className="text-text font-mono px-0.5 border border-border rounded">Alt</kbd> for the temporary alternate mode.
+              <kbd className="text-text font-mono px-0.5 border border-border rounded">Alt/Option+click</kbd> picks a color; Alt-drag uses the temporary alternate mode.
             </p>
           </div>
         )}
@@ -838,7 +838,7 @@ export default function VoxelOptionsPanel() {
         )}
 
         {/* Paint depth range */}
-        {!isVolumeTool && !(activeTool === 'select' && viewMode === 'preview-only') && (
+        {activeTool !== 'eyedropper' && !isVolumeTool && !(activeTool === 'select' && viewMode === 'preview-only') && (
           <div className="flex flex-col gap-2">
             <div className="flex justify-between items-center">
               <label className="text-xs text-text-muted uppercase tracking-wide">Depth Range</label>
@@ -915,7 +915,7 @@ export default function VoxelOptionsPanel() {
         )}
 
         {/* Symmetry */}
-        {!isVolumeTool && !(activeTool === 'select' && viewMode === 'preview-only') && <div>
+        {activeTool !== 'eyedropper' && !isVolumeTool && !(activeTool === 'select' && viewMode === 'preview-only') && <div>
           <div className="mb-1.5">
             <label className="text-xs text-text-muted uppercase tracking-wide">Symmetry</label>
           </div>

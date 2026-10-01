@@ -34,6 +34,7 @@ export function useCanvasInput(containerRef) {
   const lastPixel      = useRef(null)
   const blendDragStart = useRef(null) // {col, row} where blend stroke started
   const undoTransaction = useRef(null)
+  const pendingAltPick = useRef(null)
   // Track Alt key for temporary draw-mode override on non-front views
   const isAltHeld   = useRef(false)
   // Track Shift key for full-depth erase
@@ -145,6 +146,18 @@ export function useCanvasInput(containerRef) {
     const s      = useStore.getState()
     const coords = getPixelCoords(e)
 
+    if (s.activeTool === 'eyedropper') {
+      pickColor(coords)
+      return
+    }
+
+    if (s.activeTool === 'pencil' && (e.altKey || isAltHeld.current)) {
+      pendingAltPick.current = { coords, clientX: e.clientX, clientY: e.clientY }
+      isDrawing.current = true
+      lastPixel.current = coords
+      return
+    }
+
     if (s.activeTool === 'fill') {
       s.floodFillVoxel(coords.col, coords.row, s.currentColor)
       return
@@ -164,6 +177,14 @@ export function useCanvasInput(containerRef) {
   const onPointerMove = useCallback((e) => {
     if (!isDrawing.current) return
     const coords = getPixelCoords(e)
+    if (pendingAltPick.current) {
+      const pending = pendingAltPick.current
+      if (Math.hypot(e.clientX - pending.clientX, e.clientY - pending.clientY) < 4) return
+      const s = useStore.getState()
+      undoTransaction.current = s.beginUndoTransaction()
+      applyTool(pending.coords)
+      pendingAltPick.current = null
+    }
     const prev   = lastPixel.current
     if (!prev || (coords.col === prev.col && coords.row === prev.row)) return
 
@@ -173,6 +194,14 @@ export function useCanvasInput(containerRef) {
   }, [getPixelCoords, applyTool])
 
   const onPointerUp = useCallback(() => {
+    if (pendingAltPick.current) {
+      pickColor(pendingAltPick.current.coords)
+      pendingAltPick.current = null
+      isDrawing.current = false
+      lastPixel.current = null
+      blendDragStart.current = null
+      return
+    }
     if (undoTransaction.current) {
       useStore.getState().finishUndoTransaction(undoTransaction.current)
       undoTransaction.current = null
@@ -180,7 +209,7 @@ export function useCanvasInput(containerRef) {
     isDrawing.current      = false
     lastPixel.current      = null
     blendDragStart.current = null
-  }, [])
+  }, [pickColor])
 
   // Prevent context menu on right-click
   const onContextMenu = useCallback((e) => e.preventDefault(), [])
