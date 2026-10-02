@@ -1,7 +1,6 @@
 /.claude
 /CONCEPT.md
 /node_modules
-/package-lock.json
 /dist
 /release
 /src-tauri/target
