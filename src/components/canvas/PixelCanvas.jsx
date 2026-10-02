@@ -1,6 +1,6 @@
 import { useRef, useEffect, useMemo, useCallback } from 'react'
 import { RotateCw, RotateCcw, Layers, Trash2, Check, X } from 'lucide-react'
-import { useStore, renderView2D, renderDepthMap2D, getViewSize, getViewDepthSize, getCompositedVoxels, projectEditBoundsToView } from '../../store/index.js'
+import { useStore, renderView2D, renderDepthMap2D, getViewSize, getCompositedVoxels, projectEditBoundsToView } from '../../store/index.js'
 import { useCanvasInput } from '../../hooks/useCanvasInput.js'
 import { useShapeInput, SHAPE_TOOLS } from '../../hooks/useShapeInput.js'
 import { useSelectionInput } from '../../hooks/useSelectionInput.js'
@@ -35,7 +35,6 @@ export default function PixelCanvas() {
     selection, floatingPaste, lassoPreview, selectionAnchor,
     editBoundsEnabled, editBounds,
     showLockedVoxels,
-    paintDepthStart, paintDepthEnd, paintDirection,
     rotateSelection, scaleSelection, shiftSelectionDepth, deleteSelection, commitPaste,
   } = useStore()
 
@@ -57,14 +56,11 @@ export default function PixelCanvas() {
   }, [layers, activeView, canvasWidth, canvasHeight, D])
 
   const { w: viewW, h: viewH } = getViewSize(activeView, canvasWidth, canvasHeight, D)
-  const viewDepth = getViewDepthSize(activeView, canvasWidth, canvasHeight, D)
-  const depthStartPct = ((paintDepthStart - 1) / viewDepth) * 100
-  const depthWidthPct = ((paintDepthEnd - paintDepthStart + 1) / viewDepth) * 100
 
   // ── Space+drag pan ───────────────────────────────────────────────────────────
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.key === ' ' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+      if (e.key === ' ' && document.activeElement === containerRef.current) {
         e.preventDefault()
         isSpaceHeld.current = true
       }
@@ -124,6 +120,7 @@ export default function PixelCanvas() {
   const isBounds = activeTool === 'bounds'
 
   function routeDown(e)  {
+    containerRef.current?.focus({ preventScroll: true })
     if (isSpaceHeld.current) { handlePanDown(e); return }
     if (isBounds) return boundsInput.onPointerDown(e)
     if (isSelect) return selectInput.onPointerDown(e)
@@ -610,6 +607,8 @@ export default function PixelCanvas() {
     <div ref={scrollRef} className="flex items-center justify-center w-full h-full overflow-auto p-4 relative">
       {/* Zoom to fit button */}
       <button
+        type="button"
+        aria-label="Zoom canvas to fit"
         onClick={zoomToFit}
         title="Zoom to fit (Ctrl+0)"
         className="absolute top-2 right-2 z-10 text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent transition-colors"
@@ -619,6 +618,10 @@ export default function PixelCanvas() {
       </button>
       <div
         ref={containerRef}
+        data-canvas-keyboard-scope="true"
+        role="application"
+        aria-label={`${activeView} 2D voxel canvas. Use the selected drawing tool with the pointer. Press question mark for keyboard shortcuts.`}
+        tabIndex={0}
         className="relative flex-shrink-0"
         style={{
           boxShadow: '0 0 0 2px var(--color-border), 0 0 0 4px var(--color-surface), 0 8px 40px rgba(0,0,0,0.9)',
@@ -639,49 +642,20 @@ export default function PixelCanvas() {
         <canvas
           ref={canvasRef}
           data-main-canvas="true"
+          aria-hidden="true"
           style={{ width: viewW * pixelSize, height: viewH * pixelSize, imageRendering: 'pixelated', display: 'block' }}
         />
 
         {/* Shape preview overlay (pointer-events: none so container receives all events) */}
         <canvas
           ref={overlayRef}
+          aria-hidden="true"
           style={{
             position: 'absolute', inset: 0,
             width: viewW * pixelSize, height: viewH * pixelSize,
             imageRendering: 'pixelated', pointerEvents: 'none',
           }}
         />
-
-        {/* Visual depth ruler: active view face is left, opposite face is right. */}
-        <div
-          className="pointer-events-none absolute bottom-2 left-2 z-10 w-44 max-w-[calc(100%-1rem)] rounded border border-border/80 px-2 py-1.5 text-[9px] shadow-lg"
-          style={{ background: 'color-mix(in srgb, var(--color-surface) 88%, transparent)' }}
-          aria-label={`Depth ${paintDepthStart} to ${paintDepthEnd}, ${paintDirection}`}
-        >
-          <div className="mb-1 flex items-center justify-between uppercase tracking-wide text-text-muted">
-            <span>Depth ruler</span>
-            <span className="font-mono text-accent">{paintDepthStart}–{paintDepthEnd} · {paintDirection}</span>
-          </div>
-          <div className="relative h-2 overflow-hidden rounded-sm border border-border bg-background/80">
-            {(paintDirection === 'inward' || paintDirection === 'both') && (
-              <span
-                className="absolute inset-y-0 bg-accent/90"
-                style={{ left: `${depthStartPct}%`, width: `${depthWidthPct}%` }}
-              />
-            )}
-            {(paintDirection === 'outward' || paintDirection === 'both') && (
-              <span
-                className="absolute inset-y-0 bg-fuchsia-400/80"
-                style={{ right: `${depthStartPct}%`, width: `${depthWidthPct}%` }}
-              />
-            )}
-            <span className="absolute inset-y-0 left-1/2 w-px bg-white/30" />
-          </div>
-          <div className="mt-0.5 flex justify-between font-mono text-text-muted">
-            <span>active · 1</span>
-            <span>{viewDepth} · opposite</span>
-          </div>
-        </div>
 
         <ReferenceOverlay pixelSize={pixelSize} />
       </div>
@@ -698,6 +672,7 @@ export default function PixelCanvas() {
         >
           <span className="px-1.5 text-xs text-text-muted">Drag handles to edit</span>
           <button
+            type="button"
             onClick={shapeInput.cancel}
             className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text-muted hover:text-red-400 hover:bg-red-950/40 transition-colors"
             title="Cancel shape (Esc)"
@@ -705,6 +680,7 @@ export default function PixelCanvas() {
             <X size={13} /> Cancel
           </button>
           <button
+            type="button"
             onClick={shapeInput.commit}
             className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium"
             style={{ background: 'var(--color-accent)', color: 'var(--color-canvasBg, #000)' }}

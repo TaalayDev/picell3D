@@ -1,11 +1,14 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useStore } from '../../store/index.js'
 import { TEMPLATES } from '../layout/TemplatesDialog.jsx'
+import { useModalAccessibility } from '../../hooks/useModalAccessibility.js'
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function StartOverlay({ onDone }) {
+  const dialogRef = useRef(null)
   const [loading, setLoading] = useState(null)
+  useModalAccessibility(dialogRef, null, { closeOnEscape: false })
 
   async function handleTemplate(id) {
     setLoading(id)
@@ -31,6 +34,11 @@ export default function StartOverlay({ onDone }) {
       style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)' }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="welcome-title"
+        tabIndex={-1}
         className="relative flex flex-col gap-6 p-8 rounded-xl max-w-lg w-full mx-4"
         style={{
           background: 'var(--color-surface)',
@@ -40,7 +48,7 @@ export default function StartOverlay({ onDone }) {
       >
         {/* Header */}
         <div className="text-center">
-          <div className="text-3xl font-bold tracking-wide" style={{ color: 'var(--color-accent)' }}>
+          <div id="welcome-title" className="text-3xl font-bold tracking-wide" style={{ color: 'var(--color-accent)' }}>
             Picell3D
           </div>
           <div className="mt-1 text-sm" style={{ color: 'var(--color-textMuted)' }}>
@@ -67,6 +75,7 @@ export default function StartOverlay({ onDone }) {
           <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
             {TEMPLATES.map(t => (
               <button
+                type="button"
                 key={t.id}
                 onClick={() => handleTemplate(t.id)}
                 disabled={loading !== null}
@@ -112,6 +121,8 @@ export default function StartOverlay({ onDone }) {
 
         {/* Blank start */}
         <button
+          type="button"
+          data-autofocus
           onClick={handleBlank}
           className="w-full py-2 text-sm rounded transition-colors"
           style={{

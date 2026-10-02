@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { X, Sparkles, Plus, Search } from 'lucide-react'
 import { useStore } from '../../store/index.js'
+import { useModalAccessibility } from '../../hooks/useModalAccessibility.js'
 
 export const TEMPLATES = [
   { id: 'mushroom',   label: 'Mushroom House',  emoji: '🍄', desc: 'Toadstool cottage with chimney',  size: '23×26×23', category: 'fantasy' },
@@ -84,18 +85,13 @@ const CATEGORIES = [
 ]
 
 export default function TemplatesDialog({ onClose }) {
+  const dialogRef = useRef(null)
   const [loading, setLoading] = useState(null)
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
   const { loadProjectData, palette, clearCanvas } = useStore()
 
-  useEffect(() => {
-    function onKeyDown(e) {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+  useModalAccessibility(dialogRef, onClose)
 
   const filteredTemplates = useMemo(() => {
     return TEMPLATES.filter(t => {
@@ -135,6 +131,11 @@ export default function TemplatesDialog({ onClose }) {
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="templates-dialog-title"
+        tabIndex={-1}
         className="relative flex flex-col gap-4 p-6 rounded-2xl max-w-2xl w-full max-h-[92vh] overflow-hidden"
         style={{
           background: 'var(--color-surface)',
@@ -158,7 +159,7 @@ export default function TemplatesDialog({ onClose }) {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold tracking-wide" style={{ color: 'var(--color-text)' }}>
+                <h2 id="templates-dialog-title" className="text-base font-bold tracking-wide" style={{ color: 'var(--color-text)' }}>
                   Templates Library
                 </h2>
                 <span
@@ -178,6 +179,8 @@ export default function TemplatesDialog({ onClose }) {
             </div>
           </div>
           <button
+            type="button"
+            aria-label="Close templates library"
             onClick={onClose}
             className="w-7 h-7 rounded-lg flex items-center justify-center border border-transparent text-text-muted hover:text-text hover:border-border hover:bg-surface-alt transition-colors"
             title="Close (Esc)"
@@ -198,6 +201,8 @@ export default function TemplatesDialog({ onClose }) {
           >
             <Search size={14} className="text-text-muted flex-shrink-0" />
             <input
+              data-autofocus
+              aria-label="Search templates"
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -206,6 +211,8 @@ export default function TemplatesDialog({ onClose }) {
             />
             {search && (
               <button
+                type="button"
+                aria-label="Clear template search"
                 onClick={() => setSearch('')}
                 className="text-text-muted hover:text-text text-[11px]"
               >
@@ -220,6 +227,8 @@ export default function TemplatesDialog({ onClose }) {
               const active = activeCategory === cat.id
               return (
                 <button
+                  type="button"
+                  aria-pressed={active}
                   key={cat.id}
                   onClick={() => setActiveCategory(cat.id)}
                   className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap"
@@ -300,6 +309,7 @@ export default function TemplatesDialog({ onClose }) {
         {/* Start Blank Option */}
         <div className="pt-3 border-t border-border/50 flex items-center justify-between gap-3">
           <button
+            type="button"
             onClick={handleStartBlank}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium border border-border text-text-muted hover:text-text hover:border-accent/60 hover:bg-surface-alt transition-colors"
           >
@@ -307,6 +317,7 @@ export default function TemplatesDialog({ onClose }) {
             <span>Start Blank Canvas</span>
           </button>
           <button
+            type="button"
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-xs border border-transparent text-text-muted hover:text-text transition-colors"
           >

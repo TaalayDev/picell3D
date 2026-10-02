@@ -1,4 +1,6 @@
+import { useRef } from 'react'
 import { useStore } from '../../store/index.js'
+import { useModalAccessibility } from '../../hooks/useModalAccessibility.js'
 
 const SECTIONS = [
   {
@@ -42,7 +44,7 @@ const SECTIONS = [
   {
     title: 'Canvas',
     rows: [
-      ['Tab', 'Next view'],
+      ['Ctrl+Tab', 'Next view while canvas is focused'],
       ['[', 'Decrease end depth'],
       [']', 'Increase end depth'],
       ['Ctrl+0', 'Zoom to fit'],
@@ -82,7 +84,9 @@ const SECTIONS = [
 ]
 
 export default function ShortcutsPanel() {
+  const dialogRef = useRef(null)
   const toggleShortcutsPanel = useStore(s => s.toggleShortcutsPanel)
+  useModalAccessibility(dialogRef, toggleShortcutsPanel)
 
   return (
     <div
@@ -91,6 +95,11 @@ export default function ShortcutsPanel() {
       onClick={toggleShortcutsPanel}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="keyboard-shortcuts-title"
+        tabIndex={-1}
         className="relative rounded-xl overflow-hidden p-6 max-w-2xl w-full mx-4 max-h-[85vh] overflow-y-auto"
         style={{
           background: 'var(--color-surface)',
@@ -100,10 +109,12 @@ export default function ShortcutsPanel() {
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-sm font-semibold uppercase tracking-widest" style={{ color: 'var(--color-accent)' }}>
+          <h2 id="keyboard-shortcuts-title" className="text-sm font-semibold uppercase tracking-widest" style={{ color: 'var(--color-accent)' }}>
             Keyboard Shortcuts
           </h2>
           <button
+            type="button"
+            data-autofocus
             onClick={toggleShortcutsPanel}
             className="text-xs text-text-muted hover:text-text transition-colors"
           >

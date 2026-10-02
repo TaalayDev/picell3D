@@ -27,6 +27,7 @@ function Slider({ label, value, min, max, step, format, onChange }) {
 function IconBtn({ icon: Icon, title, disabled, onClick }) {
   return (
     <button onClick={onClick} disabled={disabled} title={title}
+      type="button" aria-label={title}
       className="p-1.5 rounded border transition-colors hover:bg-white/5 disabled:opacity-30"
       style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>
       <Icon size={14} />
@@ -49,6 +50,7 @@ export default function LowPolyTools({
       <SectionLabel>Mesh</SectionLabel>
       <div className="px-4 flex flex-col gap-1.5">
         <button
+          type="button"
           onClick={onImport} disabled={busy}
           className="w-full flex items-center justify-center gap-2 py-2 rounded border text-sm font-medium transition-colors disabled:opacity-50"
           style={stale
@@ -60,6 +62,7 @@ export default function LowPolyTools({
           {stale ? 'Re-import voxels (model changed)' : 'Re-import original voxels'}
         </button>
         <button
+          type="button"
           onClick={onGenerate} disabled={busy}
           className="w-full py-1.5 rounded border text-xs transition-colors disabled:opacity-50"
           style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}
@@ -73,6 +76,8 @@ export default function LowPolyTools({
       <div className="grid grid-cols-3 gap-1.5 px-4 pb-1">
         {EDIT_TOOLS.map(({ id, label, icon: Icon, hint }) => (
           <button
+            type="button"
+            aria-pressed={tool === id}
             key={id} onClick={() => onTool(id)} title={hint}
             className="flex flex-col items-center gap-0.5 py-1.5 rounded border text-xs transition-colors"
             style={tool === id

@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { X, ArrowRight, Frame } from 'lucide-react'
 import { useStore } from '../../store/index.js'
+import { useModalAccessibility } from '../../hooks/useModalAccessibility.js'
 
 const PRESETS = [
   { label: '8×8',    w: 8,   h: 8 },
@@ -13,6 +14,7 @@ const PRESETS = [
 ]
 
 export default function CanvasSizeDialog({ onClose }) {
+  const dialogRef = useRef(null)
   const { canvasWidth, canvasHeight, resizeCanvas } = useStore()
   const [w, setW] = useState(canvasWidth)
   const [h, setH] = useState(canvasHeight)
@@ -32,6 +34,7 @@ export default function CanvasSizeDialog({ onClose }) {
   const isGrowingW = w > canvasWidth
   const isGrowingH = h > canvasHeight
   const unchanged = w === canvasWidth && h === canvasHeight
+  useModalAccessibility(dialogRef, onClose)
 
   return (
     <div
@@ -40,16 +43,23 @@ export default function CanvasSizeDialog({ onClose }) {
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="canvas-size-title"
+        tabIndex={-1}
         className="panel-riveted relative flex flex-col gap-4 p-5 rounded-lg border border-border shadow-brass w-80"
         style={{ background: 'var(--color-surface)' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-theme text-text tracking-wide">
+          <div id="canvas-size-title" className="flex items-center gap-2 text-sm font-theme text-text tracking-wide">
             <Frame size={15} className="text-accent" />
             Canvas Size
           </div>
           <button
+            type="button"
+            aria-label="Close canvas size dialog"
             className="text-text-muted hover:text-text transition-colors"
             onClick={onClose}
           >
@@ -75,6 +85,7 @@ export default function CanvasSizeDialog({ onClose }) {
               const selected = p.w === w && p.h === h
               return (
                 <button
+                  type="button"
                   key={p.label}
                   className={`text-xs py-1 px-1 rounded border transition-colors ${
                     selected
@@ -97,8 +108,10 @@ export default function CanvasSizeDialog({ onClose }) {
           <div className="text-xs text-text-muted uppercase tracking-wide mb-2">Custom</div>
           <div className="flex items-center gap-2">
             <div className="flex-1">
-              <label className="text-xs text-text-muted block mb-1">Width</label>
+              <label htmlFor="canvas-width" className="text-xs text-text-muted block mb-1">Width</label>
               <input
+                id="canvas-width"
+                data-autofocus
                 type="number"
                 min={4} max={256}
                 value={w}
@@ -109,8 +122,9 @@ export default function CanvasSizeDialog({ onClose }) {
             </div>
             <X size={12} className="text-text-muted mt-4 flex-shrink-0" />
             <div className="flex-1">
-              <label className="text-xs text-text-muted block mb-1">Height</label>
+              <label htmlFor="canvas-height" className="text-xs text-text-muted block mb-1">Height</label>
               <input
+                id="canvas-height"
                 type="number"
                 min={4} max={256}
                 value={h}
@@ -135,12 +149,14 @@ export default function CanvasSizeDialog({ onClose }) {
         {/* Actions */}
         <div className="flex gap-2 justify-end pt-1">
           <button
+            type="button"
             className="text-xs px-3 py-1.5 rounded border border-border text-text-muted hover:text-text transition-colors"
             onClick={onClose}
           >
             Cancel
           </button>
           <button
+            type="button"
             className="btn-brass text-xs"
             disabled={unchanged}
             onClick={apply}

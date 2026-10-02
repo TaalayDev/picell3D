@@ -42,7 +42,10 @@ export function useCanvasInput(containerRef) {
 
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.key === 'Alt')   { e.preventDefault(); isAltHeld.current   = true }
+      if (e.key === 'Alt')   {
+        if (document.activeElement === containerRef.current) e.preventDefault()
+        isAltHeld.current = true
+      }
       if (e.key === 'Shift') { isShiftHeld.current = true }
     }
     const onKeyUp = (e) => {
@@ -55,7 +58,7 @@ export function useCanvasInput(containerRef) {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup',   onKeyUp)
     }
-  }, [])
+  }, [containerRef])
 
   const getPixelCoords = useCallback((e) => {
     const { pixelSize } = useStore.getState()

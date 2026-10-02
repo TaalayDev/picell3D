@@ -24,6 +24,7 @@ export default function ColorPalette() {
     <div className="flex flex-col gap-2 p-2">
       {/* HEX input */}
       <input
+        aria-label="Color hex value"
         type="text"
         value={hexInput}
         onChange={e => setHexInput(e.target.value)}
@@ -47,7 +48,9 @@ export default function ColorPalette() {
         <div className="text-xs text-text-muted mb-1 uppercase tracking-wide">
           {showBlend ? 'Start color' : 'Color'}
         </div>
-        <div
+        <button
+          type="button"
+          aria-label={`Choose ${showBlend ? 'start' : 'current'} color, ${currentColor}`}
           className="w-full h-8 rounded cursor-pointer border border-border hover:border-accent transition-colors"
           style={{ background: currentColor }}
           onClick={() => pickerRef.current?.click()}
@@ -67,7 +70,9 @@ export default function ColorPalette() {
       {showBlend && (
         <div className="relative">
           <div className="text-xs text-text-muted mb-1 uppercase tracking-wide">End color</div>
-          <div
+          <button
+            type="button"
+            aria-label={`Choose blend end color, ${blendEndColor}`}
             className="w-full h-8 rounded cursor-pointer border border-border hover:border-accent transition-colors"
             style={{ background: blendEndColor }}
             onClick={() => blendPickRef.current?.click()}
@@ -91,6 +96,9 @@ export default function ColorPalette() {
           <div className="flex flex-wrap gap-1">
             {recentColors.map((color, i) => (
               <button
+                type="button"
+                aria-label={`Use recent color ${color}`}
+                aria-pressed={currentColor === color}
                 key={i}
                 title={color}
                 className="rounded border transition-all hover:scale-110"
@@ -111,6 +119,9 @@ export default function ColorPalette() {
       <div className="grid grid-cols-4 gap-1">
         {palette.map((color, i) => (
           <button
+            type="button"
+            aria-label={`Use palette color ${color}`}
+            aria-pressed={currentColor === color}
             key={i}
             title={color}
             className="w-full aspect-square rounded border transition-all duration-100 hover:scale-110"
@@ -126,7 +137,7 @@ export default function ColorPalette() {
       </div>
 
       {/* Add custom color */}
-      <button className="btn-brass w-full text-xs py-1" onClick={() => pickerRef.current?.click()}>
+      <button type="button" className="btn-brass w-full text-xs py-1" onClick={() => pickerRef.current?.click()}>
         + Custom
       </button>
     </div>

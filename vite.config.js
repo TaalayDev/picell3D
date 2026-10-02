@@ -14,4 +14,9 @@ export default defineConfig({
       loader: { '.js': 'jsx' },
     },
   },
+  server: {
+    watch: {
+      ignored: ['**/src-tauri/**'],
+    },
+  },
 })

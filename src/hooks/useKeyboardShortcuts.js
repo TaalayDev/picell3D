@@ -28,7 +28,24 @@ export function useKeyboardShortcuts() {
 
   useEffect(() => {
     function onKeyDown(e) {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      const target = e.target instanceof Element ? e.target : null
+      const isCanvasFocused = Boolean(target?.closest('[data-canvas-keyboard-scope]'))
+      const isInteractive = Boolean(target?.closest(
+        'input, textarea, select, button, a[href], [contenteditable="true"], [role="menuitem"], [aria-modal="true"]'
+      ))
+
+      // Keep plain Tab reserved for standard focus navigation. Ctrl+Tab cycles
+      // the drawing view only while the canvas itself owns focus.
+      if (e.key === 'Tab') {
+        if (!isCanvasFocused || !e.ctrlKey) return
+        e.preventDefault()
+        const s = useStore.getState()
+        const idx = VIEWS.indexOf(s.activeView)
+        s.setActiveView(VIEWS[(idx + 1) % VIEWS.length])
+        return
+      }
+
+      if (isInteractive) return
 
       const s = useStore.getState()
 
@@ -66,14 +83,6 @@ export function useKeyboardShortcuts() {
           s.deleteSelection()
           return
         }
-      }
-
-      // ── Tab: cycle view ──
-      if (e.key === 'Tab') {
-        e.preventDefault()
-        const idx = VIEWS.indexOf(s.activeView)
-        s.setActiveView(VIEWS[(idx + 1) % VIEWS.length])
-        return
       }
 
       // ── [ ] — selection depth or paint depth ──

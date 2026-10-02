@@ -147,8 +147,6 @@ export default function App() {
 
   // ── Warn before unload ───────────────────────────────────────────────────────
   useEffect(() => {
-    // In Electron, the main process handles quit confirmation natively.
-    if (window.electron?.isElectron) return
     const onBeforeUnload = (e) => {
       e.preventDefault()
       e.returnValue = '' // required for Chrome
@@ -250,7 +248,10 @@ export default function App() {
                     {is3DEditMode ? '3D Edit Mode' : '3D Preview'}
                   </div>
                   <button
-                    onClick={toggleFlyMode}
+                    onClick={e => {
+                      e.currentTarget.blur()
+                      toggleFlyMode()
+                    }}
                     className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium transition-all cursor-pointer ${
                       flyMode
                         ? 'bg-accent text-background font-semibold shadow-sm'

@@ -55,8 +55,8 @@ export default function Preview3D({ onExport }) {
   const toolInfo = TOOL_LABELS[activeTool] ?? TOOL_LABELS.pencil
 
   return (
-    <div className="relative w-full h-full select-none overflow-hidden">
-      <div ref={containerRef} className="w-full h-full" />
+    <div role="region" aria-label="3D voxel preview" className="relative w-full h-full select-none overflow-hidden">
+      <div ref={containerRef} className="w-full h-full" aria-hidden="true" />
 
       {/* Minecraft-style Center Crosshair */}
       {flyMode && (
@@ -83,7 +83,13 @@ export default function Preview3D({ onExport }) {
       {/* Quick Fly Mode Toggle Button */}
       {(is3DEdit || flyMode) && (
         <button
-          onClick={toggleFlyMode}
+          type="button"
+          aria-pressed={flyMode}
+          aria-label="Toggle free fly mode"
+          onClick={e => {
+            e.currentTarget.blur()
+            toggleFlyMode()
+          }}
           className={`absolute top-3 right-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-xl border backdrop-blur-md text-xs font-medium transition-all shadow-lg cursor-pointer ${
             flyMode
               ? 'border-accent bg-accent/25 text-accent ring-1 ring-accent/50'
@@ -99,14 +105,16 @@ export default function Preview3D({ onExport }) {
 
       {/* Fly Mode Unlocked Click-to-lock Notice */}
       {flyMode && !isPointerLocked && (
-        <div
+        <button
+          type="button"
+          aria-label="Lock mouse look in the 3D canvas"
           onClick={requestPointerLock}
           className="absolute top-12 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-accent/40 bg-black/75 backdrop-blur-md text-xs text-white/90 shadow-xl cursor-pointer hover:bg-black/85 hover:border-accent transition-all animate-bounce"
           style={{ animationDuration: '2.5s' }}
         >
           <span className="w-2 h-2 rounded-full bg-accent animate-ping" />
           <span>Click canvas to lock mouse look · <kbd className="font-mono text-accent">Esc</kbd> to unlock</span>
-        </div>
+        </button>
       )}
 
       {is3DEdit && isShapeEditing && (
@@ -116,6 +124,7 @@ export default function Preview3D({ onExport }) {
         >
           <span className="px-1.5 text-xs text-white/60 whitespace-nowrap">Drag the white and yellow handles</span>
           <button
+            type="button"
             onClick={cancelShape}
             className="flex items-center gap-1 px-2 py-1 rounded text-xs text-white/60 hover:text-red-300 hover:bg-red-950/50 transition-colors"
             title="Cancel shape (Esc)"
@@ -123,6 +132,7 @@ export default function Preview3D({ onExport }) {
             <X size={13} /> Cancel
           </button>
           <button
+            type="button"
             onClick={confirmShape}
             className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium"
             style={{ background: toolInfo.color, color: '#07120d' }}

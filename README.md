@@ -78,6 +78,7 @@ Synthwave · Steampunk · Cyberpunk · Blueprint · Watercolor
 | Controls | OrbitControls |
 | Icons | Lucide React |
 | Build | Vite |
+| Desktop | Tauri 2 + Rust/Cargo |
 
 ---
 
@@ -89,6 +90,23 @@ npm run dev
 ```
 
 Open [http://localhost:5173](http://localhost:5173)
+
+### Desktop app (Tauri)
+
+Install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your platform, then run:
+
+```bash
+npm install
+npm run tauri:dev
+```
+
+Create a native installer with:
+
+```bash
+npm run tauri:build
+```
+
+The Rust application lives in `src-tauri`. You can validate it independently with `npm run cargo:check`.
 
 ---
 

@@ -2,8 +2,50 @@ import { create } from 'zustand'
 import { rotateBox, scaleBox, shiftVoxelListDepth, getDefaultAnchor, getPresetAnchor } from '../lib/selectionTransform.js'
 import { clampBrushSize } from '../lib/brushFootprint.js'
 import {
-  areVoxelsInBounds, collectVoxelsInBox, flipVoxels, moveVoxels, rotateVoxels90,
-} from '../lib/voxelSelection3D.js'
+  OPPOSITE_VIEW,
+  applyEditBoundsAxisLocks,
+  boundsFromViewRect,
+  getExistingVoxelTargets,
+  getSurfaceVoxelTargets,
+  getThroughVoxelTargets,
+  getViewDepthSize,
+  getViewSize,
+  getVoxelTargets,
+  isVoxelInsideEditBounds,
+  makeFullEditBounds,
+} from './viewGeometry.js'
+import {
+  createLayer,
+  getCompositedMaterials,
+  getCompositedVoxels,
+  layerHasVoxel,
+  makeEmptyVoxels,
+  resizeLayerCanvases,
+  resizeLayerDepth,
+  syncLayerSequence,
+} from './layerModel.js'
+import { applyVoxelColor, applyVoxelMaterial, collectFloodFillTargets } from './voxelCommands.js'
+import { createHistorySlice } from './slices/historySlice.js'
+import { createLayerSlice } from './slices/layerSlice.js'
+import { createSelection3DSlice } from './slices/selection3DSlice.js'
+
+export { renderDepthMap2D, renderView2D } from './viewProjection.js'
+
+export { getCompositedMaterials, getCompositedVoxels } from './layerModel.js'
+
+export {
+  OPPOSITE_VIEW,
+  getExistingVoxelTargets,
+  getSurfaceVoxelTargets,
+  getThroughVoxelTargets,
+  getViewDepthSize,
+  getViewRayCoords,
+  getViewSize,
+  getVoxelTargets,
+  isVoxelInsideEditBounds,
+  makeFullEditBounds,
+  projectEditBoundsToView,
+} from './viewGeometry.js'
 
 const DEFAULT_PALETTE = [
   // Blacks & whites
@@ -68,460 +110,9 @@ const CANVAS_W = 32
 const CANVAS_H = 32
 const DEPTH_D  = 5
 
-// voxels[y][x][z]
-function makeEmptyVoxels(W, H, D) {
-  return Array.from({ length: H }, () =>
-    Array.from({ length: W }, () => Array(D).fill('transparent'))
-  )
-}
-
-let _layerSeq = 0
-function makeLayer(W, H, D, name) {
-  _layerSeq++
-  return {
-    id: `layer-${_layerSeq}`,
-    name: name ?? `Layer ${_layerSeq}`,
-    visible: true,
-    opacity: 1,
-    voxels: makeEmptyVoxels(W, H, D),
-    voxelMaterials: {},  // 'y,x,z' → 'solid'|'emissive'|'neon'|'metal'|'glass'
-  }
-}
-
-function snapshotLayers(layers) {
-  return layers.map(l => ({
-    ...l,
-    voxels: l.voxels.map(plane => plane.map(row => [...row])),
-    voxelMaterials: { ...l.voxelMaterials },
-  }))
-}
-
-function snapshotHistory(state) {
-  return {
-    layers: snapshotLayers(state.layers),
-    editBounds: { ...state.editBounds },
-    editBoundsEnabled: state.editBoundsEnabled,
-  }
-}
-
-// ── View helpers (exported for canvas rendering) ───────────────────────────────
-
-/**
- * Composite all visible layers into a single voxels grid.
- * layers[0] = bottom, layers[last] = top.
- */
-export function getCompositedVoxels(layers, W, H, D) {
-  const result = makeEmptyVoxels(W, H, D)
-  for (const layer of layers) {
-    if (!layer.visible) continue
-    for (let y = 0; y < H; y++)
-      for (let x = 0; x < W; x++)
-        for (let z = 0; z < D; z++) {
-          const c = layer.voxels[y]?.[x]?.[z]
-          if (c && c !== 'transparent') result[y][x][z] = c
-        }
-  }
-  return result
-}
-
-/**
- * Composite voxelMaterials from all visible layers into a flat map { 'y,x,z': matType }.
- * Only non-solid entries are stored. Upper layers override lower.
- */
-export function getCompositedMaterials(layers) {
-  const result = {}
-  for (const layer of layers) {
-    if (!layer.visible) continue
-    for (const [key, mat] of Object.entries(layer.voxelMaterials || {})) {
-      if (mat && mat !== 'solid') result[key] = mat
-      else if (mat === 'solid') delete result[key]
-    }
-  }
-  return result
-}
-
-/**
- * Canvas pixel dimensions for each of the 6 views.
- * Front/Back: W×H  |  Left/Right: D×H  |  Top/Bottom: W×D
- */
-export function getViewSize(view, W, H, D) {
-  if (view === 'top'   || view === 'bottom') return { w: W, h: D }
-  if (view === 'left'  || view === 'right')  return { w: D, h: H }
-  return { w: W, h: H } // front, back
-}
-
-export function getViewDepthSize(view, W, H, D) {
-  if (view === 'left' || view === 'right') return W
-  if (view === 'top' || view === 'bottom') return H
-  return D
-}
-
-export function makeFullEditBounds(W, H, D) {
-  return { minX: 0, maxX: W - 1, minY: 0, maxY: H - 1, minZ: 0, maxZ: D - 1 }
-}
-
-export function isVoxelInsideEditBounds(x, y, z, bounds) {
-  return !bounds || (
-    x >= bounds.minX && x <= bounds.maxX &&
-    y >= bounds.minY && y <= bounds.maxY &&
-    z >= bounds.minZ && z <= bounds.maxZ
-  )
-}
-
-/** Project the shared 3D edit box into the coordinate system of a 2D view. */
-export function projectEditBoundsToView(bounds, view, W, H, D) {
-  if (!bounds) bounds = makeFullEditBounds(W, H, D)
-  switch (view) {
-    case 'front':  return { x1: bounds.minX, y1: bounds.minY, x2: bounds.maxX, y2: bounds.maxY }
-    case 'back':   return { x1: W - 1 - bounds.maxX, y1: bounds.minY, x2: W - 1 - bounds.minX, y2: bounds.maxY }
-    case 'left':   return { x1: bounds.minZ, y1: bounds.minY, x2: bounds.maxZ, y2: bounds.maxY }
-    case 'right':  return { x1: D - 1 - bounds.maxZ, y1: bounds.minY, x2: D - 1 - bounds.minZ, y2: bounds.maxY }
-    case 'top':
-    case 'bottom': return { x1: bounds.minX, y1: bounds.minZ, x2: bounds.maxX, y2: bounds.maxZ }
-    default:       return { x1: 0, y1: 0, x2: W - 1, y2: H - 1 }
-  }
-}
-
-function boundsFromViewRect(bounds, view, rect, W, H, D) {
-  const next = { ...(bounds || makeFullEditBounds(W, H, D)) }
-  const x1 = Math.min(rect.x1, rect.x2), x2 = Math.max(rect.x1, rect.x2)
-  const y1 = Math.min(rect.y1, rect.y2), y2 = Math.max(rect.y1, rect.y2)
-  if (view === 'front') Object.assign(next, { minX: x1, maxX: x2, minY: y1, maxY: y2 })
-  if (view === 'back') Object.assign(next, { minX: W - 1 - x2, maxX: W - 1 - x1, minY: y1, maxY: y2 })
-  if (view === 'left') Object.assign(next, { minZ: x1, maxZ: x2, minY: y1, maxY: y2 })
-  if (view === 'right') Object.assign(next, { minZ: D - 1 - x2, maxZ: D - 1 - x1, minY: y1, maxY: y2 })
-  if (view === 'top' || view === 'bottom') Object.assign(next, { minX: x1, maxX: x2, minZ: y1, maxZ: y2 })
-  return next
-}
-
-function applyEditBoundsAxisLocks(current, next, locks = {}) {
-  const result = { ...next }
-  for (const axis of ['X', 'Y', 'Z']) {
-    if (!locks[axis.toLowerCase()]) continue
-    result[`min${axis}`] = current[`min${axis}`]
-    result[`max${axis}`] = current[`max${axis}`]
-  }
-  return result
-}
-
-/** Compute 2D projection for any of the 6 views. Returns grid[row][col] of colors. */
-export function renderView2D(voxels, view, W, H, D) {
-  switch (view) {
-    case 'front':
-      // Camera is at +Z. High z = closest to camera = rendered first.
-      return Array.from({ length: H }, (_, y) =>
-        Array.from({ length: W }, (_, x) => {
-          for (let z = D - 1; z >= 0; z--) {
-            const c = voxels[y]?.[x]?.[z]
-            if (c && c !== 'transparent') return c
-          }
-          return 'transparent'
-        })
-      )
-
-    case 'back':
-      // Camera is at -Z. Low z = closest to camera = rendered first.
-      return Array.from({ length: H }, (_, y) =>
-        Array.from({ length: W }, (_, col) => {
-          const x = W - 1 - col
-          for (let z = 0; z < D; z++) {
-            const c = voxels[y]?.[x]?.[z]
-            if (c && c !== 'transparent') return c
-          }
-          return 'transparent'
-        })
-      )
-
-    case 'left':
-      return Array.from({ length: H }, (_, y) =>
-        Array.from({ length: D }, (_, z) => {
-          for (let x = 0; x < W; x++) {
-            const c = voxels[y]?.[x]?.[z]
-            if (c && c !== 'transparent') return c
-          }
-          return 'transparent'
-        })
-      )
-
-    case 'right':
-      return Array.from({ length: H }, (_, y) =>
-        Array.from({ length: D }, (_, col) => {
-          const z = D - 1 - col
-          for (let x = W - 1; x >= 0; x--) {
-            const c = voxels[y]?.[x]?.[z]
-            if (c && c !== 'transparent') return c
-          }
-          return 'transparent'
-        })
-      )
-
-    case 'top':
-      return Array.from({ length: D }, (_, z) =>
-        Array.from({ length: W }, (_, x) => {
-          for (let y = 0; y < H; y++) {
-            const c = voxels[y]?.[x]?.[z]
-            if (c && c !== 'transparent') return c
-          }
-          return 'transparent'
-        })
-      )
-
-    case 'bottom':
-      return Array.from({ length: D }, (_, z) =>
-        Array.from({ length: W }, (_, x) => {
-          for (let y = H - 1; y >= 0; y--) {
-            const c = voxels[y]?.[x]?.[z]
-            if (c && c !== 'transparent') return c
-          }
-          return 'transparent'
-        })
-      )
-
-    default:
-      return []
-  }
-}
-
-/**
- * Returns a 2D grid of depth-axis values (number | null) for the frontmost
- * visible voxel in each canvas cell. null = transparent (no voxel).
- * Front/back: signed offset from center (Math.floor(D/2)). Side views: axis coordinate.
- */
-export function renderDepthMap2D(voxels, view, W, H, D) {
-  const center = Math.floor(D / 2)
-  switch (view) {
-    case 'front':
-      return Array.from({ length: H }, (_, y) =>
-        Array.from({ length: W }, (_, x) => {
-          for (let z = D - 1; z >= 0; z--) if (voxels[y]?.[x]?.[z] && voxels[y][x][z] !== 'transparent') return z - center
-          return null
-        })
-      )
-    case 'back':
-      return Array.from({ length: H }, (_, y) =>
-        Array.from({ length: W }, (_, col) => {
-          const x = W - 1 - col
-          for (let z = 0; z < D; z++) if (voxels[y]?.[x]?.[z] && voxels[y][x][z] !== 'transparent') return z - center
-          return null
-        })
-      )
-    case 'left':
-      return Array.from({ length: H }, (_, y) =>
-        Array.from({ length: D }, (_, z) => {
-          for (let x = 0; x < W; x++) if (voxels[y]?.[x]?.[z] && voxels[y][x][z] !== 'transparent') return x
-          return null
-        })
-      )
-    case 'right':
-      return Array.from({ length: H }, (_, y) =>
-        Array.from({ length: D }, (_, col) => {
-          const z = D - 1 - col
-          for (let x = W - 1; x >= 0; x--) if (voxels[y]?.[x]?.[z] && voxels[y][x][z] !== 'transparent') return W - 1 - x
-          return null
-        })
-      )
-    case 'top':
-      return Array.from({ length: D }, (_, z) =>
-        Array.from({ length: W }, (_, x) => {
-          for (let y = 0; y < H; y++) if (voxels[y]?.[x]?.[z] && voxels[y][x][z] !== 'transparent') return y
-          return null
-        })
-      )
-    case 'bottom':
-      return Array.from({ length: D }, (_, z) =>
-        Array.from({ length: W }, (_, x) => {
-          for (let y = H - 1; y >= 0; y--) if (voxels[y]?.[x]?.[z] && voxels[y][x][z] !== 'transparent') return H - 1 - y
-          return null
-        })
-      )
-    default:
-      return []
-  }
-}
-
-// Maps each view to its opposite face view
-export const OPPOSITE_VIEW = {
-  front: 'back',  back: 'front',
-  left:  'right', right: 'left',
-  top:   'bottom', bottom: 'top',
-}
-
-/**
- * Returns voxel coords {x,y,z}[] to paint when the user clicks
- * canvas pixel (col, row) in the given view.
- * Front/back are now face-based (start from the visible surface, go inward).
- */
-export function getVoxelTargets(col, row, view, paintDepth, W, H, D, bounds = null, range = null) {
-  const ray = getViewRayCoords(col, row, view, W, H, D, bounds)
-  const start = Math.max(1, Math.round(range?.start ?? 1))
-  const end = Math.max(start, Math.round(range?.end ?? paintDepth))
-  const direction = range?.direction ?? 'inward'
-  const slice = source => source.slice(start - 1, end)
-  if (direction === 'outward') return slice([...ray].reverse())
-  if (direction === 'both') {
-    const targets = [...slice(ray), ...slice([...ray].reverse())]
-    return targets.filter((voxel, index) => targets.findIndex(other =>
-      other.x === voxel.x && other.y === voxel.y && other.z === voxel.z
-    ) === index)
-  }
-  return slice(ray)
-}
-
-// ── Non-front view helpers ─────────────────────────────────────────────────────
-
-/**
- * For non-front views: find existing (already occupied) voxels along the
- * view ray at canvas position (col, row), returning up to `maxCount`.
- * Used for pencil (recolor nearest) and eraser (remove nearest).
- */
-export function getExistingVoxelTargets(voxels, col, row, view, maxCount, W, H, D, bounds = null) {
-  const results = []
-  const b = bounds || makeFullEditBounds(W, H, D)
-
-  const push = (x, y, z) => {
-    if (!isVoxelInsideEditBounds(x, y, z, b)) return false
-    const c = voxels[y]?.[x]?.[z]
-    if (c && c !== 'transparent') results.push({ x, y, z })
-    return results.length >= maxCount
-  }
-
-  if (view === 'front') {
-    for (let z = b.maxZ; z >= b.minZ; z--) { if (push(col, row, z)) break }
-  } else if (view === 'back') {
-    // Back camera is at -Z: z=0 is closest to the back camera, scan upward.
-    const x = W - 1 - col
-    for (let z = b.minZ; z <= b.maxZ; z++) { if (push(x, row, z)) break }
-  } else if (view === 'left') {
-    for (let x = b.minX; x <= b.maxX; x++) { if (push(x, row, col)) break }
-  } else if (view === 'right') {
-    const z = D - 1 - col
-    for (let x = b.maxX; x >= b.minX; x--) { if (push(x, row, z)) break }
-  } else if (view === 'top') {
-    for (let y = b.minY; y <= b.maxY; y++) { if (push(col, y, row)) break }
-  } else if (view === 'bottom') {
-    for (let y = b.maxY; y >= b.minY; y--) { if (push(col, y, row)) break }
-  }
-
-  return results
-}
-
-/** Ordered camera-to-back voxel coordinates for one canvas ray. */
-export function getViewRayCoords(col, row, view, W, H, D, bounds = null) {
-  const b = bounds || makeFullEditBounds(W, H, D)
-  const result = []
-  const add = (x, y, z) => {
-    if (isVoxelInsideEditBounds(x, y, z, b)) result.push({ x, y, z })
-  }
-  if (view === 'front')  for (let z = b.maxZ; z >= b.minZ; z--) add(col, row, z)
-  if (view === 'back')   for (let z = b.minZ; z <= b.maxZ; z++) add(W - 1 - col, row, z)
-  if (view === 'left')   for (let x = b.minX; x <= b.maxX; x++) add(x, row, col)
-  if (view === 'right')  for (let x = b.maxX; x >= b.minX; x--) add(x, row, D - 1 - col)
-  if (view === 'top')    for (let y = b.minY; y <= b.maxY; y++) add(col, y, row)
-  if (view === 'bottom') for (let y = b.maxY; y >= b.minY; y--) add(col, y, row)
-  return result
-}
-
-export function getThroughVoxelTargets(voxels, col, row, view, variant, W, H, D, bounds = null) {
-  const ray = getViewRayCoords(col, row, view, W, H, D, bounds)
-  if (variant === 'solid') return ray
-  const occupied = voxel => {
-    const color = voxels[voxel.y]?.[voxel.x]?.[voxel.z]
-    return Boolean(color && color !== 'transparent')
-  }
-  if (variant === 'contiguous') {
-    const result = []
-    let started = false
-    for (const voxel of ray) {
-      if (!occupied(voxel)) {
-        if (started) break
-        continue
-      }
-      started = true
-      result.push(voxel)
-    }
-    return result
-  }
-  return ray.filter(occupied)
-}
-
-/**
- * For side views (left/right/top/bottom) in draw mode:
- * Scans the ray from the camera and returns empty voxel position(s) just in
- * front of the first visible surface (toward the camera). Falls back to the
- * face position when the ray is fully empty.
- */
-export function getSurfaceVoxelTargets(voxels, col, row, view, paintDepth, W, H, D, bounds = null, range = null) {
-  const results = []
-  const b = bounds || makeFullEditBounds(W, H, D)
-
-  // Scan from fromIdx toward toIdx (inclusive). getCoords(i) → [x, y, z].
-  // Finds the first filled voxel and places paintDepth slots just in front of it.
-  const scanAndPlace = (fromIdx, toIdx, getCoords) => {
-    const dir = fromIdx <= toIdx ? 1 : -1
-    let surfaceI = null
-    for (let i = fromIdx; dir > 0 ? i <= toIdx : i >= toIdx; i += dir) {
-      const [x, y, z] = getCoords(i)
-      const c = voxels[y]?.[x]?.[z]
-      if (c && c !== 'transparent') { surfaceI = i; break }
-    }
-    // Start placing one step in front of surface (toward camera), or at face if empty.
-    const startI = surfaceI !== null ? surfaceI - dir : fromIdx
-    const startDepth = Math.max(1, Math.round(range?.start ?? 1))
-    const endDepth = Math.max(startDepth, Math.round(range?.end ?? paintDepth))
-    const direction = range?.direction ?? 'outward'
-    const offsets = []
-    for (let d = startDepth - 1; d < endDepth; d++) {
-      if (direction === 'inward' || direction === 'both') offsets.push(dir * d)
-      if (direction === 'outward' || direction === 'both') offsets.push(-dir * d)
-    }
-    for (const offset of [...new Set(offsets)]) {
-      const [x, y, z] = getCoords(startI + offset)
-      if (x >= 0 && x < W && y >= 0 && y < H && z >= 0 && z < D)
-        if (!results.some(t => t.x === x && t.y === y && t.z === z))
-          results.push({ x, y, z })
-    }
-  }
-
-  switch (view) {
-    case 'front':  scanAndPlace(b.maxZ, b.minZ, i => [col, row, i           ]); break
-    // Back camera at -Z: z=0 is the face closest to back camera, scan inward toward z=D-1.
-    case 'back':   scanAndPlace(b.minZ, b.maxZ, i => [W - 1 - col, row, i   ]); break
-    case 'left':   scanAndPlace(b.minX, b.maxX, i => [i, row, col           ]); break
-    case 'right':  scanAndPlace(b.maxX, b.minX, i => [i, row, D - 1 - col   ]); break
-    case 'top':    scanAndPlace(b.minY, b.maxY, i => [col, i, row           ]); break
-    case 'bottom': scanAndPlace(b.maxY, b.minY, i => [col, i, row           ]); break
-    default:       return getVoxelTargets(col, row, view, paintDepth, W, H, D, b)
-  }
-
-  return results
-}
-
 // ── Store ──────────────────────────────────────────────────────────────────────
 
-const _initLayer = makeLayer(CANVAS_W, CANVAS_H, DEPTH_D)
-
-function layerHasVoxel(layer, x, y, z) {
-  const color = layer?.voxels?.[y]?.[x]?.[z]
-  return Boolean(color && color !== 'transparent')
-}
-
-function resolveOperationLayerIndexes(layers, activeLayerId, scope, voxel) {
-  const activeIdx = layers.findIndex(layer => layer.id === activeLayerId)
-  if (activeIdx < 0) return []
-  if (scope === 'all-visible') {
-    const occupied = layers
-      .map((layer, index) => ({ layer, index }))
-      .filter(({ layer }) => layer.visible && layerHasVoxel(layer, voxel.x, voxel.y, voxel.z))
-      .map(({ index }) => index)
-    return occupied.length ? occupied : [activeIdx]
-  }
-  if (scope === 'topmost') {
-    for (let index = layers.length - 1; index >= 0; index--) {
-      if (layers[index].visible && layerHasVoxel(layers[index], voxel.x, voxel.y, voxel.z)) return [index]
-    }
-  }
-  return [activeIdx]
-}
+const _initLayer = createLayer(CANVAS_W, CANVAS_H, DEPTH_D)
 
 export const useStore = create((set, get) => ({
   // ── Canvas / Voxels ──────────────────────────────────────────────────────────
@@ -531,8 +122,6 @@ export const useStore = create((set, get) => ({
   editBoundsEnabled: false,
   editBounds: makeFullEditBounds(CANVAS_W, CANVAS_H, DEPTH_D),
   editBoundsAxisLocks: { x: false, y: false, z: false },
-  layers:         [_initLayer],
-  activeLayerId:  _initLayer.id,
   pixelSize:      14,
   showGrid:       true,
   currentColor:   '#c8860a',
@@ -540,8 +129,9 @@ export const useStore = create((set, get) => ({
   blendEndColor:  '#003366',
   palette:        DEFAULT_PALETTE,
   recentColors:   [],
-  undoStack:      [],
-  redoStack:      [],
+  ...createLayerSlice(set, get, _initLayer),
+  ...createHistorySlice(set, get),
+  ...createSelection3DSlice(set, get),
 
   setEditBoundsEnabled(enabled) {
     get().pushUndo()
@@ -637,24 +227,6 @@ export const useStore = create((set, get) => ({
     if (!next) return
     get().pushUndo()
     get().setEditBounds(applyEditBoundsAxisLocks(editBounds, next, editBoundsAxisLocks))
-  },
-
-  pushUndo() {
-    const state = get()
-    set({ undoStack: [...state.undoStack.slice(-49), snapshotHistory(state)], redoStack: [] })
-  },
-
-  beginUndoTransaction() {
-    const state = get()
-    const token = { layers: state.layers, undoStack: state.undoStack, redoStack: state.redoStack }
-    get().pushUndo()
-    return token
-  },
-
-  finishUndoTransaction(token) {
-    if (!token || get().layers !== token.layers) return true
-    set({ undoStack: token.undoStack, redoStack: token.redoStack })
-    return false
   },
 
   confirmLargeOperation(label, affectedCount) {
@@ -902,20 +474,9 @@ export const useStore = create((set, get) => ({
     } = get()
     get().pushUndo()
 
-    const offX = newW > W ? Math.floor((newW - W) / 2) : 0
-    const offY = newH > H ? Math.floor((newH - H) / 2) : 0
-
-    const newLayers = layers.map(layer => {
-      const next = makeEmptyVoxels(newW, newH, D)
-      for (let y = 0; y < H; y++)
-        for (let x = 0; x < W; x++)
-          for (let z = 0; z < D; z++) {
-            const ny = y + offY, nx = x + offX
-            if (ny >= 0 && ny < newH && nx >= 0 && nx < newW)
-              next[ny][nx][z] = layer.voxels[y][x][z]
-          }
-      return { ...layer, voxels: next }
-    })
+    const { layers: newLayers, offsetX: offX, offsetY: offY } = resizeLayerCanvases(
+      layers, W, H, newW, newH, D,
+    )
 
     const planeSize = planeAxis === 'x' ? newW : planeAxis === 'y' ? newH : D
     const maxPaintDepth = getViewDepthSize(activeView, newW, newH, D)
@@ -946,17 +507,7 @@ export const useStore = create((set, get) => ({
     } = get()
     get().pushUndo()
 
-    const offZ = newD > D ? Math.floor((newD - D) / 2) : 0
-    const newLayers = layers.map(layer => {
-      const next = makeEmptyVoxels(W, H, newD)
-      for (let y = 0; y < H; y++)
-        for (let x = 0; x < W; x++)
-          for (let z = 0; z < D; z++) {
-            const nz = z + offZ
-            if (nz >= 0 && nz < newD) next[y][x][nz] = layer.voxels[y][x][z]
-          }
-      return { ...layer, voxels: next }
-    })
+    const { layers: newLayers, offsetZ: offZ } = resizeLayerDepth(layers, W, H, D, newD)
 
     const maxPaintDepth = getViewDepthSize(activeView, W, H, newD)
     set({
@@ -976,34 +527,6 @@ export const useStore = create((set, get) => ({
     })
   },
 
-  undo() {
-    const state = get()
-    const { undoStack, redoStack } = state
-    if (!undoStack.length) return
-    const prev = undoStack[undoStack.length - 1]
-    set({
-      layers:    prev.layers,
-      editBounds: prev.editBounds,
-      editBoundsEnabled: prev.editBoundsEnabled,
-      undoStack: undoStack.slice(0, -1),
-      redoStack: [...redoStack.slice(-49), snapshotHistory(state)],
-    })
-  },
-
-  redo() {
-    const state = get()
-    const { redoStack, undoStack } = state
-    if (!redoStack.length) return
-    const next = redoStack[redoStack.length - 1]
-    set({
-      layers:    next.layers,
-      editBounds: next.editBounds,
-      editBoundsEnabled: next.editBoundsEnabled,
-      redoStack: redoStack.slice(0, -1),
-      undoStack: [...undoStack.slice(-49), snapshotHistory(state)],
-    })
-  },
-
   addToPalette(color) {
     const { palette } = get()
     if (!palette.includes(color)) set({ palette: [...palette, color] })
@@ -1020,43 +543,12 @@ export const useStore = create((set, get) => ({
       layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D,
       editBoundsEnabled, editBounds, operationLayerScope,
     } = get()
-    const unique = new Map()
-    for (const voxel of targets || []) {
-      const x = Math.round(voxel.x), y = Math.round(voxel.y), z = Math.round(voxel.z)
-      if (x < 0 || x >= W || y < 0 || y >= H || z < 0 || z >= D) continue
-      if (editBoundsEnabled && !isVoxelInsideEditBounds(x, y, z, editBounds)) continue
-      unique.set(`${x},${y},${z}`, { x, y, z })
-    }
-    if (!unique.size) return
-
-    const assignments = new Map()
-    for (const voxel of unique.values()) {
-      for (const layerIdx of resolveOperationLayerIndexes(layers, activeLayerId, operationLayerScope, voxel)) {
-        const currentColor = layers[layerIdx]?.voxels?.[voxel.y]?.[voxel.x]?.[voxel.z] ?? 'transparent'
-        const materialKey = `${voxel.y},${voxel.x},${voxel.z}`
-        const removesMaterial = color === 'transparent' && Boolean(layers[layerIdx]?.voxelMaterials?.[materialKey])
-        if (currentColor === color && !removesMaterial) continue
-        if (!assignments.has(layerIdx)) assignments.set(layerIdx, [])
-        assignments.get(layerIdx).push(voxel)
-      }
-    }
-    if (!assignments.size) return
-
-    const newLayers = [...layers]
-    for (const [layerIdx, voxelsToPaint] of assignments) {
-      const layer = layers[layerIdx]
-      const affectedY = new Set(voxelsToPaint.map(voxel => voxel.y))
-      const voxels = layer.voxels.map((plane, iy) =>
-        affectedY.has(iy) ? plane.map(xRow => [...xRow]) : plane
-      )
-      const voxelMaterials = { ...(layer.voxelMaterials || {}) }
-      for (const { x, y, z } of voxelsToPaint) {
-        voxels[y][x][z] = color
-        if (color === 'transparent') delete voxelMaterials[`${y},${x},${z}`]
-      }
-      newLayers[layerIdx] = { ...layer, voxels, voxelMaterials }
-    }
-    set({ layers: newLayers })
+    const result = applyVoxelColor({
+      layers, activeLayerId, scope: operationLayerScope, targets, color,
+      width: W, height: H, depth: D,
+      bounds: editBoundsEnabled ? editBounds : null,
+    })
+    if (result) set({ layers: result.layers })
   },
 
   /** Flood-fill existing voxels from a picked face in the 3D editor.
@@ -1074,148 +566,14 @@ export const useStore = create((set, get) => ({
     if (layerIdx < 0) return
 
     const composited = getCompositedVoxels(layers, W, H, D)
-    const targetColor = composited[y]?.[x]?.[z]
-    if (!targetColor || targetColor === 'transparent' || targetColor === newColor) return
-
-    const inside = (vx, vy, vz) => vx >= 0 && vx < W && vy >= 0 && vy < H && vz >= 0 && vz < D &&
-      (!editBoundsEnabled || isVoxelInsideEditBounds(vx, vy, vz, editBounds))
-    const colorAt = (vx, vy, vz) => inside(vx, vy, vz) ? composited[vy][vx][vz] : 'transparent'
-    const targets = []
-    const visited = new Set()
-    const stack = [[x, y, z]]
-
-    if (fillScope === 'all') {
-      const neighbors = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]]
-      while (stack.length) {
-        const [vx, vy, vz] = stack.pop()
-        const key = `${vx},${vy},${vz}`
-        if (visited.has(key) || colorAt(vx, vy, vz) !== targetColor) continue
-        visited.add(key)
-        targets.push({ x: vx, y: vy, z: vz })
-        for (const [dx, dy, dz] of neighbors) stack.push([vx + dx, vy + dy, vz + dz])
-      }
-    } else {
-      const normal = faceNormal || { x: 0, y: 0, z: 1 }
-      const abs = [Math.abs(normal.x || 0), Math.abs(normal.y || 0), Math.abs(normal.z || 0)]
-      const axis = abs[0] >= abs[1] && abs[0] >= abs[2] ? 'x' : abs[1] >= abs[2] ? 'y' : 'z'
-      const sign = (normal[axis] || 0) >= 0 ? 1 : -1
-      // World +Y points toward decreasing voxel Y.
-      const outward = axis === 'x' ? [sign, 0, 0] : axis === 'y' ? [0, -sign, 0] : [0, 0, sign]
-      const planeNeighbors = axis === 'x'
-        ? [[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]]
-        : axis === 'y'
-          ? [[1,0,0],[-1,0,0],[0,0,1],[0,0,-1]]
-          : [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0]]
-      const planeValue = axis === 'x' ? x : axis === 'y' ? y : z
-
-      while (stack.length) {
-        const [vx, vy, vz] = stack.pop()
-        const key = `${vx},${vy},${vz}`
-        if (visited.has(key)) continue
-        visited.add(key)
-        if ((axis === 'x' ? vx : axis === 'y' ? vy : vz) !== planeValue) continue
-        if (colorAt(vx, vy, vz) !== targetColor) continue
-        if (colorAt(vx + outward[0], vy + outward[1], vz + outward[2]) !== 'transparent') continue
-        targets.push({ x: vx, y: vy, z: vz })
-        for (const [dx, dy, dz] of planeNeighbors) stack.push([vx + dx, vy + dy, vz + dz])
-      }
-    }
-
+    if (composited[y]?.[x]?.[z] === newColor) return
+    const targets = collectFloodFillTargets({
+      voxels: composited, start: { x, y, z }, scope: fillScope, faceNormal,
+      width: W, height: H, depth: D,
+      bounds: editBoundsEnabled ? editBounds : null,
+    })
     if (!targets.length) return
     get().paintVoxelsDirect(targets, newColor)
-  },
-
-  // ── Layer actions ─────────────────────────────────────────────────────────────
-
-  addLayer() {
-    const { layers, canvasWidth: W, canvasHeight: H, depthDimension: D } = get()
-    const newLayer = makeLayer(W, H, D)
-    set({ layers: [...layers, newLayer], activeLayerId: newLayer.id })
-  },
-
-  deleteLayer(id) {
-    const { layers, activeLayerId } = get()
-    if (layers.length <= 1) return
-    const newLayers = layers.filter(l => l.id !== id)
-    const newActive = id === activeLayerId
-      ? (newLayers[newLayers.length - 1]?.id ?? newLayers[0].id)
-      : activeLayerId
-    set({ layers: newLayers, activeLayerId: newActive })
-  },
-
-  setActiveLayer:    (id) => set({ activeLayerId: id }),
-
-  toggleLayerVisible(id) {
-    const { layers } = get()
-    set({ layers: layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l) })
-  },
-
-  renameLayer(id, name) {
-    const { layers } = get()
-    set({ layers: layers.map(l => l.id === id ? { ...l, name: name.trim() || l.name } : l) })
-  },
-
-  moveLayerUp(id) {
-    const { layers } = get()
-    const idx = layers.findIndex(l => l.id === id)
-    if (idx >= layers.length - 1) return
-    const next = [...layers]
-    ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
-    set({ layers: next })
-  },
-
-  moveLayerDown(id) {
-    const { layers } = get()
-    const idx = layers.findIndex(l => l.id === id)
-    if (idx <= 0) return
-    const next = [...layers]
-    ;[next[idx], next[idx - 1]] = [next[idx - 1], next[idx]]
-    set({ layers: next })
-  },
-
-  duplicateLayer(id) {
-    const { layers } = get()
-    const idx = layers.findIndex(l => l.id === id)
-    if (idx < 0) return
-    const src = layers[idx]
-    _layerSeq++
-    const dup = {
-      ...src,
-      id: `layer-${_layerSeq}`,
-      name: `${src.name} copy`,
-      voxels: src.voxels.map(plane => plane.map(row => [...row])),
-      voxelMaterials: { ...src.voxelMaterials },
-    }
-    const next = [...layers]
-    next.splice(idx + 1, 0, dup)
-    set({ layers: next, activeLayerId: dup.id })
-  },
-
-  setLayerOpacity(id, opacity) {
-    const { layers } = get()
-    set({ layers: layers.map(l => l.id === id ? { ...l, opacity: Math.max(0, Math.min(1, opacity)) } : l) })
-  },
-
-  mergeLayers() {
-    const { layers, canvasWidth: W, canvasHeight: H, depthDimension: D } = get()
-    const visible = layers.filter(l => l.visible)
-    if (visible.length <= 1) return
-    get().pushUndo()
-    const merged = makeEmptyVoxels(W, H, D)
-    for (const layer of visible) {
-      for (let y = 0; y < H; y++)
-        for (let x = 0; x < W; x++)
-          for (let z = 0; z < D; z++) {
-            const c = layer.voxels[y]?.[x]?.[z]
-            if (c && c !== 'transparent') merged[y][x][z] = c
-          }
-    }
-    _layerSeq++
-    const mergedLayer = {
-      id: `layer-${_layerSeq}`, name: 'Merged', visible: true, opacity: 1,
-      voxels: merged, voxelMaterials: {},
-    }
-    set({ layers: [mergedLayer, ...layers.filter(l => !l.visible)], activeLayerId: mergedLayer.id })
   },
 
   // ── Voxel view ───────────────────────────────────────────────────────────────
@@ -1350,41 +708,12 @@ export const useStore = create((set, get) => ({
       layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D,
       activeMaterial, editBoundsEnabled, editBounds, operationLayerScope,
     } = get()
-    const layerIdx = layers.findIndex(l => l.id === activeLayerId)
-    if (layerIdx < 0) return
-    const composited = getCompositedVoxels(layers, W, H, D)
-    const visited = new Set()
-    const assignments = new Map()
-    for (const voxel of targets || []) {
-      const x = Math.round(voxel.x), y = Math.round(voxel.y), z = Math.round(voxel.z)
-      if (x < 0 || x >= W || y < 0 || y >= H || z < 0 || z >= D) continue
-      if (editBoundsEnabled && !isVoxelInsideEditBounds(x, y, z, editBounds)) continue
-      const voxelKey = `${x},${y},${z}`
-      if (visited.has(voxelKey)) continue
-      visited.add(voxelKey)
-      if (!composited[y]?.[x]?.[z] || composited[y][x][z] === 'transparent') continue
-      for (const targetLayerIdx of resolveOperationLayerIndexes(layers, activeLayerId, operationLayerScope, { x, y, z })) {
-        if (!layerHasVoxel(layers[targetLayerIdx], x, y, z)) continue
-        const materialKey = `${y},${x},${z}`
-        const currentMaterial = layers[targetLayerIdx].voxelMaterials?.[materialKey] ?? 'solid'
-        if (currentMaterial === activeMaterial) continue
-        if (!assignments.has(targetLayerIdx)) assignments.set(targetLayerIdx, [])
-        assignments.get(targetLayerIdx).push({ x, y, z })
-      }
-    }
-    if (!assignments.size) return
-    const newLayers = [...layers]
-    for (const [targetLayerIdx, voxels] of assignments) {
-      const layer = layers[targetLayerIdx]
-      const voxelMaterials = { ...(layer.voxelMaterials || {}) }
-      for (const { x, y, z } of voxels) {
-        const materialKey = `${y},${x},${z}`
-        if (activeMaterial === 'solid') delete voxelMaterials[materialKey]
-        else voxelMaterials[materialKey] = activeMaterial
-      }
-      newLayers[targetLayerIdx] = { ...layer, voxelMaterials }
-    }
-    set({ layers: newLayers })
+    const result = applyVoxelMaterial({
+      layers, activeLayerId, scope: operationLayerScope, targets, material: activeMaterial,
+      width: W, height: H, depth: D,
+      bounds: editBoundsEnabled ? editBounds : null,
+    })
+    if (result) set({ layers: result.layers })
   },
 
   // ── Reference image overlay ──────────────────────────────────────────────────
@@ -1435,6 +764,7 @@ export const useStore = create((set, get) => ({
     const W = data.canvasWidth ?? CANVAS_W
     const H = data.canvasHeight ?? CANVAS_H
     const D = data.depthDimension ?? DEPTH_D
+    syncLayerSequence(data.layers)
     set({
       layers:         data.layers,
       canvasWidth:    W,
@@ -1457,108 +787,6 @@ export const useStore = create((set, get) => ({
   },
 
   // ── Selection tool ───────────────────────────────────────────────────────────
-  selection3D: null, // {layerId, source: Voxel[], voxels: Voxel[]}
-
-  setSelection3DBox(start, end) {
-    const { layers, activeLayerId, editBoundsEnabled, editBounds } = get()
-    const layer = layers.find(item => item.id === activeLayerId)
-    const voxels = collectVoxelsInBox(layer, start, end).filter(v =>
-      !editBoundsEnabled || isVoxelInsideEditBounds(v.x, v.y, v.z, editBounds)
-    )
-    set({
-      selection3D: voxels.length
-        ? { layerId: activeLayerId, source: voxels.map(v => ({ ...v })), voxels }
-        : null,
-    })
-  },
-
-  clearSelection3D() {
-    set({ selection3D: null })
-  },
-
-  moveSelection3D(dx, dy, dz) {
-    const { selection3D, canvasWidth: W, canvasHeight: H, depthDimension: D, editBoundsEnabled, editBounds } = get()
-    if (!selection3D) return
-    const voxels = moveVoxels(selection3D.voxels, dx, dy, dz)
-    if (areVoxelsInBounds(voxels, W, H, D) && (!editBoundsEnabled || voxels.every(v => isVoxelInsideEditBounds(v.x, v.y, v.z, editBounds)))) set({ selection3D: { ...selection3D, voxels } })
-  },
-
-  flipSelection3D(axis) {
-    const { selection3D } = get()
-    if (!selection3D) return
-    set({ selection3D: { ...selection3D, voxels: flipVoxels(selection3D.voxels, axis) } })
-  },
-
-  rotateSelection3D(axis, direction = 1) {
-    const { selection3D, canvasWidth: W, canvasHeight: H, depthDimension: D, editBoundsEnabled, editBounds } = get()
-    if (!selection3D) return
-    const voxels = rotateVoxels90(selection3D.voxels, axis, direction)
-    if (areVoxelsInBounds(voxels, W, H, D) && (!editBoundsEnabled || voxels.every(v => isVoxelInsideEditBounds(v.x, v.y, v.z, editBounds)))) set({ selection3D: { ...selection3D, voxels } })
-  },
-
-  applySelection3D() {
-    const { selection3D, layers, canvasWidth: W, canvasHeight: H, depthDimension: D, editBoundsEnabled, editBounds } = get()
-    if (!selection3D || !areVoxelsInBounds(selection3D.voxels, W, H, D)) return
-    if (editBoundsEnabled && !selection3D.voxels.every(v => isVoxelInsideEditBounds(v.x, v.y, v.z, editBounds))) return
-    const layerIdx = layers.findIndex(layer => layer.id === selection3D.layerId)
-    if (layerIdx < 0) return
-    const affectedKeys = new Set([
-      ...selection3D.source.map(v => `${v.x},${v.y},${v.z}`),
-      ...selection3D.voxels.map(v => `${v.x},${v.y},${v.z}`),
-    ])
-    if (!get().confirmLargeOperation('Apply 3D selection transform?', affectedKeys.size)) return
-    get().pushUndo()
-    const layer = layers[layerIdx]
-    const affectedY = new Set([
-      ...selection3D.source.map(v => v.y),
-      ...selection3D.voxels.map(v => v.y),
-    ])
-    const voxels = layer.voxels.map((plane, y) =>
-      affectedY.has(y) ? plane.map(row => [...row]) : plane
-    )
-    const materials = { ...(layer.voxelMaterials || {}) }
-    for (const voxel of selection3D.source) {
-      voxels[voxel.y][voxel.x][voxel.z] = 'transparent'
-      delete materials[`${voxel.y},${voxel.x},${voxel.z}`]
-    }
-    for (const voxel of selection3D.voxels) {
-      voxels[voxel.y][voxel.x][voxel.z] = voxel.color
-      const key = `${voxel.y},${voxel.x},${voxel.z}`
-      if (voxel.material && voxel.material !== 'solid') materials[key] = voxel.material
-      else delete materials[key]
-    }
-    const nextLayers = [...layers]
-    nextLayers[layerIdx] = { ...layer, voxels, voxelMaterials: materials }
-    set({ layers: nextLayers, selection3D: null })
-  },
-
-  deleteSelection3D() {
-    const { selection3D, layers } = get()
-    if (!selection3D) return
-    const layerIdx = layers.findIndex(layer => layer.id === selection3D.layerId)
-    if (layerIdx < 0) return
-    const changedVoxels = selection3D.source.filter(v => layerHasVoxel(layers[layerIdx], v.x, v.y, v.z))
-    if (!changedVoxels.length) {
-      set({ selection3D: null })
-      return
-    }
-    if (!get().confirmLargeOperation('Delete 3D selection?', changedVoxels.length)) return
-    get().pushUndo()
-    const layer = layers[layerIdx]
-    const affectedY = new Set(changedVoxels.map(v => v.y))
-    const voxels = layer.voxels.map((plane, y) =>
-      affectedY.has(y) ? plane.map(row => [...row]) : plane
-    )
-    const materials = { ...(layer.voxelMaterials || {}) }
-    for (const voxel of changedVoxels) {
-      voxels[voxel.y][voxel.x][voxel.z] = 'transparent'
-      delete materials[`${voxel.y},${voxel.x},${voxel.z}`]
-    }
-    const nextLayers = [...layers]
-    nextLayers[layerIdx] = { ...layer, voxels, voxelMaterials: materials }
-    set({ layers: nextLayers, selection3D: null })
-  },
-
   selectionMode:   'rect', // 'rect' | 'lasso'
   selection:       null,   // {x1, y1, x2, y2, type, mask, polygon} in canvas 2D coords
   clipboard:       null,   // {w, h, colors: string[][]} visible colors

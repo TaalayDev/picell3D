@@ -6,95 +6,23 @@ import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { createChunkedVoxelMesh } from '../../lib/chunkedMeshBuilder.js'
 import {
-  SHAPE_TOOLS_3D, VOLUME_PRIMITIVE_TOOLS_3D,
-  dominantAxis, lockVoxelToPlane, compute3DShapeVoxels, computeVolumePrimitiveVoxels,
+  VOLUME_PRIMITIVE_TOOLS_3D, dominantAxis, lockVoxelToPlane,
 } from '../../lib/shapeRasterizer3D.js'
 import { samplePointerSegment } from '../../lib/strokeSampler.js'
 import { expandVoxelBrush } from '../../lib/brushFootprint.js'
 import { useStore, getCompositedVoxels, getCompositedMaterials } from '../../store/index.js'
-
-// ── 3D Edit helpers ────────────────────────────────────────────────────────────
-const EDIT_UNIT = 0.1           // must match chunkMesher.js VOXEL_UNIT
-const EDIT_EPS  = EDIT_UNIT * 0.6  // offset to step inside/outside a face
-const ALL_SHAPE_TOOLS_3D = new Set([...SHAPE_TOOLS_3D, ...VOLUME_PRIMITIVE_TOOLS_3D])
-const PLANE_DRAW_TOOLS = new Set(['pencil', 'eraser', 'material', 'blend', ...ALL_SHAPE_TOOLS_3D])
-const BRUSH_TOOLS_3D = new Set(['pencil', 'eraser', 'material', 'blend'])
-
-function isLockedPlaneActive(state) {
-  return state.planeLock && PLANE_DRAW_TOOLS.has(state.activeTool)
-}
-
-function computeShapeDragVoxels(drag, W, H, D) {
-  if (VOLUME_PRIMITIVE_TOOLS_3D.has(drag.tool)) {
-    return computeVolumePrimitiveVoxels(
-      drag.tool, drag.start, drag.end, drag.axis, W, H, D,
-      {
-        filled: drag.filled,
-        thickness: drag.thickness,
-        depth: drag.primitiveDepth,
-        direction: drag.direction,
-      },
-    )
-  }
-  return compute3DShapeVoxels(
-    drag.tool, drag.start, drag.end, drag.axis, W, H, D,
-    drag.filled, drag.thickness,
-  )
-}
-
-function worldToVoxel(wx, wy, wz, W, H, D) {
-  const x = Math.round(wx / EDIT_UNIT + W / 2 - 0.5)
-  const y = Math.round(H - 1 - (wy - EDIT_UNIT / 2) / EDIT_UNIT)
-  const z = Math.round(wz / EDIT_UNIT + D / 2 - 0.5)
-  return {
-    x: Math.max(0, Math.min(W - 1, x)),
-    y: Math.max(0, Math.min(H - 1, y)),
-    z: Math.max(0, Math.min(D - 1, z)),
-  }
-}
-
-function voxelCenterWorld(x, y, z, W, H, D) {
-  return new THREE.Vector3(
-    (x - W / 2 + 0.5) * EDIT_UNIT,
-    (H - 1 - y) * EDIT_UNIT + EDIT_UNIT / 2,
-    (z - D / 2 + 0.5) * EDIT_UNIT,
-  )
-}
-
-function getDrawingPlaneSpec(state) {
-  const { canvasWidth: W, canvasHeight: H, depthDimension: D } = state
-  const axis = state.planeAxis === 'x' || state.planeAxis === 'y' ? state.planeAxis : 'z'
-  const size = axis === 'x' ? W : axis === 'y' ? H : D
-  const depth = Math.max(0, Math.min(size - 1, Math.round(state.planeDepth)))
-  const center = axis === 'x'
-    ? voxelCenterWorld(depth, (H - 1) / 2, (D - 1) / 2, W, H, D)
-    : axis === 'y'
-      ? voxelCenterWorld((W - 1) / 2, depth, (D - 1) / 2, W, H, D)
-      : voxelCenterWorld((W - 1) / 2, (H - 1) / 2, depth, W, H, D)
-  const normal = axis === 'x'
-    ? new THREE.Vector3(1, 0, 0)
-    : axis === 'y' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1)
-  return {
-    axis,
-    depth,
-    center,
-    normal,
-    width: (axis === 'x' ? D : W) * EDIT_UNIT,
-    height: (axis === 'y' ? D : H) * EDIT_UNIT,
-    plane: new THREE.Plane().setFromNormalAndCoplanarPoint(normal, center),
-  }
-}
-
-function isPointInsideVoxelBounds(point, W, H, D) {
-  const eps = EDIT_UNIT * 0.02
-  return point.x >= -W * EDIT_UNIT / 2 - eps
-    && point.x <= W * EDIT_UNIT / 2 + eps
-    && point.y >= -eps
-    && point.y <= H * EDIT_UNIT + eps
-    && point.z >= -D * EDIT_UNIT / 2 - eps
-    && point.z <= D * EDIT_UNIT / 2 + eps
-}
-// ──────────────────────────────────────────────────────────────────────────────
+import {
+  ALL_SHAPE_TOOLS_3D,
+  BRUSH_TOOLS_3D,
+  EDIT_EPS,
+  EDIT_UNIT,
+  computeShapeDragVoxels,
+  getDrawingPlaneSpec,
+  isLockedPlaneActive,
+  isPointInsideVoxelBounds,
+  voxelCenterWorld,
+  worldToVoxel,
+} from './threeSceneGeometry.js'
 
 export function useThreeScene(containerRef) {
   const rendererRef     = useRef(null)
@@ -928,7 +856,7 @@ export function useThreeScene(containerRef) {
 
     // ── Keyboard: Space toggles between paint-drag and orbit-drag ─────
     const onKeyDown = (e) => {
-      if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(e.target?.tagName)) return
+      if (e.target instanceof Element && e.target.closest('input, textarea, select, button, a[href], [contenteditable="true"], [aria-modal="true"]')) return
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') shiftHeld = true
       if (isFlyMode) {
         if (e.code === 'KeyW' || e.key === 'ArrowUp') {

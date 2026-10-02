@@ -10,6 +10,8 @@ export default function ThemeSelector() {
       <div className="flex gap-1">
         {Object.values(THEMES).map(theme => (
           <button
+            type="button"
+            aria-pressed={activeTheme === theme.id}
             key={theme.id}
             className={`text-xs px-2 py-0.5 rounded border transition-all ${
               activeTheme === theme.id

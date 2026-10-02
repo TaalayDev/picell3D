@@ -148,7 +148,7 @@ export function useShapeInput(containerRef) {
   // ── Keyboard: Enter = commit, Escape = cancel ────────────────────────────────
   useEffect(() => {
     function onKey(e) {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      if (e.target instanceof Element && e.target.closest('input, textarea, select, button, a[href], [contenteditable="true"], [aria-modal="true"]')) return
       if (phase.current === 'editing') {
         if (e.key === 'Enter')  { e.preventDefault(); doCommit() }
         if (e.key === 'Escape') { e.preventDefault(); cancel() }

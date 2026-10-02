@@ -11,7 +11,7 @@ export default function StatusBar() {
   const shortcuts = ['P: Pencil', 'E: Eraser', 'F: Fill', 'G: Grid', 'Ctrl+Z: Undo']
 
   return (
-    <div className="flex items-center justify-between px-3 py-0.5 border-t border-border text-xs text-text-muted"
+    <div role="status" aria-live="polite" aria-atomic="false" className="flex items-center justify-between px-3 py-0.5 border-t border-border text-xs text-text-muted"
       style={{ background: 'var(--color-surface)' }}>
       <div className="flex items-center gap-3">
         <span className="font-mono">{canvasWidth}×{canvasHeight}×{depthDimension}</span>

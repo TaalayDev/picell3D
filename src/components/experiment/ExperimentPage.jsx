@@ -68,7 +68,7 @@ export default function ExperimentPage() {
 
   useEffect(() => {
     const onKeyDown = event => {
-      if (event.target instanceof HTMLInputElement) return
+      if (event.target instanceof Element && event.target.closest('input, textarea, select, button, a[href], [contenteditable="true"]')) return
       const key = event.key.toLowerCase()
       if (key === 'w') setMode('translate')
       if (key === 'e') setMode('rotate')
@@ -145,7 +145,7 @@ export default function ExperimentPage() {
     <div className="experiment-shell direct-model-lab">
       <header className="experiment-header">
         <div className="flex items-center gap-3 min-w-0">
-          <a href={window.electron?.isElectron ? './index.html' : '/'} className="experiment-icon-button" title="Back to Picell3D editor"><ArrowLeft size={17} /></a>
+          <a href="./index.html" className="experiment-icon-button" title="Back to Picell3D editor"><ArrowLeft size={17} /></a>
           <div className="experiment-mark"><Sparkles size={16} /></div>
           <div className="min-w-0">
             <div className="experiment-title">Assembly Lab <span>MODULAR KIT</span></div>

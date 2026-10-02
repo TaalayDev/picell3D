@@ -117,6 +117,7 @@ export default function ReferenceOverlay({ pixelSize }) {
       >
         <SlidersHorizontal size={9} style={{ flexShrink: 0 }} />
         <input
+          aria-label="Reference image opacity"
           type="range" min={5} max={90}
           value={Math.round(opacity * 100)}
           onChange={e => setReferenceImage({ ...referenceImage, opacity: e.target.value / 100 })}
@@ -127,6 +128,8 @@ export default function ReferenceOverlay({ pixelSize }) {
           {Math.round(opacity * 100)}%
         </span>
         <button
+          type="button"
+          aria-label="Remove reference image"
           onClick={clearReferenceImage}
           title="Remove reference"
           style={{ color: 'var(--color-text-muted)', lineHeight: 1, padding: '0 2px' }}

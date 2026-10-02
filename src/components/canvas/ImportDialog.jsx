@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { Upload, Layers, ImageIcon } from 'lucide-react'
 import { useStore } from '../../store/index.js'
 import { imageToPixelGrid, loadImageMeta } from '../../lib/imageImport.js'
+import { useModalAccessibility } from '../../hooks/useModalAccessibility.js'
 
 const SCALE_MODES = [
   { id: 'fit',     label: 'Fit'     },
@@ -10,6 +11,7 @@ const SCALE_MODES = [
 ]
 
 export default function ImportDialog({ onClose }) {
+  const dialogRef = useRef(null)
   const { canvasWidth: W, canvasHeight: H, depthDimension: D, setReferenceImage } = useStore()
 
   const [tab,       setTab]       = useState('pixelart')
@@ -19,6 +21,7 @@ export default function ImportDialog({ onClose }) {
   const [opacity,   setOpacity]   = useState(40)     // 0–100 integer
   const [loading,   setLoading]   = useState(false)
   const inputRef = useRef(null)
+  useModalAccessibility(dialogRef, onClose)
 
   async function handleFile(f) {
     if (!f) return
@@ -90,22 +93,26 @@ export default function ImportDialog({ onClose }) {
       style={{ background: 'rgba(0,0,0,0.75)' }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-96 rounded-lg border border-border shadow-2xl overflow-hidden"
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="import-dialog-title" tabIndex={-1}
+        className="w-96 rounded-lg border border-border shadow-2xl overflow-hidden"
         style={{ background: 'var(--color-surface)' }}>
 
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <span className="text-sm font-theme text-text">Import Image</span>
-          <button onClick={onClose} className="text-text-muted hover:text-text text-xl leading-none">×</button>
+          <span id="import-dialog-title" className="text-sm font-theme text-text">Import Image</span>
+          <button type="button" aria-label="Close import dialog" onClick={onClose} className="text-text-muted hover:text-text text-xl leading-none">×</button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-border">
+        <div className="flex border-b border-border" role="tablist" aria-label="Import mode">
           {[
             { id: 'pixelart',  Icon: Layers,    label: 'Pixel Art'  },
             { id: 'reference', Icon: ImageIcon, label: 'Reference'  },
           ].map(({ id, Icon, label }) => (
             <button
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
               key={id}
               onClick={() => setTab(id)}
               className={`flex items-center gap-1.5 px-4 py-2 text-xs border-b-2 transition-colors ${
@@ -123,6 +130,10 @@ export default function ImportDialog({ onClose }) {
 
           {/* Drop zone / preview */}
           <div
+            role="button"
+            tabIndex={0}
+            data-autofocus
+            aria-label={preview ? 'Choose a different image' : 'Choose an image to import'}
             className="flex flex-col items-center justify-center rounded border-2 border-dashed cursor-pointer transition-colors"
             style={{
               borderColor: preview ? 'var(--color-accent)' : 'var(--color-border)',
@@ -130,11 +141,17 @@ export default function ImportDialog({ onClose }) {
               minHeight:   120,
             }}
             onClick={() => inputRef.current?.click()}
+            onKeyDown={event => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                inputRef.current?.click()
+              }
+            }}
           >
             {preview ? (
               <img
                 src={preview.src}
-                alt="preview"
+                alt="Selected image preview"
                 className="max-h-28 max-w-full object-contain rounded"
                 style={{ imageRendering: 'pixelated' }}
               />
@@ -162,6 +179,8 @@ export default function ImportDialog({ onClose }) {
                 <div className="grid grid-cols-3 gap-1">
                   {SCALE_MODES.map(({ id, label }) => (
                     <button
+                      type="button"
+                      aria-pressed={scaleMode === id}
                       key={id}
                       onClick={() => setScaleMode(id)}
                       className={`text-xs py-1 rounded border transition-colors ${
@@ -190,6 +209,7 @@ export default function ImportDialog({ onClose }) {
                   <span className="text-xs font-mono text-accent">{opacity}%</span>
                 </div>
                 <input
+                  aria-label="Reference image opacity"
                   type="range" min={5} max={90} value={opacity}
                   onChange={e => setOpacity(Number(e.target.value))}
                   className="w-full cursor-pointer"
@@ -205,12 +225,14 @@ export default function ImportDialog({ onClose }) {
           {/* Buttons */}
           <div className="flex gap-2 justify-end pt-1">
             <button
+              type="button"
               onClick={onClose}
               className="text-xs px-3 py-1.5 rounded border border-border text-text-muted hover:text-text transition-colors"
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={tab === 'pixelart' ? importAsPixelArt : importAsReference}
               disabled={!preview || loading}
               className="btn-brass text-xs px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"

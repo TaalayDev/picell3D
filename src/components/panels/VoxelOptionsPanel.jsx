@@ -100,6 +100,7 @@ export default function VoxelOptionsPanel() {
               <span className="mr-auto text-[10px] uppercase tracking-wide text-text-muted">Axis locks</span>
               {['x', 'y', 'z'].map(axis => (
                 <button
+                  type="button"
                   key={axis}
                   onClick={() => setEditBoundsAxisLock(axis, !editBoundsAxisLocks[axis])}
                   className={`h-6 min-w-6 rounded border px-1.5 text-[10px] font-mono uppercase transition-colors ${
@@ -172,6 +173,8 @@ export default function VoxelOptionsPanel() {
             <div className="grid grid-cols-5 gap-1">
               {[1, 2, 3, 5, 8].map(size => (
                 <button
+                  type="button"
+                  aria-pressed={brushSize === size}
                   key={size}
                   onClick={() => setBrushSize(size)}
                   className={`py-1 rounded border text-xs font-mono transition-colors ${
@@ -185,6 +188,7 @@ export default function VoxelOptionsPanel() {
               ))}
             </div>
             <input
+              aria-label="Brush size"
               type="range"
               min={1}
               max={8}
@@ -390,6 +394,7 @@ export default function VoxelOptionsPanel() {
                 <span className="text-xs font-mono text-accent">{shapeThickness}</span>
               </div>
               <input
+                aria-label="Shape outline thickness"
                 type="range"
                 min={1}
                 max={8}
@@ -416,6 +421,7 @@ export default function VoxelOptionsPanel() {
                   <span className="text-xs font-mono text-accent">{primitiveDepth}</span>
                 </div>
                 <input
+                  aria-label={activeTool === 'cylinder3d' ? 'Cylinder height' : 'Primitive depth'}
                   type="range"
                   min={1}
                   max={Math.min(64, Math.max(canvasWidth, canvasHeight, depthDimension))}
@@ -466,6 +472,7 @@ export default function VoxelOptionsPanel() {
                   </span>
                 </div>
                 <input
+                  aria-label={`${planeAxis.toUpperCase()} drawing plane depth`}
                   type="range"
                   min={0}
                   max={Math.max(0, planeSize - 1)}
@@ -826,6 +833,7 @@ export default function VoxelOptionsPanel() {
               ))}
             </div>
             <input
+              aria-label="Canvas depth"
               type="range"
               min={4}
               max={128}
@@ -868,6 +876,8 @@ export default function VoxelOptionsPanel() {
                   ['both', 'Both'],
                 ].map(([id, label]) => (
                   <button
+                    type="button"
+                    aria-pressed={paintDirection === id}
                     key={id}
                     onClick={() => setPaintDirection(id)}
                     className={`rounded border py-1 text-[10px] transition-colors ${
@@ -971,6 +981,7 @@ function SymToggle({ label, value, onChange }) {
         type="button"
         role="switch"
         aria-checked={value}
+        aria-label={label}
         onClick={() => onChange(!value)}
         className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 transition-colors focus:outline-none ${
           value ? 'border-accent bg-accent/30' : 'border-border bg-surface-alt'

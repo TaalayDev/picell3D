@@ -115,6 +115,8 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
       {/* Logo + app menu */}
       <div className="flex items-center gap-1 mr-1 pr-1 xl:mr-2 xl:pr-2 border-r border-border">
         <button
+          type="button"
+          aria-label="Open templates library"
           onClick={() => setShowTemplatesDialog(true)}
           title="Open Templates Library"
           className="font-theme text-text text-sm tracking-wider hover:text-accent transition-all flex items-center gap-1 cursor-pointer select-none px-1.5 py-0.5 rounded border border-transparent hover:border-accent/40 hover:bg-surface-alt active:scale-95"
@@ -191,12 +193,16 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
       {/* Zoom */}
       <div className="flex items-center gap-1 mr-1 pr-1 xl:mr-2 xl:pr-2 border-r border-border">
         <button
+          type="button"
+          aria-label="Zoom out"
           className="text-text-muted hover:text-text text-xs px-1.5 py-0.5 rounded border border-border hover:border-accent transition-colors"
           onClick={() => setPixelSize(pixelSize - 2)}
           title="Zoom out"
         >−</button>
         <span className="text-xs text-text-muted font-mono w-8 text-center">{pixelSize}px</span>
         <button
+          type="button"
+          aria-label="Zoom in"
           className="text-text-muted hover:text-text text-xs px-1.5 py-0.5 rounded border border-border hover:border-accent transition-colors"
           onClick={() => setPixelSize(pixelSize + 2)}
           title="Zoom in"
@@ -205,6 +211,9 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
 
       {/* Grid toggle */}
       <button
+        type="button"
+        aria-pressed={showGrid}
+        aria-label="Toggle grid"
         className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors mr-1 xl:mr-2 ${
           showGrid
             ? 'border-accent bg-accent/20 text-accent'
@@ -220,6 +229,9 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
       <div className="flex items-center gap-0.5 mr-1 pr-1 xl:mr-2 xl:pr-2 border-r border-border">
         {VIEW_MODES.map(({ id, Icon, label }) => (
           <button
+            type="button"
+            aria-label={label}
+            aria-pressed={viewMode === id}
             key={id}
             className={`w-8 h-8 rounded flex items-center justify-center border transition-colors ${
               viewMode === id
@@ -237,6 +249,8 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
       {/* Canvas size, import, save/load — inline on wide screens, in the app menu otherwise */}
       <div className="hidden xl:flex items-center">
       <button
+        type="button"
+        aria-label="Change canvas size"
         className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent transition-colors mr-2"
         onClick={() => setShowSizeDialog(true)}
         title="Canvas size"
@@ -247,6 +261,8 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
 
       {/* Import image */}
       <button
+        type="button"
+        aria-label="Import image"
         className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent transition-colors mr-2"
         onClick={() => setShowImportDialog(true)}
         title="Import image"
@@ -259,6 +275,8 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
       <input ref={fileInputRef} type="file" accept=".picell3d" className="hidden" onChange={handleLoadProject} />
       <div className="flex items-center gap-0.5 mr-1 pr-1 xl:mr-2 xl:pr-2 border-r border-border">
         <button
+          type="button"
+          aria-label="Save project"
           className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent transition-colors"
           onClick={handleSaveProject}
           title="Save project (Ctrl+S)"
@@ -267,6 +285,8 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
           <span className="hidden 2xl:inline">Save</span>
         </button>
         <button
+          type="button"
+          aria-label="Load project"
           className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent transition-colors"
           onClick={() => fileInputRef.current?.click()}
           title="Load project"
@@ -287,6 +307,7 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
       {/* Export + Render */}
       <div className="flex items-center gap-1.5 ml-auto">
         <button
+          type="button"
           className="btn-brass flex items-center gap-1.5"
           onClick={() => setShowExportDialog(true)}
           title="Export as PNG"
@@ -295,6 +316,7 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
           <span className="hidden xl:inline">Export PNG</span>
         </button>
         <button
+          type="button"
           className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition-all"
           style={{
             borderColor: 'var(--color-accent)',
@@ -308,6 +330,7 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
           <span className="hidden xl:inline">Render</span>
         </button>
         <button
+          type="button"
           className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition-all"
           style={{
             borderColor: 'var(--color-accent)',
@@ -329,6 +352,9 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
 function ToolButton({ Icon, label, active, onClick }) {
   return (
     <button
+      type="button"
+      aria-label={label}
+      aria-pressed={active}
       className={`w-8 h-8 rounded flex items-center justify-center transition-all border ${
         active
           ? 'border-accent bg-accent/20 text-accent shadow-glow-accent'
@@ -345,6 +371,8 @@ function ToolButton({ Icon, label, active, onClick }) {
 function ActionButton({ Icon, label, onClick, danger }) {
   return (
     <button
+      type="button"
+      aria-label={label}
       className={`w-8 h-8 rounded flex items-center justify-center border border-transparent transition-colors ${
         danger
           ? 'text-text-muted hover:border-red-900 hover:bg-red-950 hover:text-red-400'
@@ -359,13 +387,19 @@ function ActionButton({ Icon, label, onClick, danger }) {
 }
 
 /** Closes a popup on outside pointerdown or Escape. */
-function useDismiss(open, setOpen, refs) {
+function useDismiss(open, setOpen, refs, triggerRef) {
   useEffect(() => {
     if (!open) return
     const onPointerDown = (e) => {
       if (refs.every(r => !r.current?.contains(e.target))) setOpen(false)
     }
-    const onKeyDown = (e) => { if (e.key === 'Escape') setOpen(false) }
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setOpen(false)
+        triggerRef?.current?.focus()
+      }
+    }
     window.addEventListener('pointerdown', onPointerDown)
     window.addEventListener('keydown', onKeyDown)
     return () => {
@@ -377,9 +411,23 @@ function useDismiss(open, setOpen, refs) {
 }
 
 function MenuPanel({ menuRef, heading, children, align = 'left' }) {
+  function handleKeyDown(event) {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+    const items = [...event.currentTarget.querySelectorAll('[role="menuitem"]')]
+    if (!items.length) return
+    event.preventDefault()
+    const current = items.indexOf(document.activeElement)
+    if (event.key === 'Home') items[0].focus()
+    else if (event.key === 'End') items[items.length - 1].focus()
+    else if (event.key === 'ArrowDown') items[(current + 1 + items.length) % items.length].focus()
+    else items[(current - 1 + items.length) % items.length].focus()
+  }
   return (
     <div
       ref={menuRef}
+      role="menu"
+      aria-label={heading || 'Application menu'}
+      onKeyDown={handleKeyDown}
       className={`absolute top-full ${align === 'left' ? 'left-0' : 'right-0'} mt-1.5 z-50 py-1 rounded-lg border shadow-2xl flex flex-col min-w-[165px]`}
       style={{
         background: 'var(--color-surface)',
@@ -411,8 +459,8 @@ function MenuItem({ Icon, label, hint, selected, onClick, href }) {
       {selected && <span className="text-xs font-bold text-accent">✓</span>}
     </>
   )
-  if (href) return <a href={href} className={className}>{content}</a>
-  return <button className={className} onClick={onClick}>{content}</button>
+  if (href) return <a role="menuitem" href={href} className={className}>{content}</a>
+  return <button type="button" role="menuitem" aria-checked={selected ? true : undefined} className={className} onClick={onClick}>{content}</button>
 }
 
 /**
@@ -423,7 +471,11 @@ function ToolMenuButton({ heading, options, value, active, title, onActivate, on
   const [open, setOpen] = useState(false)
   const buttonRef = useRef(null)
   const menuRef   = useRef(null)
-  useDismiss(open, setOpen, [buttonRef, menuRef])
+  useDismiss(open, setOpen, [buttonRef, menuRef], buttonRef)
+
+  useEffect(() => {
+    if (open) requestAnimationFrame(() => menuRef.current?.querySelector('[role="menuitem"]')?.focus())
+  }, [open])
 
   const current = options.find(o => o.id === value) ?? options[0]
   const Icon = current.Icon
@@ -431,7 +483,11 @@ function ToolMenuButton({ heading, options, value, active, title, onActivate, on
   return (
     <div className="relative">
       <button
+        type="button"
         ref={buttonRef}
+        aria-label={title}
+        aria-haspopup="menu"
+        aria-expanded={open}
         className={`w-8 h-8 rounded flex items-center justify-center transition-all border relative ${
           active
             ? 'border-accent bg-accent/20 text-accent shadow-glow-accent'
@@ -486,14 +542,23 @@ function AppMenu({ onSettings, onShortcuts, onSize, onImport, onSave, onLoad }) 
   const [open, setOpen] = useState(false)
   const buttonRef = useRef(null)
   const menuRef   = useRef(null)
-  useDismiss(open, setOpen, [buttonRef, menuRef])
+  useDismiss(open, setOpen, [buttonRef, menuRef], buttonRef)
+
+  useEffect(() => {
+    if (open) requestAnimationFrame(() => menuRef.current?.querySelector('[role="menuitem"]')?.focus())
+  }, [open])
 
   const run = (fn) => () => { setOpen(false); fn() }
 
   return (
     <div className="relative">
       <button
+        type="button"
         ref={buttonRef}
+        data-dialog-return-focus="true"
+        aria-label="Application menu"
+        aria-haspopup="menu"
+        aria-expanded={open}
         onClick={() => setOpen(prev => !prev)}
         title="Menu"
         className={`flex items-center justify-center w-7 h-7 rounded border transition-colors ${
@@ -519,7 +584,7 @@ function AppMenu({ onSettings, onShortcuts, onSize, onImport, onSave, onLoad }) 
           <MenuItem
             Icon={FlaskConical}
             label="Model Lab"
-            href={window.electron?.isElectron ? './index.html?page=experiment' : '/experiment'}
+            href="./index.html?page=experiment"
           />
         </MenuPanel>
       )}

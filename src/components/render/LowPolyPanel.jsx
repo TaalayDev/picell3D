@@ -47,6 +47,8 @@ function Segmented({ label, value, options, onChange }) {
       <div className="flex rounded border overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
         {options.map(o => (
           <button
+            type="button"
+            aria-pressed={value === o.value}
             key={o.value}
             onClick={() => onChange(o.value)}
             className="flex-1 py-1 text-xs transition-colors"
@@ -73,6 +75,8 @@ export default function LowPolyPanel({ params, onChange, activePreset, onPreset 
       <div className="grid grid-cols-2 gap-1.5 px-4 pb-2">
         {Object.entries(LOWPOLY_PRESETS).map(([key, p]) => (
           <button
+            type="button"
+            aria-pressed={activePreset === key}
             key={key}
             onClick={() => onPreset(key)}
             className="py-1.5 rounded border text-xs transition-all"

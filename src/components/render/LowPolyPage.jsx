@@ -9,6 +9,7 @@ import { downloadGroupObjMtl } from '../../lib/exportObj.js'
 import LowPolyPanel, { SectionLabel } from './LowPolyPanel.jsx'
 import LowPolyTools from './LowPolyTools.jsx'
 import { useMeshEditor } from './useMeshEditor.js'
+import { useModalAccessibility } from '../../hooks/useModalAccessibility.js'
 
 const DEFAULT_BRUSH = { radius: 0.2, strength: 0.5, color: '#e0a040' }
 
@@ -75,6 +76,7 @@ function ViewToggle({ Icon, label, active, onClick, ...rest }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function LowPolyPage({ onClose }) {
+  const pageRef = useRef(null)
   const containerRef = useRef(null)
   const { rebuild: showVoxels, setMesh, applyPreset, exportPng, getContext } = useRenderScene(containerRef, { autoBuild: false })
 
@@ -89,6 +91,7 @@ export default function LowPolyPage({ onClose }) {
   const [stale, setStale]             = useState(false)   // settings or voxels changed since the last generate
   const [tool, setTool]               = useState('orbit')
   const [brush, setBrush]             = useState(DEFAULT_BRUSH)
+  useModalAccessibility(pageRef, onClose)
 
   const workerRef     = useRef(null)
   const requestIdRef  = useRef(0)
@@ -187,8 +190,7 @@ export default function LowPolyPage({ onClose }) {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
-      if (e.key === 'Escape') { onClose(); return }
+      if (e.target instanceof Element && e.target.closest('input, textarea, select, button, a[href], [contenteditable="true"]')) return
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         // Mesh history, not the voxel editor's: keep the app-wide shortcut from also firing
         e.preventDefault(); e.stopImmediatePropagation()
@@ -199,7 +201,7 @@ export default function LowPolyPage({ onClose }) {
     }
     window.addEventListener('keydown', onKey, { capture: true })
     return () => window.removeEventListener('keydown', onKey, { capture: true })
-  }, [onClose])
+  }, [])
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleParams = (p) => { setParams(p); setActivePreset(null) }
@@ -242,6 +244,11 @@ export default function LowPolyPage({ onClose }) {
 
   return (
     <div
+      ref={pageRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="low-poly-studio-title"
+      tabIndex={-1}
       className="fixed inset-0 flex flex-col"
       style={{ zIndex: 100, background: 'var(--color-background)', color: 'var(--color-text)' }}
     >
@@ -252,7 +259,7 @@ export default function LowPolyPage({ onClose }) {
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <Triangle size={15} style={{ color: 'var(--color-accent)' }} />
-          <span className="font-theme text-sm tracking-wider">Low Poly Studio</span>
+          <span id="low-poly-studio-title" className="font-theme text-sm tracking-wider">Low Poly Studio</span>
           <span className="text-xs opacity-40 ml-1 truncate">
             {W} × {H} × {D}
             {stats && <> · {stats.rawTriangles.toLocaleString()} → <b>{stats.triangles.toLocaleString()}</b> triangles · {stats.ms} ms</>}
@@ -260,6 +267,8 @@ export default function LowPolyPage({ onClose }) {
           {busy && <Loader2 size={13} className="animate-spin opacity-60" />}
         </div>
         <button
+          type="button"
+          data-autofocus
           onClick={onClose}
           className="flex items-center gap-1.5 px-3 py-1 rounded border text-xs transition-colors"
           style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}

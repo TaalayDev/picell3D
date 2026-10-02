@@ -7,6 +7,7 @@ import { useStore } from '../../store/index.js'
 import { useRenderScene, LIGHT_PRESETS, BG_PRESETS } from './useRenderScene.js'
 import { downloadVox }    from '../../lib/exportVox.js'
 import { downloadObjMtl } from '../../lib/exportObj.js'
+import { useModalAccessibility } from '../../hooks/useModalAccessibility.js'
 
 // ── Preset icons ──────────────────────────────────────────────────────────────
 const PRESET_ICONS = { studio: Sun, warm: Zap, cool: Snowflake, dramatic: Moon }
@@ -61,6 +62,7 @@ function ExportBtn({ label, sub, onClick, icon: Icon = Download }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function RenderPage({ onClose }) {
+  const pageRef = useRef(null)
   const containerRef  = useRef(null)
   const { rebuild, applyPreset, applyBg, exportPng, exportGlb } = useRenderScene(containerRef)
 
@@ -69,6 +71,7 @@ export default function RenderPage({ onClose }) {
   const [activePreset, setActivePreset] = useState('studio')
   const [customBg,     setCustomBg]     = useState('#111111')
   const [bgMode,       setBgMode]       = useState('dark')
+  useModalAccessibility(pageRef, onClose)
 
   // Rebuild whenever layers or dimensions change
   useEffect(() => {
@@ -104,6 +107,11 @@ export default function RenderPage({ onClose }) {
 
   return (
     <div
+      ref={pageRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="render-studio-title"
+      tabIndex={-1}
       className="fixed inset-0 flex flex-col"
       style={{
         zIndex: 100,
@@ -118,12 +126,14 @@ export default function RenderPage({ onClose }) {
       >
         <div className="flex items-center gap-2 flex-1">
           <Box size={15} style={{ color: 'var(--color-accent)' }} />
-          <span className="font-theme text-sm tracking-wider">Render Studio</span>
+          <span id="render-studio-title" className="font-theme text-sm tracking-wider">Render Studio</span>
           <span className="text-xs opacity-30 ml-1">
             {W} × {H} × {D} · {voxelCount.toLocaleString()} voxels
           </span>
         </div>
         <button
+          type="button"
+          data-autofocus
           onClick={onClose}
           className="flex items-center gap-1.5 px-3 py-1 rounded border text-xs transition-colors"
           style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}
