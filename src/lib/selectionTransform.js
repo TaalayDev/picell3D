@@ -135,7 +135,7 @@ export function rotateBox(item, angleRad, anchorX, anchorY) {
           const matching = voxelMap.get(`${oldDcol},${oldDrow}`)
           if (matching) {
             for (const mv of matching) {
-              newVoxelList.push({ dcol: c, drow: r, z: mv.z, color: mv.color })
+              newVoxelList.push({ ...mv, dcol: c, drow: r })
             }
           }
         }
@@ -201,7 +201,7 @@ export function scaleBox(item, scaleX, scaleY, anchorX, anchorY) {
         const matching = voxelMap.get(`${srcCol},${srcRow}`)
         if (matching) {
           for (const mv of matching) {
-            newVoxelList.push({ dcol: c, drow: r, z: mv.z, color: mv.color })
+            newVoxelList.push({ ...mv, dcol: c, drow: r })
           }
         }
       }

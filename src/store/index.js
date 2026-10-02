@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { rotateBox, scaleBox, shiftVoxelListDepth, getDefaultAnchor, getPresetAnchor } from '../lib/selectionTransform.js'
+import { rotateBox, scaleBox, getDefaultAnchor, getPresetAnchor } from '../lib/selectionTransform.js'
 import { clampBrushSize } from '../lib/brushFootprint.js'
 import {
   OPPOSITE_VIEW,
@@ -25,11 +25,25 @@ import {
   syncLayerSequence,
 } from './layerModel.js'
 import { applyVoxelColor, applyVoxelMaterial, collectFloodFillTargets } from './voxelCommands.js'
+import {
+  applyPasteTargets,
+  collectPasteTargets,
+  collectSelectionTargets,
+  createCenteredFloatingPaste,
+  createSelectionClipboard,
+  eraseSelectionTargets,
+  flipClipboard as flipSelectionClipboard,
+  getSelectionVolumeBounds,
+  moveFloatingPaste as moveSelectionPaste,
+  normalizeSelection,
+  shiftVoxelListZ,
+} from './selection2DCommands.js'
 import { createHistorySlice } from './slices/historySlice.js'
 import { createLayerSlice } from './slices/layerSlice.js'
 import { createSelection3DSlice } from './slices/selection3DSlice.js'
+import { renderDepthMap2D, renderView2D } from './viewProjection.js'
 
-export { renderDepthMap2D, renderView2D } from './viewProjection.js'
+export { renderDepthMap2D, renderView2D }
 
 export { getCompositedMaterials, getCompositedVoxels } from './layerModel.js'
 
@@ -199,31 +213,15 @@ export const useStore = create((set, get) => ({
       selection3D, selection, floatingPaste, activeView,
       editBounds, editBoundsAxisLocks,
       canvasWidth: W, canvasHeight: H, depthDimension: D,
+      paintDepthStart, paintDepthEnd, paintDirection,
     } = get()
-    let next = null
-    if (selection3D?.voxels?.length) {
-      next = {
-        minX: Math.min(...selection3D.voxels.map(v => v.x)),
-        maxX: Math.max(...selection3D.voxels.map(v => v.x)),
-        minY: Math.min(...selection3D.voxels.map(v => v.y)),
-        maxY: Math.max(...selection3D.voxels.map(v => v.y)),
-        minZ: Math.min(...selection3D.voxels.map(v => v.z)),
-        maxZ: Math.max(...selection3D.voxels.map(v => v.z)),
-      }
-    } else {
-      const source = floatingPaste || selection
-      if (source) {
-        const x1 = source.col ?? source.x1
-        const y1 = source.row ?? source.y1
-        const x2 = source.col != null ? source.col + source.w - 1 : source.x2
-        const y2 = source.row != null ? source.row + source.h - 1 : source.y2
-        if ([x1, y1, x2, y2].every(Number.isFinite)) {
-          next = boundsFromViewRect(editBounds, activeView, {
-            x1, y1, x2, y2,
-          }, W, H, D)
-        }
-      }
-    }
+    const next = getSelectionVolumeBounds({
+      selection3D, selection, floatingPaste, view: activeView,
+      width: W, height: H, depth: D,
+      editBoundsEnabled: get().editBoundsEnabled,
+      editBounds,
+      range: { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection },
+    })
     if (!next) return
     get().pushUndo()
     get().setEditBounds(applyEditBoundsAxisLocks(editBounds, next, editBoundsAxisLocks))
@@ -425,7 +423,6 @@ export const useStore = create((set, get) => ({
   },
   setActiveTool:   (tool)  => set(s => ({
     activeTool: tool,
-    selection3D: tool === 'select' ? s.selection3D : null,
     flyMode: ['select', 'bounds', 'rect', 'circle', 'ellipse', 'line', 'box3d', 'sphere3d', 'cylinder3d'].includes(tool)
       ? false
       : s.flyMode,
@@ -808,14 +805,8 @@ export const useStore = create((set, get) => ({
 
   setSelection(sel) {
     if (!sel) { set({ selection: null, lassoPreview: null, selectionAnchor: null }); return }
-    const { x1, y1, x2, y2, type = 'rect', mask = null, polygon = null } = sel
-    const normalized = {
-      x1: Math.min(x1, x2), y1: Math.min(y1, y2),
-      x2: Math.max(x1, x2), y2: Math.max(y1, y2),
-      type,
-      mask,
-      polygon,
-    }
+    const normalized = normalizeSelection(sel)
+    if (!normalized) return
     const defaultAnchor = getDefaultAnchor(normalized)
     set({
       selection: normalized,
@@ -858,7 +849,7 @@ export const useStore = create((set, get) => ({
     if (floatingPaste || !selection) return
     const { x1, y1 } = selection
     const savedAnchor = get().selectionAnchor || getDefaultAnchor(selection)
-    get().cutSelection()
+    if (!get().cutSelection()) return false
     get().pasteFromClipboard()
     const fp = get().floatingPaste
     if (fp) {
@@ -866,7 +857,9 @@ export const useStore = create((set, get) => ({
         floatingPaste: { ...fp, col: x1, row: y1 },
         selectionAnchor: savedAnchor,
       })
+      return true
     }
+    return false
   },
 
   rotateSelection(angleRad) {
@@ -902,7 +895,7 @@ export const useStore = create((set, get) => ({
     if (!fp) return
     let newVoxelList = null
     if (fp.voxelList && fp.voxelList.length > 0) {
-      newVoxelList = shiftVoxelListDepth(fp.voxelList, delta, D)
+      newVoxelList = shiftVoxelListZ(fp.voxelList, delta, fp.copyView || get().activeView, D)
     } else {
       newVoxelList = []
       const baseZ = Math.max(0, Math.min(D - 1, Math.floor(D / 2) + delta))
@@ -928,100 +921,55 @@ export const useStore = create((set, get) => ({
   },
 
   copySelection() {
-    const { selection, layers, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView } = get()
-    if (!selection) return
-    const { x1, y1, x2, y2, mask } = selection
-    const tw = x2 - x1 + 1, th = y2 - y1 + 1
-    const composited = getCompositedVoxels(layers, W, H, D)
-    const view2d = renderView2D(composited, activeView, W, H, D)
-
-    // 2D visible-face colors (for floating paste overlay display)
-    const colors = Array.from({ length: th }, (_, drow) =>
-      Array.from({ length: tw }, (_, dcol) => {
-        if (mask && !mask[drow]?.[dcol]) return 'transparent'
-        return view2d[y1 + drow]?.[x1 + dcol] ?? 'transparent'
-      })
-    )
-
-    // Full 3D voxel list — preserves depth for front/back views.
-    // Stores (dcol, drow, z, color) where dcol/drow are canvas offsets
-    // and z is the absolute voxel depth coordinate.
-    const voxelList = []
-    if (activeView === 'front') {
-      for (let drow = 0; drow < th; drow++)
-        for (let dcol = 0; dcol < tw; dcol++) {
-          if (mask && !mask[drow]?.[dcol]) continue
-          for (let z = 0; z < D; z++) {
-            const c = composited[y1 + drow]?.[x1 + dcol]?.[z]
-            if (c && c !== 'transparent') voxelList.push({ dcol, drow, z, color: c })
-          }
-        }
-    } else if (activeView === 'back') {
-      for (let drow = 0; drow < th; drow++)
-        for (let dcol = 0; dcol < tw; dcol++) {
-          if (mask && !mask[drow]?.[dcol]) continue
-          const vx = W - 1 - (x1 + dcol)
-          for (let z = 0; z < D; z++) {
-            const c = composited[y1 + drow]?.[vx]?.[z]
-            if (c && c !== 'transparent') voxelList.push({ dcol, drow, z, color: c })
-          }
-        }
-    }
-    // Side views fall back to colors-only (voxelList stays empty → 2D fallback in commitPaste)
-
-    set({ clipboard: { w: tw, h: th, colors, voxelList } })
+    const {
+      selection, layers, activeLayerId,
+      canvasWidth: W, canvasHeight: H, depthDimension: D, activeView,
+      editBoundsEnabled, editBounds, paintDepthStart, paintDepthEnd, paintDirection,
+    } = get()
+    const clipboard = createSelectionClipboard({
+      selection, layers, sourceLayerId: activeLayerId,
+      width: W, height: H, depth: D, view: activeView,
+      bounds: editBoundsEnabled ? editBounds : null,
+      range: { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection },
+    })
+    if (clipboard) set({ clipboard })
   },
 
   cutSelection() {
-    const { selection, layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView, editBoundsEnabled, editBounds } = get()
-    if (!selection) return
-    const { x1, y1, x2, y2, mask } = selection
-    const layerIdx = layers.findIndex(l => l.id === activeLayerId)
-    if (layerIdx < 0) return
-    const { w: viewW, h: viewH } = getViewSize(activeView, W, H, D)
-    const layerVoxels = layers[layerIdx].voxels
-    const allTargets = []
-    for (let row = y1; row <= y2; row++) {
-      for (let col = x1; col <= x2; col++) {
-        if (col < 0 || col >= viewW || row < 0 || row >= viewH) continue
-        if (mask && !mask[row - y1]?.[col - x1]) continue
-        const targets = getVoxelTargets(col, row, activeView, D, W, H, D)
-        allTargets.push(...targets.filter(t => !editBoundsEnabled || isVoxelInsideEditBounds(t.x, t.y, t.z, editBounds)))
-      }
+    const {
+      selection, layers, activeLayerId,
+      canvasWidth: W, canvasHeight: H, depthDimension: D, activeView,
+      editBoundsEnabled, editBounds, paintDepthStart, paintDepthEnd, paintDirection,
+    } = get()
+    if (!selection) return false
+    const bounds = editBoundsEnabled ? editBounds : null
+    const targets = collectSelectionTargets({
+      selection, view: activeView, width: W, height: H, depth: D, bounds,
+      range: { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection },
+    })
+    const result = eraseSelectionTargets(layers, activeLayerId, targets)
+    if (!result) return false
+    if (!result.affectedCount) {
+      set({ clipboard: null })
+      return false
     }
-    const changedTargets = [...new Map(allTargets
-      .filter(({ x, y, z }) => layerHasVoxel(layers[layerIdx], x, y, z))
-      .map(voxel => [`${voxel.x},${voxel.y},${voxel.z}`, voxel])).values()]
-    if (!changedTargets.length) {
-      set({ selection: null, selectionAnchor: null })
-      return
-    }
-    if (!get().confirmLargeOperation('Cut selected voxels?', changedTargets.length)) return
-    get().copySelection()
+    if (!get().confirmLargeOperation('Cut selected voxels?', result.affectedCount)) return false
+    const clipboard = createSelectionClipboard({
+      selection, layers, sourceLayerId: activeLayerId,
+      width: W, height: H, depth: D, view: activeView, bounds,
+      range: { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection },
+    })
     get().pushUndo()
-    const affectedY = new Set(changedTargets.map(t => t.y))
-    const newVoxels = [...layerVoxels]
-    for (const y of affectedY) newVoxels[y] = layerVoxels[y].map(xRow => [...xRow])
-    for (const { x, y, z } of changedTargets) newVoxels[y][x][z] = 'transparent'
-    const newLayers = [...layers]
-    newLayers[layerIdx] = { ...layers[layerIdx], voxels: newVoxels }
-    set({ layers: newLayers, selection: null })
+    set({ layers: result.layers, clipboard, selection: null })
+    return true
   },
 
   pasteFromClipboard() {
     const { clipboard, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView } = get()
     if (!clipboard) return
-    const { w: viewW, h: viewH } = getViewSize(activeView, W, H, D)
-    const col = Math.floor((viewW - clipboard.w) / 2)
-    const row = Math.floor((viewH - clipboard.h) / 2)
+    const floatingPaste = createCenteredFloatingPaste(clipboard, activeView, W, H, D)
     set({
-      floatingPaste: {
-        col, row,
-        w: clipboard.w, h: clipboard.h,
-        colors: clipboard.colors,
-        voxelList: clipboard.voxelList?.length ? clipboard.voxelList : null,
-        copyView: clipboard.voxelList?.length ? activeView : null,
-      },
+      floatingPaste,
       selection: null,
     })
   },
@@ -1029,75 +977,29 @@ export const useStore = create((set, get) => ({
   moveFloatingPaste(col, row) {
     const { floatingPaste, selectionAnchor } = get()
     if (!floatingPaste) return
-    const dcol = col - floatingPaste.col
-    const drow = row - floatingPaste.row
+    const moved = moveSelectionPaste(floatingPaste, selectionAnchor, col, row)
     set({
-      floatingPaste: { ...floatingPaste, col, row },
-      selectionAnchor: selectionAnchor
-        ? { x: selectionAnchor.x + dcol, y: selectionAnchor.y + drow }
-        : null,
+      floatingPaste: moved.floatingPaste,
+      selectionAnchor: moved.anchor,
     })
   },
 
   commitPaste() {
     const { floatingPaste, layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView, editBoundsEnabled, editBounds } = get()
     if (!floatingPaste) return
-    const layerIdx = layers.findIndex(l => l.id === activeLayerId)
-    if (layerIdx < 0) return
-    const { col: startCol, row: startRow, w, h, colors, voxelList } = floatingPaste
-    const { w: viewW, h: viewH } = getViewSize(activeView, W, H, D)
-    const layerVoxels = layers[layerIdx].voxels
-    const allTargets = []
-
-    if (voxelList?.length) {
-      // Full 3D paste — preserves depth
-      for (const { dcol, drow, z, color } of voxelList) {
-        const col = startCol + dcol
-        const row = startRow + drow
-        let vx, vy
-        if (activeView === 'front') {
-          vx = col; vy = row
-        } else if (activeView === 'back') {
-          vx = W - 1 - col; vy = row
-        } else {
-          continue // other views: skip 3D, handled by 2D fallback below
-        }
-        if (vx >= 0 && vx < W && vy >= 0 && vy < H && z >= 0 && z < D &&
-          (!editBoundsEnabled || isVoxelInsideEditBounds(vx, vy, z, editBounds)))
-          allTargets.push({ x: vx, y: vy, z, color })
-      }
-    } else {
-      // 2D fallback — single depth layer
-      for (let drow = 0; drow < h; drow++) {
-        for (let dcol = 0; dcol < w; dcol++) {
-          const color = colors[drow]?.[dcol]
-          if (!color || color === 'transparent') continue
-          const col = startCol + dcol
-          const row = startRow + drow
-          if (col < 0 || col >= viewW || row < 0 || row >= viewH) continue
-          const targets = getVoxelTargets(col, row, activeView, 1, W, H, D)
-          for (const t of targets)
-            if (!editBoundsEnabled || isVoxelInsideEditBounds(t.x, t.y, t.z, editBounds)) allTargets.push({ ...t, color })
-        }
-      }
-    }
-
-    const changedTargets = [...new Map(allTargets
-      .filter(({ x, y, z, color }) => layerVoxels[y]?.[x]?.[z] !== color)
-      .map(voxel => [`${voxel.x},${voxel.y},${voxel.z}`, voxel])).values()]
-    if (!changedTargets.length) {
+    const targets = collectPasteTargets({
+      floatingPaste, view: activeView, width: W, height: H, depth: D,
+      bounds: editBoundsEnabled ? editBounds : null,
+    })
+    const result = applyPasteTargets(layers, activeLayerId, targets)
+    if (!result) return
+    if (!result.affectedCount) {
       set({ floatingPaste: null, selectionAnchor: null })
       return
     }
-    if (!get().confirmLargeOperation('Paste voxels?', changedTargets.length)) return
+    if (!get().confirmLargeOperation('Paste voxels?', result.affectedCount)) return
     get().pushUndo()
-    const affectedY = new Set(changedTargets.map(t => t.y))
-    const newVoxels = [...layerVoxels]
-    for (const y of affectedY) newVoxels[y] = layerVoxels[y].map(xRow => [...xRow])
-    for (const { x, y, z, color } of changedTargets) newVoxels[y][x][z] = color
-    const newLayers = [...layers]
-    newLayers[layerIdx] = { ...layers[layerIdx], voxels: newVoxels }
-    set({ layers: newLayers, floatingPaste: null, selectionAnchor: null })
+    set({ layers: result.layers, floatingPaste: null, selectionAnchor: null })
   },
 
   cancelPaste() { set({ floatingPaste: null, selectionAnchor: null }) },
@@ -1105,24 +1007,12 @@ export const useStore = create((set, get) => ({
   flipClipboard(axis) {
     const { clipboard } = get()
     if (!clipboard) return
-    const { w, h } = clipboard
-
-    const flippedColors = axis === 'h'
-      ? clipboard.colors.map(row => [...row].reverse())
-      : [...clipboard.colors].reverse()
-
-    const flippedVoxelList = clipboard.voxelList?.map(v => ({
-      ...v,
-      dcol: axis === 'h' ? (w - 1 - v.dcol) : v.dcol,
-      drow: axis === 'v' ? (h - 1 - v.drow) : v.drow,
-    })) ?? null
-
-    const newClip = { ...clipboard, colors: flippedColors, voxelList: flippedVoxelList }
+    const newClip = flipSelectionClipboard(clipboard, axis)
     const { floatingPaste } = get()
     set({
       clipboard: newClip,
       floatingPaste: floatingPaste
-        ? { ...floatingPaste, colors: flippedColors, voxelList: flippedVoxelList }
+        ? { ...floatingPaste, colors: newClip.colors, voxelList: newClip.voxelList }
         : null,
     })
   },
@@ -1133,38 +1023,25 @@ export const useStore = create((set, get) => ({
       set({ floatingPaste: null, selection: null, selectionAnchor: null })
       return
     }
-    const { selection, layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView, editBoundsEnabled, editBounds } = get()
+    const {
+      selection, layers, activeLayerId,
+      canvasWidth: W, canvasHeight: H, depthDimension: D, activeView,
+      editBoundsEnabled, editBounds, paintDepthStart, paintDepthEnd, paintDirection,
+    } = get()
     if (!selection) return
-    const { x1, y1, x2, y2, mask } = selection
-    const layerIdx = layers.findIndex(l => l.id === activeLayerId)
-    if (layerIdx < 0) return
-    const { w: viewW, h: viewH } = getViewSize(activeView, W, H, D)
-    const layerVoxels = layers[layerIdx].voxels
-    const allTargets = []
-    for (let row = y1; row <= y2; row++) {
-      for (let col = x1; col <= x2; col++) {
-        if (col < 0 || col >= viewW || row < 0 || row >= viewH) continue
-        if (mask && !mask[row - y1]?.[col - x1]) continue
-        allTargets.push(...getVoxelTargets(col, row, activeView, D, W, H, D).filter(t =>
-          !editBoundsEnabled || isVoxelInsideEditBounds(t.x, t.y, t.z, editBounds)
-        ))
-      }
-    }
-    const changedTargets = [...new Map(allTargets
-      .filter(({ x, y, z }) => layerHasVoxel(layers[layerIdx], x, y, z))
-      .map(voxel => [`${voxel.x},${voxel.y},${voxel.z}`, voxel])).values()]
-    if (!changedTargets.length) {
+    const targets = collectSelectionTargets({
+      selection, view: activeView, width: W, height: H, depth: D,
+      bounds: editBoundsEnabled ? editBounds : null,
+      range: { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection },
+    })
+    const result = eraseSelectionTargets(layers, activeLayerId, targets)
+    if (!result) return
+    if (!result.affectedCount) {
       set({ selection: null, selectionAnchor: null })
       return
     }
-    if (!get().confirmLargeOperation('Delete selected voxels?', changedTargets.length)) return
+    if (!get().confirmLargeOperation('Delete selected voxels?', result.affectedCount)) return
     get().pushUndo()
-    const affectedY = new Set(changedTargets.map(t => t.y))
-    const newVoxels = [...layerVoxels]
-    for (const y of affectedY) newVoxels[y] = layerVoxels[y].map(xRow => [...xRow])
-    for (const { x, y, z } of changedTargets) newVoxels[y][x][z] = 'transparent'
-    const newLayers = [...layers]
-    newLayers[layerIdx] = { ...layers[layerIdx], voxels: newVoxels }
-    set({ layers: newLayers, selection: null, selectionAnchor: null })
+    set({ layers: result.layers, selection: null, selectionAnchor: null })
   },
 }))

@@ -29,6 +29,7 @@ export default function VoxelOptionsPanel() {
     fitEditBoundsToModel, fitEditBoundsToSelection, showLockedVoxels, setShowLockedVoxels, pushUndo,
     selection3D, moveSelection3D, rotateSelection3D, flipSelection3D,
     applySelection3D, clearSelection3D, deleteSelection3D,
+    setSelection3DFromEditBounds, duplicateSelection3D, moveSelection3DToNewLayer,
     selectionMode, setSelectionMode,
     selection, clipboard, floatingPaste, selectionAnchor,
     copySelection, cutSelection, pasteFromClipboard, deleteSelection,
@@ -157,6 +158,14 @@ export default function VoxelOptionsPanel() {
                 Fit to selection
               </button>
             </div>
+            <button
+              onClick={setSelection3DFromEditBounds}
+              disabled={!editBoundsEnabled}
+              className="py-1 rounded border border-border text-xs text-text-muted hover:text-text hover:border-accent/60 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              title="Select occupied voxels from the active layer inside Edit Bounds"
+            >
+              Selection from bounds
+            </button>
             <button onClick={resetEditBounds} className="py-1 rounded border border-border text-xs text-text-muted hover:text-text hover:border-accent/60 transition-colors">
               Reset to full canvas
             </button>
@@ -574,6 +583,27 @@ export default function VoxelOptionsPanel() {
                   Cancel Esc
                 </button>
                 <button
+                  onClick={duplicateSelection3D}
+                  className="flex items-center justify-center gap-1 py-1.5 rounded border border-border text-xs text-text-muted hover:text-text hover:border-accent/60"
+                  title="Copy the transformed selection while keeping its original voxels"
+                >
+                  <Copy size={13} /> Duplicate
+                </button>
+                <button
+                  onClick={moveSelection3DToNewLayer}
+                  className="flex items-center justify-center gap-1 py-1.5 rounded border border-border text-xs text-text-muted hover:text-text hover:border-accent/60"
+                  title="Move selected voxels into a separate layer"
+                >
+                  <Layers size={13} /> New layer
+                </button>
+                <button
+                  onClick={fitEditBoundsToSelection}
+                  className="col-span-2 py-1.5 rounded border border-border text-xs text-text-muted hover:text-text hover:border-accent/60"
+                  title="Set Edit Bounds to the current selection volume"
+                >
+                  Bounds from selection
+                </button>
+                <button
                   onClick={deleteSelection3D}
                   className="col-span-2 flex items-center justify-center gap-1 py-1.5 rounded border border-border text-xs text-text-muted hover:text-red-400 hover:border-red-900 transition-colors"
                   title="Delete selected voxels"
@@ -648,6 +678,15 @@ export default function VoxelOptionsPanel() {
                 Paste
               </button>
             </div>
+            {(selection || floatingPaste) && (
+              <button
+                onClick={fitEditBoundsToSelection}
+                className="py-1.5 rounded border border-border text-xs text-text-muted hover:text-text hover:border-accent/60 transition-colors"
+                title="Create Edit Bounds from the current selection volume"
+              >
+                Bounds from selection
+              </button>
+            )}
             {/* Flip */}
             <div className="grid grid-cols-2 gap-1">
               <button

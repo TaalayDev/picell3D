@@ -35,6 +35,13 @@ export const OBJECT_LIBRARY = [
   { type: 'railing',             name: 'Balcony Railing',    category: 'Structure',      color: DEFAULT_MODULAR_COLOR, size: [2.0, 0.8, 0.1] },
   { type: 'chimney',             name: 'Chimney Block',      category: 'Structure',      color: DEFAULT_MODULAR_COLOR, size: [0.6, 1.4, 0.6] },
 
+  // ── Furniture ──
+  { type: 'chair_wood',          name: 'Dining Chair',       category: 'Furniture',      color: '#8b5a2b', size: [0.6, 1.1, 0.6] },
+  { type: 'armchair',            name: 'Cozy Armchair',      category: 'Furniture',      color: '#2a7886', size: [0.9, 0.9, 0.85] },
+  { type: 'table_dining',        name: 'Dining Table',       category: 'Furniture',      color: '#784421', size: [1.6, 0.8, 1.0] },
+  { type: 'table_coffee',        name: 'Coffee Table',       category: 'Furniture',      color: '#8c593e', size: [1.0, 0.45, 0.6] },
+  { type: 'bookshelf',           name: 'Bookshelf',          category: 'Furniture',      color: '#5c3a21', size: [1.0, 1.8, 0.4] },
+
   // ── Basic Shapes ──
   { type: 'box',                 name: 'Block',              category: 'Basic',          color: DEFAULT_MODULAR_COLOR, size: [1.0, 1.0, 1.0] },
   { type: 'sphere',              name: 'Sphere',             category: 'Basic',          color: DEFAULT_MODULAR_COLOR, size: [1.0, 1.0, 1.0] },
@@ -48,6 +55,10 @@ export const MODEL_TEMPLATES = [
   { id: 'cottage', name: 'Classic Cottage', description: 'Gabled home · 22 pieces', preview: 'cottage', color: '#d9b98c' },
   { id: 'modern-house', name: 'Modern House', description: 'Flat-roof home · 11 pieces', preview: 'modern-house', color: '#d9e4ee' },
   { id: 'watchtower', name: 'Watchtower', description: 'Raised lookout · 9 pieces', preview: 'watchtower', color: '#c6b493' },
+  { id: 'door-entry-set', name: 'Doorway & Porch', description: 'Entrance with stairs & door · 6 pieces', preview: 'door-entry-set', color: '#c49a6c' },
+  { id: 'window-balcony-set', name: 'Window Balcony', description: 'Window wall & railing · 6 pieces', preview: 'window-balcony-set', color: '#88a8ba' },
+  { id: 'dining-set', name: 'Dining Room Set', description: 'Table with 4 chairs · 5 pieces', preview: 'dining-set', color: '#b07a52' },
+  { id: 'living-room-set', name: 'Living Room Set', description: 'Armchairs, table & rug · 5 pieces', preview: 'living-room-set', color: '#4592a4' },
   { id: 'rover', name: 'Explorer Rover', description: 'Seven-part vehicle', preview: 'rover', color: '#ef6a8a' },
   { id: 'table-set', name: 'Table Set', description: 'Table and stools · 10 pieces', preview: 'table-set', color: '#a87450' },
 ]
@@ -210,6 +221,52 @@ export function createModelTemplate(templateId, origin = { x: 0, y: 0, z: 0 }) {
       at('column', 'Table pedestal', 0, 0.62, 0, { color: '#493a35', scale: { x: 1.15, y: 0.65, z: 1.15 } }),
       ...stool('North stool', 0, -1.65), ...stool('South stool', 0, 1.65),
       ...stool('West stool', -1.65, 0), ...stool('East stool', 1.65, 0),
+    ]
+  }
+
+  if (templateId === 'door-entry-set') {
+    const at = (...args) => makeAt(origin, ...args)
+    return [
+      at('floor_tile', 'Porch base', 0, 0.1, 0.4, { color: '#9fa3a9', scale: { x: 1.2, y: 1, z: 1.4 } }),
+      at('wall_door', 'Entry wall', 0, 1.2, 0, { color: '#e8e5dc' }),
+      at('door_panel', 'Front door', 0, 1.0, 0, { color: '#8a532d' }),
+      at('stairs', 'Porch steps', 0, 0.5, 1.4, { color: '#878c94' }),
+      at('column', 'Left porch post', -0.95, 1.0, 0.8, { color: '#5c3a21', scale: { x: 0.8, y: 1, z: 0.8 } }),
+      at('column', 'Right porch post', 0.95, 1.0, 0.8, { color: '#5c3a21', scale: { x: 0.8, y: 1, z: 0.8 } }),
+    ]
+  }
+
+  if (templateId === 'window-balcony-set') {
+    const at = (...args) => makeAt(origin, ...args)
+    return [
+      at('floor_tile', 'Balcony floor', 0, 0.1, 0.5, { color: '#6d7582', scale: { x: 1.2, y: 1, z: 1.2 } }),
+      at('wall_window', 'Window wall', 0, 1.2, -0.1, { color: '#e2e4ea' }),
+      at('window_shutters', 'Shutter window', 0, 1.2, -0.1, { color: '#4a6b58' }),
+      at('railing', 'Front railing', 0, 0.5, 1.0, { color: '#323a48' }),
+      at('railing', 'Left railing', -1.0, 0.5, 0.4, { color: '#323a48', scale: { x: 0.6, y: 1, z: 1 }, rotation: { x: 0, y: 90, z: 0 } }),
+      at('railing', 'Right railing', 1.0, 0.5, 0.4, { color: '#323a48', scale: { x: 0.6, y: 1, z: 1 }, rotation: { x: 0, y: 90, z: 0 } }),
+    ]
+  }
+
+  if (templateId === 'dining-set') {
+    const at = (...args) => makeAt(origin, ...args)
+    return [
+      at('table_dining', 'Dining table', 0, 0.4, 0, { color: '#784421' }),
+      at('chair_wood', 'North chair', 0, 0.55, -0.85, { color: '#8b5a2b', rotation: { x: 0, y: 0, z: 0 } }),
+      at('chair_wood', 'South chair', 0, 0.55, 0.85, { color: '#8b5a2b', rotation: { x: 0, y: 180, z: 0 } }),
+      at('chair_wood', 'West chair', -1.15, 0.55, 0, { color: '#8b5a2b', rotation: { x: 0, y: 90, z: 0 } }),
+      at('chair_wood', 'East chair', 1.15, 0.55, 0, { color: '#8b5a2b', rotation: { x: 0, y: -90, z: 0 } }),
+    ]
+  }
+
+  if (templateId === 'living-room-set') {
+    const at = (...args) => makeAt(origin, ...args)
+    return [
+      at('floor_tile', 'Living room rug', 0, 0.05, 0, { color: '#a04832', scale: { x: 1.4, y: 0.5, z: 1.2 } }),
+      at('table_coffee', 'Coffee table', 0, 0.22, 0, { color: '#5a351e' }),
+      at('armchair', 'Left armchair', -1.05, 0.45, 0, { color: '#2a7886', rotation: { x: 0, y: 90, z: 0 } }),
+      at('armchair', 'Right armchair', 1.05, 0.45, 0, { color: '#2a7886', rotation: { x: 0, y: -90, z: 0 } }),
+      at('bookshelf', 'Living room bookshelf', 0, 0.9, -1.05, { color: '#5c3a21', rotation: { x: 0, y: 0, z: 0 } }),
     ]
   }
 

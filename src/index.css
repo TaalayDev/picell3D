@@ -1194,8 +1194,25 @@ body {
 .template-table-set .part-a { left: 38px; top: 28px; width: 45px; height: 17px; border-radius: 50%; background: #ac754f; }
 .template-table-set .part-b { left: 57px; top: 41px; width: 7px; height: 25px; background: #493a35; }
 .template-table-set .part-c { left: 20px; top: 51px; width: 20px; height: 9px; border-radius: 50%; background: #b37b52; box-shadow: 80px 0 0 #b37b52; }
+.template-door-entry-set .part-a { left: 32px; top: 20px; width: 50px; height: 42px; background: #e0dcd3; }
+.template-door-entry-set .part-b { left: 45px; top: 28px; width: 24px; height: 34px; background: #8b5a2b; border-radius: 2px; }
+.template-door-entry-set .part-c { left: 36px; top: 54px; width: 42px; height: 12px; background: #878c94; }
+.template-window-balcony-set .part-a { left: 30px; top: 18px; width: 54px; height: 42px; background: #e2e4ea; }
+.template-window-balcony-set .part-b { left: 40px; top: 25px; width: 34px; height: 28px; background: rgba(87,196,230,0.8); border: 2px solid #4a6b58; }
+.template-window-balcony-set .part-c { left: 28px; top: 46px; width: 58px; height: 18px; border: 2px solid #323a48; background: repeating-linear-gradient(90deg, #323a48 0 3px, transparent 3px 8px); }
+.template-dining-set .part-a { left: 34px; top: 34px; width: 46px; height: 14px; background: #784421; border-radius: 2px; }
+.template-dining-set .part-b { left: 19px; top: 26px; width: 14px; height: 28px; background: #8b5a2b; border-radius: 2px 2px 0 0; }
+.template-dining-set .part-c { left: 81px; top: 26px; width: 14px; height: 28px; background: #8b5a2b; border-radius: 2px 2px 0 0; }
+.template-living-room-set .part-a { left: 40px; top: 42px; width: 34px; height: 12px; background: #5a351e; }
+.template-living-room-set .part-b { left: 16px; top: 28px; width: 24px; height: 28px; background: #2a7886; border-radius: 5px; }
+.template-living-room-set .part-c { left: 74px; top: 28px; width: 24px; height: 28px; background: #2a7886; border-radius: 5px; }
 .preview-railing .experiment-preview-shape { width: 50px; height: 26px; background: repeating-linear-gradient(90deg, var(--preview-color) 0 6px, transparent 6px 12px); border: 2px solid var(--preview-color); transform: rotateY(-10deg); }
 .preview-chimney .experiment-preview-shape { width: 22px; height: 44px; border-radius: 2px; background: linear-gradient(180deg, color-mix(in srgb, var(--preview-color) 60%, black) 0 7px, var(--preview-color) 7px 100%); transform: rotateY(-10deg); }
+.preview-chair_wood .experiment-preview-shape { width: 24px; height: 40px; border-radius: 2px; background: linear-gradient(180deg, var(--preview-color) 0 42%, transparent 42% 58%, var(--preview-color) 58% 100%); transform: rotateY(-12deg); }
+.preview-armchair .experiment-preview-shape { width: 38px; height: 34px; border-radius: 6px; background: linear-gradient(135deg, color-mix(in srgb, var(--preview-color) 85%, white), var(--preview-color)); transform: rotateY(-12deg); }
+.preview-table_dining .experiment-preview-shape { width: 48px; height: 26px; border-radius: 2px; transform: rotateX(40deg) rotateZ(-20deg); }
+.preview-table_coffee .experiment-preview-shape { width: 40px; height: 20px; border-radius: 2px; transform: rotateX(40deg) rotateZ(-20deg); }
+.preview-bookshelf .experiment-preview-shape { width: 32px; height: 46px; border-radius: 2px; background: repeating-linear-gradient(180deg, var(--preview-color) 0 4px, #182035 4px 14px); transform: rotateY(-10deg); }
 
 /* Riveted panel style */
 .panel-riveted {

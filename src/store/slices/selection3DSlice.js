@@ -2,6 +2,8 @@ import {
   applySelection3DToLayers,
   createSelection3D,
   deleteSelection3DFromLayers,
+  duplicateSelection3DToLayers,
+  moveSelection3DToNewLayer as extractSelection3DToNewLayer,
   transformSelection3D,
 } from '../selection3DCommands.js'
 
@@ -39,6 +41,22 @@ export function createSelection3DSlice(set, get) {
       })
     },
 
+    setSelection3DFromEditBounds() {
+      const state = get()
+      const layer = state.layers.find(item => item.id === state.activeLayerId)
+      const bounds = state.editBounds
+      set({
+        activeTool: 'select',
+        selection3D: createSelection3D(
+          layer,
+          state.activeLayerId,
+          { x: bounds.minX, y: bounds.minY, z: bounds.minZ },
+          { x: bounds.maxX, y: bounds.maxY, z: bounds.maxZ },
+          bounds,
+        ),
+      })
+    },
+
     clearSelection3D() {
       set({ selection3D: null })
     },
@@ -64,6 +82,28 @@ export function createSelection3DSlice(set, get) {
       if (!state.confirmLargeOperation('Apply 3D selection transform?', result.affectedCount)) return
       state.pushUndo()
       set({ layers: result.layers, selection3D: null })
+    },
+
+    duplicateSelection3D() {
+      const state = get()
+      const result = duplicateSelection3DToLayers(
+        state.layers, state.selection3D, dimensions(state), activeBounds(state),
+      )
+      if (!result?.affectedCount) return
+      if (!state.confirmLargeOperation('Duplicate transformed selection?', result.affectedCount)) return
+      state.pushUndo()
+      set({ layers: result.layers, selection3D: null })
+    },
+
+    moveSelection3DToNewLayer() {
+      const state = get()
+      const result = extractSelection3DToNewLayer(
+        state.layers, state.selection3D, dimensions(state), activeBounds(state),
+      )
+      if (!result) return
+      if (!state.confirmLargeOperation('Move selection to a new layer?', result.affectedCount)) return
+      state.pushUndo()
+      set({ layers: result.layers, activeLayerId: result.activeLayerId, selection3D: null })
     },
 
     deleteSelection3D() {

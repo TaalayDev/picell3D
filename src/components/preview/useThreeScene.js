@@ -11,6 +11,7 @@ import {
 import { samplePointerSegment } from '../../lib/strokeSampler.js'
 import { expandVoxelBrush } from '../../lib/brushFootprint.js'
 import { useStore, getCompositedVoxels, getCompositedMaterials } from '../../store/index.js'
+import { getSelectionVolumeBounds } from '../../store/selection2DCommands.js'
 import {
   ALL_SHAPE_TOOLS_3D,
   BRUSH_TOOLS_3D,
@@ -469,20 +470,41 @@ export function useThreeScene(containerRef) {
     function updateSelectionPreview(state = useStore.getState()) {
       clearSelectionPreview()
       const selection = state.selection3D
-      if (state.viewMode !== 'preview-only' || state.activeTool !== 'select' || !selection?.voxels?.length) return
       const { canvasWidth: W, canvasHeight: H, depthDimension: D } = state
-      selectionPreviewMesh = new THREE.InstancedMesh(ghostBoxGeo, selectionPreviewMat, selection.voxels.length)
-      const matrix = new THREE.Matrix4()
-      const box = new THREE.Box3()
-      for (let i = 0; i < selection.voxels.length; i++) {
-        const voxel = selection.voxels[i]
-        const center = voxelCenterWorld(voxel.x, voxel.y, voxel.z, W, H, D)
-        matrix.makeTranslation(...center.toArray())
-        selectionPreviewMesh.setMatrixAt(i, matrix)
-        box.expandByPoint(center)
+      const bounds = getSelectionVolumeBounds({
+        selection3D: selection,
+        selection: state.selection,
+        floatingPaste: state.floatingPaste,
+        view: state.activeView,
+        width: W,
+        height: H,
+        depth: D,
+        editBoundsEnabled: state.editBoundsEnabled,
+        editBounds: state.editBounds,
+        range: {
+          start: state.paintDepthStart,
+          end: state.paintDepthEnd,
+          direction: state.paintDirection,
+        },
+      })
+      if (!bounds) return
+
+      if (selection?.voxels?.length) {
+        selectionPreviewMesh = new THREE.InstancedMesh(ghostBoxGeo, selectionPreviewMat, selection.voxels.length)
+        const matrix = new THREE.Matrix4()
+        for (let i = 0; i < selection.voxels.length; i++) {
+          const voxel = selection.voxels[i]
+          const center = voxelCenterWorld(voxel.x, voxel.y, voxel.z, W, H, D)
+          matrix.makeTranslation(...center.toArray())
+          selectionPreviewMesh.setMatrixAt(i, matrix)
+        }
+        selectionPreviewMesh.instanceMatrix.needsUpdate = true
+        selectionPreviewGroup.add(selectionPreviewMesh)
       }
-      selectionPreviewMesh.instanceMatrix.needsUpdate = true
-      selectionPreviewGroup.add(selectionPreviewMesh)
+
+      const box = new THREE.Box3()
+      box.expandByPoint(voxelCenterWorld(bounds.minX, bounds.minY, bounds.minZ, W, H, D))
+      box.expandByPoint(voxelCenterWorld(bounds.maxX, bounds.maxY, bounds.maxZ, W, H, D))
       box.min.addScalar(-EDIT_UNIT / 2)
       box.max.addScalar(EDIT_UNIT / 2)
       selectionBoundsHelper = new THREE.Box3Helper(box, 0x22ccff)
@@ -1323,8 +1345,16 @@ export function useThreeScene(containerRef) {
       }
       if (
         state.selection3D !== previous.selection3D
+        || state.selection !== previous.selection
+        || state.floatingPaste !== previous.floatingPaste
+        || state.activeView !== previous.activeView
+        || state.paintDepthStart !== previous.paintDepthStart
+        || state.paintDepthEnd !== previous.paintDepthEnd
+        || state.paintDirection !== previous.paintDirection
         || state.activeTool !== previous.activeTool
         || state.viewMode !== previous.viewMode
+        || state.editBoundsEnabled !== previous.editBoundsEnabled
+        || state.editBounds !== previous.editBounds
         || state.canvasWidth !== previous.canvasWidth
         || state.canvasHeight !== previous.canvasHeight
         || state.depthDimension !== previous.depthDimension

@@ -1155,6 +1155,765 @@ const templates = {
     m.box(14, 7, 11, 14, 9, 12, '#8a7b70', 'matte')
     for (const [x, h, z] of [[5, 13, 8], [6, 15, 8], [18, 12, 5], [19, 14, 5]]) m.set(x, h, z, '#e9fbff', 'glass')
   }),
+
+  // ─── House Set ─────────────────────────────────────────────────────────────────
+
+  door: buildTemplate(18, 26, 8, (m) => {
+    const frameDark = '#452b1a'
+    const frameMid = '#5c3a24'
+    const woodBase = '#8a532d'
+    const woodDark = '#6b3f20'
+    const woodLight = '#9e6236'
+    const brass = '#e5b842'
+    const brassDark = '#ad8420'
+    const stone = '#7d828a'
+    const stoneDark = '#5a5d63'
+
+    // Stone step at the bottom
+    m.box(1, 0, 0, 16, 1, 7, (x, h, z) => (m.noise(x, h, z) > 0.6 ? stoneDark : stone), 'matte')
+
+    // Outer door frame (casing)
+    m.box(2, 1, 1, 4, 24, 6, (x, h, z) => (z >= 5 ? frameMid : frameDark))
+    m.box(13, 1, 1, 15, 24, 6, (x, h, z) => (z >= 5 ? frameMid : frameDark))
+    m.box(2, 23, 1, 15, 25, 6, (x, h) => (h === 25 ? frameMid : frameDark))
+
+    // Main door slab inside frame: x: 5..12, h: 2..22, z: 2..4
+    m.box(5, 2, 2, 12, 22, 4, (x, h) => ((x + h) % 3 === 0 ? woodLight : woodBase))
+
+    // Recessed or raised panel moldings on door face (z: 4)
+    // Upper panel: x: 6..11, h: 13..21
+    m.box(6, 13, 4, 11, 21, 4, woodLight)
+    m.box(7, 14, 4, 10, 20, 4, woodDark)
+    m.box(8, 15, 4, 9, 19, 4, woodBase)
+
+    // Lower panel: x: 6..11, h: 3..11
+    m.box(6, 3, 4, 11, 11, 4, woodLight)
+    m.box(7, 4, 4, 10, 10, 4, woodDark)
+    m.box(8, 5, 4, 9, 9, 4, woodBase)
+
+    // Hinges on left jamb (metal)
+    m.box(4, 19, 4, 5, 21, 5, '#2e3033', 'metal')
+    m.box(4, 5, 4, 5, 7, 5, '#2e3033', 'metal')
+
+    // Door knob and escutcheon plate on right side
+    m.box(11, 10, 5, 11, 13, 5, brassDark, 'metal')
+    m.set(11, 11, 6, brass, 'metal')
+    m.set(11, 12, 6, brass, 'metal')
+    m.set(11, 10, 5, '#1a1a1a') // keyhole
+
+    // Mail slot
+    m.box(7, 12, 5, 10, 12, 5, brass, 'metal')
+  }),
+
+  window: buildTemplate(22, 22, 8, (m) => {
+    const frameWhite = '#e8edf2'
+    const sillWood = '#3d281a'
+    const glassColor = '#a8daf5'
+    const glassLight = '#ccebff'
+    const shutterGreen = '#456b52'
+    const shutterDark = '#324e3c'
+
+    // Windowsill at bottom: x: 2..19, h: 3..4, z: 1..6
+    m.box(2, 3, 1, 19, 4, 6, sillWood)
+
+    // Window flower box on sill: x: 4..17, h: 3..6, z: 5..7
+    m.box(4, 3, 5, 17, 6, 7, '#784323')
+    m.box(5, 6, 6, 16, 6, 6, '#402615') // Soil
+    for (let x = 4; x <= 17; x++) {
+      m.set(x, 7, 6, m.noise(x, 7, 6) > 0.4 ? '#43a047' : '#2e7d32')
+      if (x % 3 === 0) {
+        const flowerColor = x % 6 === 0 ? '#e91e63' : x % 4 === 0 ? '#ffeb3b' : '#ff5722'
+        m.set(x, 8, 6, flowerColor, 'glossy')
+      }
+    }
+
+    // Window frame surround
+    m.box(5, 20, 2, 16, 21, 4, frameWhite)
+    m.box(5, 5, 2, 16, 6, 4, frameWhite)
+    m.box(5, 5, 2, 6, 21, 4, frameWhite)
+    m.box(15, 5, 2, 16, 21, 4, frameWhite)
+
+    // Central crossbars (mullions)
+    m.box(10, 5, 3, 11, 21, 3, frameWhite)
+    m.box(5, 13, 3, 16, 13, 3, frameWhite)
+
+    // Glass panes with 'glass' material
+    m.fill((x, h, z) => {
+      const inX = (x >= 7 && x <= 9) || (x >= 12 && x <= 14)
+      const inH = (h >= 7 && h <= 12) || (h >= 14 && h <= 19)
+      return inX && inH && z === 3
+    }, (x, h) => ((x + h) % 2 === 0 ? glassLight : glassColor), 'glass')
+
+    // Wooden shutters on left and right sides
+    m.box(1, 5, 3, 4, 20, 4, (x, h) => (h % 3 === 0 ? shutterDark : shutterGreen))
+    m.box(1, 5, 4, 4, 6, 4, shutterDark)
+    m.box(1, 19, 4, 4, 20, 4, shutterDark)
+
+    m.box(17, 5, 3, 20, 20, 4, (x, h) => (h % 3 === 0 ? shutterDark : shutterGreen))
+    m.box(17, 5, 4, 20, 6, 4, shutterDark)
+    m.box(17, 19, 4, 20, 20, 4, shutterDark)
+  }),
+
+  chair: buildTemplate(16, 24, 16, (m) => {
+    const wood = '#7c4d30'
+    const woodDark = '#56331e'
+    const woodLight = '#9a6442'
+    const cushion = '#c0392b'
+    const cushionLight = '#d9534f'
+
+    // 4 legs
+    for (const [lx, lz] of [[3, 3], [12, 3], [3, 12], [12, 12]]) {
+      m.box(lx, 0, lz, lx + 1, 9, lz + 1, (x, h) => (h < 2 ? woodDark : wood))
+    }
+
+    // Cross stretchers (leg braces)
+    m.box(3, 4, 4, 4, 4, 11, woodDark)
+    m.box(12, 4, 4, 13, 4, 11, woodDark)
+    m.box(4, 3, 3, 11, 3, 4, woodDark)
+    m.box(4, 3, 12, 11, 3, 13, woodDark)
+
+    // Seat frame under cushion
+    m.box(2, 9, 2, 13, 9, 13, woodDark)
+
+    // Padded seat cushion
+    m.box(2, 10, 2, 13, 11, 13, (x, h, z) => {
+      const edge = x === 2 || x === 13 || z === 2 || z === 13
+      return edge ? cushion : cushionLight
+    })
+
+    // Backrest posts
+    m.box(3, 11, 3, 4, 23, 4, wood)
+    m.box(12, 11, 3, 13, 23, 4, wood)
+
+    // Top curved crest rail
+    m.box(2, 22, 3, 13, 23, 4, woodLight)
+    m.set(1, 23, 3, wood)
+    m.set(14, 23, 3, wood)
+
+    // Middle horizontal back rail
+    m.box(4, 16, 3, 11, 16, 3, woodDark)
+
+    // Vertical backrest slats
+    m.box(6, 12, 3, 7, 21, 3, (x, h) => (h % 2 ? woodLight : wood))
+    m.box(9, 12, 3, 10, 21, 3, (x, h) => (h % 2 ? woodLight : wood))
+  }),
+
+  armchair: buildTemplate(20, 20, 18, (m) => {
+    const legWood = '#4a2c17'
+    const fabric = '#296d7e'
+    const fabricDark = '#1b4a56'
+    const fabricLight = '#3a8c9e'
+    const cushion = '#358193'
+    const cushionHighlight = '#4fa3b6'
+
+    // 4 short wooden tapered legs
+    m.box(3, 0, 3, 4, 2, 4, legWood)
+    m.box(15, 0, 3, 16, 2, 4, legWood)
+    m.box(3, 0, 13, 4, 2, 14, legWood)
+    m.box(15, 0, 13, 16, 2, 14, legWood)
+
+    // Main base frame
+    m.box(2, 3, 2, 17, 6, 15, fabricDark)
+
+    // Deep seat cushion
+    m.box(5, 7, 3, 14, 9, 13, (x, h, z) => {
+      if (h === 9 && (x >= 7 && x <= 12) && (z >= 5 && z <= 10)) return cushionHighlight
+      return cushion
+    })
+
+    // Backrest with tufted detailing
+    m.box(3, 7, 2, 16, 19, 5, (x, h, z) => {
+      const isButton = (h === 11 || h === 15) && (x === 6 || x === 10 || x === 13) && z === 5
+      if (isButton) return fabricDark
+      return (x === 3 || x === 16 || h === 19) ? fabricDark : fabric
+    })
+    m.box(4, 19, 3, 15, 19, 4, fabricLight)
+
+    // Left & right armrests
+    m.box(2, 6, 3, 4, 12, 14, fabric)
+    m.box(2, 13, 3, 4, 13, 14, fabricLight)
+    m.box(15, 6, 3, 17, 12, 14, fabric)
+    m.box(15, 13, 3, 17, 13, 14, fabricLight)
+  }),
+
+  table: buildTemplate(22, 16, 18, (m) => {
+    const legWood = '#5a351e'
+    const apronWood = '#6d4125'
+    const topWood = '#965a34'
+    const topWoodLight = '#af6d40'
+    const topBorder = '#4a2b18'
+
+    // 4 sturdy legs at corners
+    for (const [lx, lz] of [[3, 3], [17, 3], [3, 13], [17, 13]]) {
+      m.box(lx, 0, lz, lx + 1, 12, lz + 1, (x, h) => (h === 0 || h === 8 ? legWood : '#754528'))
+    }
+
+    // Under-table apron rails
+    m.box(3, 10, 4, 4, 12, 13, apronWood)
+    m.box(17, 10, 4, 18, 12, 13, apronWood)
+    m.box(5, 10, 3, 16, 12, 4, apronWood)
+    m.box(5, 10, 13, 16, 12, 14, apronWood)
+
+    // Tabletop slab
+    m.box(1, 13, 1, 20, 14, 16, (x, h, z) => {
+      const isEdge = x === 1 || x === 20 || z === 1 || z === 16
+      if (isEdge) return topBorder
+      return (x + z) % 4 === 0 ? topWoodLight : topWood
+    })
+
+    // Centerpiece runner and fruit bowl
+    m.box(8, 15, 1, 13, 15, 16, (x, h, z) => (z % 3 === 0 ? '#d4af37' : '#f0e6d2'), 'matte')
+    m.box(9, 15, 7, 12, 16, 10, '#ffffff', 'glossy')
+    m.set(10, 17, 8, '#e74c3c', 'glossy')
+    m.set(11, 17, 9, '#f1c40f', 'glossy')
+    m.set(10, 17, 9, '#2ecc71', 'glossy')
+  }),
+
+  house: buildTemplate(24, 26, 24, (m) => {
+    const foundation = '#6e7075'
+    const foundationDark = '#4e5055'
+    const wallPlaster = '#f2efe9'
+    const wallTrim = '#5c3a21'
+    const roofTile = '#b23b2b'
+    const roofDark = '#8c281b'
+    const roofRidge = '#6d1e15'
+    const glass = '#a2d5ec'
+    const doorWood = '#7d4a27'
+    const chimneyBrick = '#9e4738'
+
+    // Cobblestone foundation
+    m.box(2, 0, 2, 21, 2, 21, (x, h, z) => (m.noise(x, h, z) > 0.5 ? foundation : foundationDark), 'matte')
+
+    // Main house walls
+    m.box(3, 3, 3, 20, 14, 20, (x, h, z) => {
+      const isCorner = (x === 3 || x === 20) && (z === 3 || z === 20)
+      const isBeamH = h === 3 || h === 8 || h === 14
+      if (isCorner || isBeamH) return wallTrim
+      return wallPlaster
+    })
+
+    // Front door
+    m.box(10, 3, 20, 13, 9, 20, doorWood)
+    m.box(9, 3, 20, 9, 10, 20, wallTrim)
+    m.box(14, 3, 20, 14, 10, 20, wallTrim)
+    m.box(9, 10, 20, 14, 10, 20, wallTrim)
+    m.set(13, 6, 21, '#e5b842', 'metal')
+    m.box(10, 1, 21, 13, 2, 22, foundation, 'matte') // Step
+
+    // Porch lantern
+    m.set(11, 11, 21, '#ffc107', 'neon')
+    m.set(12, 11, 21, '#ffc107', 'neon')
+
+    // Front windows
+    m.box(5, 5, 20, 7, 8, 20, glass, 'glass')
+    m.box(4, 4, 20, 8, 4, 21, wallTrim)
+    m.box(4, 5, 20, 4, 8, 20, '#3e6b48')
+    m.box(8, 5, 20, 8, 8, 20, '#3e6b48')
+
+    m.box(16, 5, 20, 18, 8, 20, glass, 'glass')
+    m.box(15, 4, 20, 19, 4, 21, wallTrim)
+    m.box(15, 5, 20, 15, 8, 20, '#3e6b48')
+    m.box(19, 5, 20, 19, 8, 20, '#3e6b48')
+
+    // Side windows
+    m.box(3, 6, 9, 3, 9, 14, glass, 'glass')
+    m.box(20, 6, 9, 20, 9, 14, glass, 'glass')
+
+    // Sloped roof
+    for (let step = 0; step <= 8; step++) {
+      const h = 14 + step
+      const zMin = 2 + step
+      const zMax = 21 - step
+      if (zMin > zMax) break
+      for (let z = zMin; z <= zMax; z++) {
+        for (let x = 1; x <= 22; x++) {
+          const isRidge = zMin === zMax || z === zMin || z === zMax
+          const c = isRidge ? (step === 8 ? roofRidge : roofDark) : roofTile
+          m.set(x, h, z, c)
+        }
+      }
+    }
+
+    // Gable triangular wall fill
+    for (let step = 0; step <= 7; step++) {
+      const h = 14 + step
+      const zMin = 3 + step
+      const zMax = 20 - step
+      m.box(3, h, zMin, 3, h, zMax, wallPlaster)
+      m.box(20, h, zMin, 20, h, zMax, wallPlaster)
+    }
+
+    // Attic round window
+    m.box(11, 16, 5, 12, 17, 5, glass, 'glass')
+
+    // Chimney with smoke
+    m.box(16, 15, 6, 18, 24, 8, (x, h) => (h === 24 ? '#5c231a' : ((x + h) % 2 ? chimneyBrick : '#87392c')), 'matte')
+    m.box(15, 24, 5, 19, 24, 9, '#4a1b14', 'matte')
+    m.sphere(17, 26, 7, 1.2, '#e0e6ed', 'matte')
+  }),
+
+  bookshelf: buildTemplate(20, 26, 10, (m) => {
+    const wood = '#5c3822'
+    const woodDark = '#3e2415'
+    const woodLight = '#784b2e'
+
+    // Outer bookshelf cabinet
+    m.box(2, 0, 1, 3, 25, 8, wood)
+    m.box(16, 0, 1, 17, 25, 8, wood)
+    m.box(2, 0, 1, 17, 1, 8, woodDark)
+    m.box(1, 24, 0, 18, 25, 9, woodLight)
+    m.box(3, 1, 1, 16, 24, 2, woodDark)
+
+    // Shelf dividers
+    m.box(3, 7, 2, 16, 7, 8, wood)
+    m.box(3, 13, 2, 16, 13, 8, wood)
+    m.box(3, 19, 2, 16, 19, 8, wood)
+
+    // Top shelf: Plant & crystal
+    m.box(4, 20, 4, 6, 21, 6, '#b55330', 'matte')
+    m.sphere(5, 22, 5, 1.3, '#388e3c')
+    m.shard([14, 20, 5], [0, 1, 0], 3, 1.2, '#9c27b0', 'glass')
+
+    // Bookshelf row 3
+    const bookColors = ['#c0392b', '#2980b9', '#27ae60', '#f39c12', '#8e44ad', '#d35400', '#16a085', '#34495e']
+    let bx = 4
+    for (let i = 0; i < 6; i++) {
+      const bh = 14 + 3 + (i % 2)
+      const color = bookColors[i % bookColors.length]
+      m.box(bx, 14, 3, bx + 1, bh, 7, color)
+      m.box(bx, 14, 7, bx + 1, bh, 7, '#fdfefe')
+      bx += 2
+    }
+
+    // Bookshelf row 2
+    bx = 4
+    for (let i = 0; i < 5; i++) {
+      const bh = 8 + 3 + ((i * 2) % 3)
+      const color = bookColors[(i + 3) % bookColors.length]
+      m.box(bx, 8, 3, bx + 1, bh, 7, color)
+      bx += 2
+    }
+    m.line([14, 8, 5], [15, 12, 5], '#e74c3c', 'matte', 0.6)
+
+    // Bottom shelf: large books
+    m.box(4, 2, 3, 6, 6, 7, '#1b3a4b')
+    m.box(7, 2, 3, 9, 6, 7, '#4a154b')
+    m.box(10, 2, 3, 12, 5, 7, '#593e2b')
+    m.box(13, 2, 3, 15, 3, 7, '#b7950b')
+    m.box(13, 4, 3, 15, 4, 7, '#239b56')
+  }),
+
+  // ─── Forest Set ────────────────────────────────────────────────────────────────
+
+  'pine-tree': buildTemplate(20, 28, 20, (m) => {
+    const { cx, cz } = m
+    const trunkDark = '#382315'
+    const trunkMid = '#4d321f'
+    const trunkLight = '#63422a'
+
+    // Mossy ground patch with pine needle litter
+    m.cylY(cx, cz, 8.5, 0, 0, (x, h, z) => {
+      const n = m.noise(x, h, z)
+      return n > 0.65 ? '#2b441f' : n > 0.35 ? '#3c5a27' : '#453020'
+    }, 'matte')
+
+    // Tree trunk tapering upwards
+    m.cylY(cx, cz, (h) => Math.max(1.1, 2.3 - h * 0.08), 0, 14, (x, h, z) => {
+      const a = Math.atan2(z - cz, x - cx)
+      const ridge = Math.cos(a * 4) > 0.3
+      return ridge ? trunkLight : ((x + h) % 2 ? trunkMid : trunkDark)
+    })
+
+    // 4 tiered needle canopy skirts
+    // Tier 1 (bottom): h: 6..13
+    m.fill((x, h, z) => {
+      if (h < 6 || h > 13) return false
+      const r = 7.6 - (h - 6) * 0.72
+      const d = Math.hypot(x - cx, z - cz)
+      return d <= r && d >= 1.2
+    }, (x, h, z) => {
+      const edge = Math.hypot(x - cx, z - cz) > (7.6 - (h - 6) * 0.72) - 0.9
+      return edge ? '#346d2c' : (m.noise(x, h, z) > 0.5 ? '#1f481b' : '#275822')
+    })
+    // Pinecones hanging beneath tier 1
+    for (const [px, pz] of [[cx - 4, cz - 3], [cx + 4, cz - 2], [cx - 2, cz + 4], [cx + 3, cz + 4]]) {
+      m.box(px, 5, pz, px + 1, 6, pz + 1, '#56351d', 'matte')
+    }
+
+    // Tier 2 (lower-mid): h: 11..18
+    m.fill((x, h, z) => {
+      if (h < 11 || h > 18) return false
+      const r = 6.2 - (h - 11) * 0.75
+      const d = Math.hypot(x - cx, z - cz)
+      return d <= r && d >= 1.0
+    }, (x, h, z) => {
+      const edge = Math.hypot(x - cx, z - cz) > (6.2 - (h - 11) * 0.75) - 0.9
+      return edge ? '#3c7a33' : (m.noise(x, h, z) > 0.5 ? '#245220' : '#2d6228')
+    })
+
+    // Tier 3 (upper-mid): h: 16..23
+    m.fill((x, h, z) => {
+      if (h < 16 || h > 23) return false
+      const r = 4.8 - (h - 16) * 0.78
+      const d = Math.hypot(x - cx, z - cz)
+      return d <= r && d >= 0.8
+    }, (x, h, z) => {
+      const edge = Math.hypot(x - cx, z - cz) > (4.8 - (h - 16) * 0.78) - 0.9
+      return edge ? '#468b3c' : (m.noise(x, h, z) > 0.5 ? '#2c6628' : '#357730')
+    })
+
+    // Tier 4 (top crown): h: 21..27
+    m.fill((x, h, z) => {
+      if (h < 21 || h > 27) return false
+      const r = 3.2 - (h - 21) * 0.52
+      return Math.hypot(x - cx, z - cz) <= r
+    }, (x, h, z) => (m.noise(x, h, z) > 0.5 ? '#3a7d34' : '#499342'))
+    m.set(cx, 27, cz, '#5ca754')
+  }),
+
+  'oak-tree': buildTemplate(24, 28, 24, (m) => {
+    const { cx, cz } = m
+    const bark = '#4a2f1b'
+    const barkDark = '#352011'
+    const barkLight = '#5d3d25'
+
+    // Grassy forest mound with moss
+    m.ellipsoid(cx, 0, cz, 10, 1.4, 10, (x, h, z) => {
+      const n = m.noise(x, h, z)
+      return n > 0.6 ? '#2e6b22' : n > 0.3 ? '#3d822d' : '#4d9338'
+    }, 'matte')
+
+    // Sprawling tree roots radiating outwards
+    m.line([cx - 2, 0, cz - 2], [cx - 8, 0, cz - 7], bark, 'matte', 1.3)
+    m.line([cx + 2, 0, cz - 2], [cx + 8, 0, cz - 8], bark, 'matte', 1.3)
+    m.line([cx - 2, 0, cz + 2], [cx - 8, 0, cz + 7], bark, 'matte', 1.3)
+    m.line([cx + 2, 0, cz + 2], [cx + 7, 0, cz + 8], bark, 'matte', 1.3)
+
+    // Sturdy gnarly trunk
+    m.cylY(cx, cz, (h) => Math.max(2.2, 4.0 - h * 0.14), 0, 15, (x, h, z) => {
+      const a = Math.atan2(z - cz, x - cx)
+      const groove = Math.cos(a * 5) > 0.25
+      return groove ? barkLight : ((x + h) % 2 ? bark : barkDark)
+    })
+
+    // Tree hollow / knot at front
+    m.box(cx - 0.5, 6, cz + 3, cx + 0.5, 8, cz + 3, '#1c1008')
+
+    // Major branches reaching outwards into canopy
+    m.line([cx, 13, cz], [cx - 5, 17, cz - 4], bark, 'matte', 1.4)
+    m.line([cx, 13, cz], [cx + 5, 17, cz - 4], bark, 'matte', 1.4)
+    m.line([cx, 13, cz], [cx - 4, 18, cz + 5], bark, 'matte', 1.4)
+    m.line([cx, 13, cz], [cx + 4, 18, cz + 5], bark, 'matte', 1.4)
+
+    // Overlapping lush foliage spheres
+    const leafColor = (x, h, z) => {
+      const n = m.noise(x, h, z)
+      if (n > 0.88) return '#e53935' // Red forest berries
+      if (n > 0.82) return '#d4af37' // Golden autumn leaves
+      return n > 0.55 ? '#2e7d32' : n > 0.25 ? '#388e3c' : '#1b5e20'
+    }
+
+    m.sphere(cx, 21, cz, 7.6, leafColor)
+    m.sphere(cx - 4.5, 19, cz + 3.5, 5.2, leafColor)
+    m.sphere(cx + 4.5, 19, cz + 3.5, 5.2, leafColor)
+    m.sphere(cx - 4.5, 19, cz - 3.5, 5.2, leafColor)
+    m.sphere(cx + 4.5, 19, cz - 3.5, 5.2, leafColor)
+    m.sphere(cx, 24, cz, 4.8, leafColor)
+  }),
+
+  'log-cabin': buildTemplate(24, 22, 22, (m) => {
+    const stone = '#687884'
+    const stoneDark = '#485662'
+    const logDark = '#4e331e'
+    const logMid = '#634228'
+    const logLight = '#785334'
+    const logEnd = '#8f6440'
+    const roofShingle = '#385332'
+    const roofDark = '#293e25'
+
+    // River-stone foundation
+    m.box(2, 0, 2, 21, 1, 19, (x, h, z) => (m.noise(x, h, z) > 0.5 ? stoneDark : stone), 'matte')
+
+    // Stacked log cabin walls: horizontal log courses from h: 2 to h: 12
+    m.fill((x, h, z) => {
+      if (h < 2 || h > 12) return false
+      const inX = x >= 3 && x <= 20
+      const inZ = z >= 3 && z <= 18
+      const isWall = (x === 3 || x === 20) && inZ || (z === 3 || z === 18) && inX
+      // Notch extensions at corners
+      const isCornerNotch = (x === 2 || x === 21) && (z === 3 || z === 18) ||
+                            (z === 2 || z === 19) && (x === 3 || x === 20)
+      return isWall || isCornerNotch
+    }, (x, h, z) => {
+      const isEnd = x <= 2 || x >= 21 || z <= 2 || z >= 19
+      if (isEnd) return logEnd
+      const logRow = Math.floor(h / 2) % 2
+      return logRow ? logMid : ((x + z) % 3 === 0 ? logLight : logDark)
+    })
+
+    // Wooden plank door
+    m.box(5, 2, 18, 8, 8, 18, '#3b2314')
+    m.box(4, 2, 18, 4, 9, 18, logDark)
+    m.box(9, 2, 18, 9, 9, 18, logDark)
+    m.box(4, 9, 18, 9, 9, 18, logDark)
+    m.set(8, 5, 19, '#d4af37', 'metal') // Handle
+
+    // Front window with glowing warm interior light
+    m.box(13, 4, 18, 17, 7, 18, '#ffeb3b', 'neon')
+    m.box(15, 4, 19, 15, 7, 19, logDark) // Cross bars
+    m.box(13, 5, 19, 17, 5, 19, logDark)
+    m.box(12, 3, 18, 18, 3, 19, logMid)  // Sill
+
+    // Side window on right wall (x: 20)
+    m.box(20, 5, 8, 20, 8, 13, '#ffeb3b', 'neon')
+    m.box(21, 6, 8, 21, 6, 13, logDark)
+    m.box(20, 4, 7, 21, 4, 14, logMid)
+
+    // Front porch deck & posts
+    m.box(3, 1, 19, 10, 1, 21, logMid)
+    m.box(3, 2, 21, 3, 11, 21, logDark) // Left post
+    m.box(10, 2, 21, 10, 11, 21, logDark) // Right post
+
+    // Firewood stack next to porch
+    for (let h = 2; h <= 4; h++) {
+      for (let x = 13; x <= 18; x += 2) {
+        m.box(x, h, 19, x + 1, h, 20, (x_, h_, z_) => (z_ === 20 ? '#9c6f47' : '#5c3a22'))
+      }
+    }
+
+    // Gabled roof with mossy shingles
+    for (let step = 0; step <= 8; step++) {
+      const h = 12 + step
+      const zMin = 1 + step
+      const zMax = 20 - step
+      if (zMin > zMax) break
+      for (let z = zMin; z <= zMax; z++) {
+        for (let x = 1; x <= 22; x++) {
+          const isEdge = z === zMin || z === zMax
+          m.set(x, h, z, isEdge ? roofDark : (m.noise(x, h, z) > 0.4 ? roofShingle : '#47633f'))
+        }
+      }
+    }
+
+    // Gable triangular fill on left (x=3) and right (x=20)
+    for (let step = 0; step <= 7; step++) {
+      const h = 12 + step
+      const zMin = 3 + step
+      const zMax = 18 - step
+      m.box(3, h, zMin, 3, h, zMax, logMid)
+      m.box(20, h, zMin, 20, h, zMax, logMid)
+    }
+
+    // River stone fireplace chimney on left wall
+    m.box(1, 0, 8, 3, 20, 12, (x, h, z) => ((x + h + z) % 2 ? stone : stoneDark), 'matte')
+    m.box(1, 20, 8, 3, 21, 12, '#333e46', 'matte')
+  }),
+
+  stump: buildTemplate(18, 16, 18, (m) => {
+    const { cx, cz } = m
+    const bark = '#48301e'
+    const barkDark = '#321f11'
+    const barkMoss = '#507c32'
+    const woodHeart = '#986c47'
+    const woodLight = '#b58b62'
+
+    // Autumn forest leaf litter & moss ground
+    m.fill((x, h, z) => h === 0 && Math.hypot(x - cx, z - cz) <= 8.5, (x, h, z) => {
+      const n = m.noise(x, h, z)
+      return n > 0.7 ? '#c25e26' : n > 0.4 ? '#3e6325' : '#453020'
+    }, 'matte')
+
+    // Root buttresses flaring outward
+    m.line([cx - 2, 0, cz - 2], [cx - 6, 0, cz - 6], bark, 'matte', 1.2)
+    m.line([cx + 2, 0, cz - 2], [cx + 6, 0, cz - 6], bark, 'matte', 1.2)
+    m.line([cx - 2, 0, cz + 2], [cx - 6, 0, cz + 6], bark, 'matte', 1.2)
+    m.line([cx + 2, 0, cz + 2], [cx + 6, 0, cz + 6], bark, 'matte', 1.2)
+
+    // Main weathered stump body: h: 0..9
+    m.cylY(cx, cz, (h) => 5.4 - h * 0.08, 0, 9, (x, h, z) => {
+      // Moss climbing up north & west sides
+      const isMossy = (x < cx || z > cz) && m.noise(x, h, z) > 0.45
+      if (isMossy) return barkMoss
+      return (x + h) % 2 ? bark : barkDark
+    })
+
+    // Cut top surface with annual growth rings at h: 9
+    m.fill((x, h, z) => h === 9 && Math.hypot(x - cx, z - cz) <= 4.7, (x, h, z) => {
+      const d = Math.hypot(x - cx, z - cz)
+      if (d < 1.2) return '#2e1c10' // Central hollow cavity
+      const ring = Math.floor(d * 2.2) % 2
+      return ring ? woodLight : woodHeart
+    })
+
+    // Center hollow cavity depression
+    m.box(cx - 0.5, 7, cz - 0.5, cx + 0.5, 8, cz + 0.5, '#22140a')
+
+    // Shelf bracket fungi growing from right side bark
+    m.box(cx + 4, 4, cz - 1, cx + 6, 4, cz + 2, '#d47833')
+    m.box(cx + 4, 4, cz + 2, cx + 6, 4, cz + 2, '#f0ad6b') // Pale margin
+    m.box(cx + 3, 6, cz + 2, cx + 5, 6, cz + 4, '#d47833')
+
+    // Green sapling sprout emerging from the hollow center
+    m.box(cx, 10, cz, cx, 13, cz, '#388e3c')
+    m.set(cx - 1, 13, cz, '#4caf50')
+    m.set(cx + 1, 14, cz, '#66bb6a')
+  }),
+
+  deer: buildTemplate(18, 26, 16, (m) => {
+    const { cx } = m
+    const cz = 7.5
+    const coat = '#a8673a'
+    const coatDark = '#8a5028'
+    const coatLight = '#c47d4c'
+    const white = '#f5efe8'
+    const hoof = '#24170d'
+    const antler = '#d8cfc4'
+    const antlerDark = '#b8aa9a'
+
+    // 4 slender legs
+    for (const [lx, lz] of [[cx - 2.5, 3.5], [cx + 2.5, 3.5], [cx - 2.5, 11.5], [cx + 2.5, 11.5]]) {
+      m.box(lx, 0, lz, lx + 0.9, 1, lz + 0.9, hoof)
+      m.box(lx, 2, lz, lx + 0.9, 9, lz + 0.9, coat)
+    }
+
+    // Torso / body: h: 9..14, z: 2..12
+    m.ellipsoid(cx, 12, 7.5, 3.2, 2.8, 5.0, (x, h, z) => {
+      if (h <= 10) return white // Underbelly
+      // White dapples along the flank
+      if (h === 13 && (z === 5 || z === 7 || z === 9) && Math.abs(x - cx) >= 2.5) return white
+      return (x + z) % 3 === 0 ? coatLight : coat
+    })
+
+    // Fluffy tail
+    m.box(cx - 0.5, 13, 1, cx + 0.5, 15, 2, white)
+    m.set(cx, 15, 1, coatDark)
+
+    // Graceful arching neck
+    m.line([cx, 13, 10.5], [cx, 19, 12.5], coat, 'matte', 1.6)
+    m.box(cx - 0.5, 14, 12, cx + 0.5, 17, 13, white) // White throat patch
+
+    // Sculpted deer head
+    m.ellipsoid(cx, 20, 13.5, 2.0, 1.8, 2.5, coat)
+    // Snout & black nose
+    m.box(cx - 1, 19, 15, cx + 1, 20, 16, coatLight)
+    m.box(cx - 0.5, 19.5, 16, cx + 0.5, 20, 16, '#1a1a1a') // Nose
+
+    // Dark eyes with white orbital rings
+    m.set(cx - 1.8, 21, 13.5, '#1a1a1a', 'glossy')
+    m.set(cx + 1.8, 21, 13.5, '#1a1a1a', 'glossy')
+    m.set(cx - 1.8, 21.5, 13.5, white)
+    m.set(cx + 1.8, 21.5, 13.5, white)
+
+    // Ears angled back
+    m.box(cx - 3.5, 22, 11, cx - 2.5, 24, 12, coat)
+    m.box(cx + 2.5, 22, 11, cx + 3.5, 24, 12, coat)
+    m.set(cx - 3, 23, 11.5, white)
+    m.set(cx + 3, 23, 11.5, white)
+
+    // Branching majestic antlers
+    // Left antler beam & tines
+    m.line([cx - 1.5, 22, 12.5], [cx - 3, 26, 11.5], antler, 'matte', 0.6)
+    m.line([cx - 2.2, 23.5, 12], [cx - 3.5, 24.5, 13], antlerDark, 'matte', 0.5)
+    m.line([cx - 2.8, 25, 11.8], [cx - 1.5, 26, 12.5], antlerDark, 'matte', 0.5)
+    // Right antler beam & tines
+    m.line([cx + 1.5, 22, 12.5], [cx + 3, 26, 11.5], antler, 'matte', 0.6)
+    m.line([cx + 2.2, 23.5, 12], [cx + 3.5, 24.5, 13], antlerDark, 'matte', 0.5)
+    m.line([cx + 2.8, 25, 11.8], [cx + 1.5, 26, 12.5], antlerDark, 'matte', 0.5)
+  }),
+
+  mushrooms: buildTemplate(20, 18, 20, (m) => {
+    // Forest floor with moss and humus
+    m.cylY(9.5, 9.5, 9.0, 0, 0, (x, h, z) => {
+      const n = m.noise(x, h, z)
+      return n > 0.6 ? '#4e7e2e' : n > 0.3 ? '#3d6323' : '#3d281a'
+    }, 'matte')
+
+    // Big red toadstool (Fly Agaric)
+    // Curved stalk: h: 1..9, x: 6..8, z: 6..8
+    m.cylY(7, 7, 1.7, 1, 9, (x, h) => (h === 6 ? '#ffffff' : '#f7f4ec'), 'matte')
+    // Underside gills
+    m.ellipsoid(7, 9, 7, 5.0, 1.0, 5.0, '#f2ece0', 'matte')
+    // Vibrant scarlet cap with domed curvature
+    m.ellipsoid(7, 12, 7, 5.2, 3.8, 5.2, (x, h, z) => {
+      if (h < 10) return null
+      return (x + h + z) % 3 === 0 ? '#b71c1c' : '#d32f2f'
+    }, 'glossy')
+    // White raised warts/spots on toadstool cap
+    for (const [sx, sh, sz] of [
+      [7, 15, 7], [5, 14, 6], [9, 14, 7], [7, 14, 9], [7, 14, 5],
+      [4, 12, 8], [9, 12, 5], [10, 12, 8], [5, 11, 4], [8, 11, 10],
+    ]) {
+      m.box(sx, sh, sz, sx, sh, sz, '#ffffff', 'glossy')
+    }
+
+    // Medium brown bolete mushroom: x: 13.5, z: 13
+    m.cylY(13.5, 13, 1.4, 1, 6, '#eddcb9', 'matte')
+    m.ellipsoid(13.5, 7.5, 13, 3.6, 2.4, 3.6, (x, h) => (h < 6.5 ? '#ded1b4' : '#8d562b'), 'matte')
+
+    // Two baby mushrooms
+    m.box(13, 1, 6, 14, 3, 7, '#f7f4ec', 'matte')
+    m.sphere(13.5, 4, 6.5, 1.6, '#e53935', 'glossy')
+    m.set(13.5, 5, 6.5, '#ffffff')
+
+    m.box(4, 1, 13, 5, 3, 14, '#f7f4ec', 'matte')
+    m.sphere(4.5, 3.8, 13.5, 1.4, '#9e673a', 'matte')
+
+    // Fallen autumn oak leaf
+    m.box(11, 1, 4, 15, 1, 5, '#c85a24')
+    m.set(16, 1, 4, '#8a3c14')
+    // Tiny snail on the leaf
+    m.set(12, 2, 4, '#dfc599')
+    m.set(13, 2, 4, '#7a5432')
+  }),
+
+  boulder: buildTemplate(22, 14, 20, (m) => {
+    const { cx, cz } = m
+    const stone = '#687884'
+    const stoneDark = '#4e5b66'
+    const stoneLight = '#82939f'
+    const moss = '#4c8832'
+    const mossDark = '#386923'
+
+    // Sandy gravel soil base
+    m.cylY(cx, cz, 9.8, 0, 0, (x, h, z) => {
+      const n = m.noise(x, h, z)
+      return n > 0.6 ? '#3b5c28' : n > 0.3 ? '#5c4e38' : '#4a3d2c'
+    }, 'matte')
+
+    // Main rugged rock mass (merged ellipsoids with noise)
+    m.fill((x, h, z) => {
+      if (h < 1 || h > 11) return false
+      const d1 = ((x - cx) / 8.6) ** 2 + ((h - 4.5) / 5.2) ** 2 + ((z - cz) / 7.6) ** 2
+      const d2 = ((x - (cx - 2.8)) / 5.8) ** 2 + ((h - 3.8) / 4.2) ** 2 + ((z - (cz + 2)) / 5.4) ** 2
+      const d3 = ((x - (cx + 3.2)) / 5.4) ** 2 + ((h - 3.2) / 3.8) ** 2 + ((z - (cz - 2.2)) / 5.2) ** 2
+      return d1 <= 1 || d2 <= 1 || d3 <= 1
+    }, (x, h, z) => {
+      // Moss covering top surfaces and crevasses
+      if (h >= 7 && m.noise(x, h, z) > 0.35) return (x + z) % 2 ? moss : mossDark
+      const n = m.noise(x, h, z)
+      return n > 0.6 ? stoneLight : n > 0.3 ? stone : stoneDark
+    })
+
+    // Creeping ivy vine climbing the rock
+    for (let h = 1; h <= 7; h++) {
+      const x = cx + 4 - Math.floor(h * 0.4)
+      const z = cz + 5 - Math.floor(h * 0.3)
+      m.set(x, h, z, '#3e8428')
+      if (h % 2 === 0) m.set(x + 1, h, z, '#589e3a')
+    }
+
+    // Small forest ferns at shaded base
+    m.box(2, 1, 13, 5, 4, 16, (x, h, z) => {
+      if ((x + h + z) % 2 === 0) return '#3d882b'
+      return null
+    })
+
+    // Crystal forest spring puddle at front corner
+    m.fill((x, h, z) => {
+      return h === 1 && Math.hypot(x - 5, z - 5) <= 3.2
+    }, '#a4e8f7', 'glass')
+    m.set(4, 1, 4, '#5c6b73') // River pebble in water
+  }),
 }
 
 // ── Write files ────────────────────────────────────────────────────────────────

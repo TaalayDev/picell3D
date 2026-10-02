@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ArrowLeft, Box, Circle, Columns3, Component, Copy, Disc3, DoorOpen, Flame,
+  Armchair, ArrowLeft, BookOpen, Box, Circle, Columns3, Component, Copy, Disc3, DoorOpen, Flame,
   Folder, Footprints, Grid, Grid3X3, Home, Minus, Move3D, MousePointer2, PanelsTopLeft,
   Rotate3D, RotateCcw, Scaling, Sparkles, Square, Tent, Trash2, Triangle,
 } from 'lucide-react'
@@ -31,6 +31,13 @@ const ICONS = {
   window_shutters: Columns3,
   window_round: Circle,
 
+  // Furniture
+  chair_wood: Armchair,
+  armchair: Armchair,
+  table_dining: Columns3,
+  table_coffee: Minus,
+  bookshelf: BookOpen,
+
   // Roofs & Floors
   floor_tile: Box,
   roof_straight: Home,
@@ -53,7 +60,7 @@ const ICONS = {
   capsule: Component,
 }
 
-const FOLDERS = ['Templates', 'Walls', 'Doors & Windows', 'Roofs & Floors', 'Structure', 'Basic']
+const FOLDERS = ['Templates', 'Walls', 'Doors & Windows', 'Furniture', 'Roofs & Floors', 'Structure', 'Basic']
 
 const SNAP_STEPS = [0.5, 1.0, 0]
 

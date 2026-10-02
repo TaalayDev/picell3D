@@ -5,6 +5,8 @@ import {
   applySelection3DToLayers,
   createSelection3D,
   deleteSelection3DFromLayers,
+  duplicateSelection3DToLayers,
+  moveSelection3DToNewLayer,
   transformSelection3D,
 } from '../src/store/selection3DCommands.js'
 
@@ -72,4 +74,30 @@ test('deleting a 3D selection clears only original occupied voxels', () => {
   assert.equal(result.layers[0].voxels[1][1][1], 'transparent')
   assert.equal(result.layers[0].voxels[1][2][1], '#0f0')
   assert.equal(layer.voxels[1][1][1], '#f00')
+})
+
+test('duplicating a transformed selection keeps the source voxels', () => {
+  const source = makeLayer()
+  const selection = createSelection3D(
+    source, 'layer', { x: 1, y: 1, z: 1 }, { x: 1, y: 1, z: 1 },
+  )
+  const moved = transformSelection3D(selection, { type: 'move', dx: 0, dy: 1, dz: 0 }, dimensions)
+  const result = duplicateSelection3DToLayers([source], moved, dimensions)
+  assert.equal(result.affectedCount, 1)
+  assert.equal(result.layers[0].voxels[1][1][1], '#f00')
+  assert.equal(result.layers[0].voxels[2][1][1], '#f00')
+  assert.equal(result.layers[0].voxelMaterials['2,1,1'], 'metal')
+})
+
+test('moving a selection to a new layer clears its source and activates the new layer', () => {
+  const source = makeLayer()
+  const selection = createSelection3D(
+    source, 'layer', { x: 1, y: 1, z: 1 }, { x: 1, y: 1, z: 1 },
+  )
+  const result = moveSelection3DToNewLayer([source], selection, dimensions)
+  assert.equal(result.layers.length, 2)
+  assert.equal(result.layers[0].voxels[1][1][1], 'transparent')
+  assert.equal(result.layers[1].voxels[1][1][1], '#f00')
+  assert.equal(result.layers[1].voxelMaterials['1,1,1'], 'metal')
+  assert.equal(result.activeLayerId, result.layers[1].id)
 })

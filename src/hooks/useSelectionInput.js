@@ -185,24 +185,21 @@ export function useSelectionInput(containerRef) {
       const sel = selection
       const anchorCol = sel.x1
       const anchorRow = sel.y1
-      s.cutSelection()
-      const clip = useStore.getState().clipboard
-      if (clip) {
-        s.pasteFromClipboard()
-        const fp = useStore.getState().floatingPaste
-        if (fp) {
-          const relCol = col - anchorCol
-          const relRow = row - anchorRow
-          useStore.getState().moveFloatingPaste(col - relCol, row - relRow)
-          phase.current = 'dragging'
-          dragOrig.current = {
-            col, row,
-            fpCol: col - relCol,
-            fpRow: row - relRow,
-          }
-          return
+      if (!s.liftSelectionToFloating()) return
+      const fp = useStore.getState().floatingPaste
+      if (fp) {
+        const relCol = col - anchorCol
+        const relRow = row - anchorRow
+        useStore.getState().moveFloatingPaste(col - relCol, row - relRow)
+        phase.current = 'dragging'
+        dragOrig.current = {
+          col, row,
+          fpCol: col - relCol,
+          fpRow: row - relRow,
         }
+        return
       }
+      return
     }
 
     // D. Start drawing new selection

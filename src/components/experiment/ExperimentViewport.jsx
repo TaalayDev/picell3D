@@ -397,6 +397,151 @@ function geometryFor(object) {
       return safeMerge([shaft, crown])
     }
 
+    // ── Furniture ─────────────────────────────────────────────────────────────
+    case 'chair':
+    case 'chair_wood': {
+      const legW = Math.min(w, d) * 0.12
+      const seatH = h * 0.45
+      const seatThick = h * 0.08
+      const parts = []
+
+      // 4 legs
+      const legGeom = new THREE.BoxGeometry(legW, seatH, legW)
+      const xOff = w / 2 - legW / 2
+      const zOff = d / 2 - legW / 2
+      const legY = -h / 2 + seatH / 2
+
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const l = legGeom.clone()
+          l.translate(sx * xOff, legY, sz * zOff)
+          parts.push(l)
+        }
+      }
+
+      // Seat slab
+      const seat = new THREE.BoxGeometry(w, seatThick, d)
+      seat.translate(0, -h / 2 + seatH + seatThick / 2, 0)
+      parts.push(seat)
+
+      // Backrest: 2 posts + slats
+      const backH = h - seatH - seatThick
+      const postW = legW * 0.9
+      const postL = new THREE.BoxGeometry(postW, backH, postW)
+      postL.translate(-xOff, -h / 2 + seatH + seatThick + backH / 2, -zOff)
+      const postR = new THREE.BoxGeometry(postW, backH, postW)
+      postR.translate(xOff, -h / 2 + seatH + seatThick + backH / 2, -zOff)
+      parts.push(postL, postR)
+
+      // Top backrest rail
+      const topRailH = backH * 0.28
+      const topRail = new THREE.BoxGeometry(w, topRailH, postW * 0.8)
+      topRail.translate(0, h / 2 - topRailH / 2, -zOff)
+      parts.push(topRail)
+
+      // Middle backrest slat
+      const midRail = new THREE.BoxGeometry(postW * 0.9, backH * 0.5, postW * 0.6)
+      midRail.translate(0, -h / 2 + seatH + seatThick + backH * 0.35, -zOff)
+      parts.push(midRail)
+
+      return safeMerge(parts)
+    }
+
+    case 'armchair': {
+      const parts = []
+      const seatH = h * 0.38
+      const cushionThick = h * 0.16
+      const armW = w * 0.2
+      const armH = h * 0.6
+      const backThick = d * 0.25
+
+      // Base / feet
+      const base = new THREE.BoxGeometry(w * 0.92, seatH, d * 0.9)
+      base.translate(0, -h / 2 + seatH / 2, 0)
+      parts.push(base)
+
+      // Seat cushion
+      const seat = new THREE.BoxGeometry(w - armW * 2, cushionThick, d - backThick)
+      seat.translate(0, -h / 2 + seatH + cushionThick / 2, backThick / 4)
+      parts.push(seat)
+
+      // Backrest cushion
+      const back = new THREE.BoxGeometry(w, h - seatH, backThick)
+      back.translate(0, h / 2 - (h - seatH) / 2, -d / 2 + backThick / 2)
+      parts.push(back)
+
+      // Left & right armrests
+      const armL = new THREE.BoxGeometry(armW, armH, d * 0.85)
+      armL.translate(-w / 2 + armW / 2, -h / 2 + armH / 2, backThick / 4)
+      const armR = new THREE.BoxGeometry(armW, armH, d * 0.85)
+      armR.translate(w / 2 - armW / 2, -h / 2 + armH / 2, backThick / 4)
+      parts.push(armL, armR)
+
+      return safeMerge(parts)
+    }
+
+    case 'table':
+    case 'table_dining':
+    case 'table_coffee': {
+      const parts = []
+      const topThick = Math.max(0.04, h * 0.1)
+      const legW = Math.min(w, d) * 0.08
+      const legH = h - topThick
+
+      // Table top
+      const top = new THREE.BoxGeometry(w, topThick, d)
+      top.translate(0, h / 2 - topThick / 2, 0)
+      parts.push(top)
+
+      // 4 legs
+      const legGeom = new THREE.BoxGeometry(legW, legH, legW)
+      const xOff = w / 2 - legW
+      const zOff = d / 2 - legW
+      const legY = -h / 2 + legH / 2
+
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const l = legGeom.clone()
+          l.translate(sx * xOff, legY, sz * zOff)
+          parts.push(l)
+        }
+      }
+
+      // Apron frame under table
+      const apronH = topThick * 1.2
+      const apronX = new THREE.BoxGeometry(w - legW * 2, apronH, legW * 0.5)
+      const a1 = apronX.clone(); a1.translate(0, h / 2 - topThick - apronH / 2, zOff)
+      const a2 = apronX.clone(); a2.translate(0, h / 2 - topThick - apronH / 2, -zOff)
+      parts.push(a1, a2)
+
+      return safeMerge(parts)
+    }
+
+    case 'bookshelf': {
+      const parts = []
+      const t = Math.min(w, d) * 0.1
+      const sideL = new THREE.BoxGeometry(t, h, d)
+      sideL.translate(-w / 2 + t / 2, 0, 0)
+      const sideR = new THREE.BoxGeometry(t, h, d)
+      sideR.translate(w / 2 - t / 2, 0, 0)
+      const top = new THREE.BoxGeometry(w, t, d)
+      top.translate(0, h / 2 - t / 2, 0)
+      const bot = new THREE.BoxGeometry(w, t, d)
+      bot.translate(0, -h / 2 + t / 2, 0)
+      const back = new THREE.BoxGeometry(w, h, t * 0.5)
+      back.translate(0, 0, -d / 2 + t * 0.25)
+      const shelfW = w - t * 2
+      const shelf1 = new THREE.BoxGeometry(shelfW, t * 0.8, d * 0.95)
+      shelf1.translate(0, -h * 0.2, t * 0.1)
+      const shelf2 = new THREE.BoxGeometry(shelfW, t * 0.8, d * 0.95)
+      shelf2.translate(0, h * 0.05, t * 0.1)
+      const shelf3 = new THREE.BoxGeometry(shelfW, t * 0.8, d * 0.95)
+      shelf3.translate(0, h * 0.3, t * 0.1)
+
+      parts.push(sideL, sideR, top, bot, back, shelf1, shelf2, shelf3)
+      return safeMerge(parts)
+    }
+
     // ── Basic Shapes ──────────────────────────────────────────────────────────
     case 'sphere': return new THREE.SphereGeometry(w / 2, 32, 20)
     case 'cylinder': return new THREE.CylinderGeometry(w / 2, d / 2, h, 28)
