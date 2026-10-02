@@ -5,7 +5,7 @@ import {
   Undo2, Redo2, Trash2, Download, Frame, ImagePlus, Settings2, Aperture,
   RectangleHorizontal, Circle, Ellipse, Minus,
   BoxSelect, LassoSelect, Droplets, HelpCircle,
-  Save, FolderOpen, FlaskConical, Triangle, Menu, Pipette,
+  Save, FolderOpen, Triangle, Menu, Pipette,
 } from 'lucide-react'
 import { useStore } from '../../store/index.js'
 import TemplatesDialog from './TemplatesDialog.jsx'
@@ -114,16 +114,12 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
 
       {/* Logo + app menu */}
       <div className="flex items-center gap-1 mr-1 pr-1 xl:mr-2 xl:pr-2 border-r border-border">
-        <button
-          type="button"
-          aria-label="Open templates library"
-          onClick={() => setShowTemplatesDialog(true)}
-          title="Open Templates Library"
-          className="font-theme text-text text-sm tracking-wider hover:text-accent transition-all flex items-center gap-1 cursor-pointer select-none px-1.5 py-0.5 rounded border border-transparent hover:border-accent/40 hover:bg-surface-alt active:scale-95"
-        >
+        <div className="font-theme text-text text-sm tracking-wider flex items-center gap-1 select-none px-1.5 py-0.5">
           <span>Picell3D</span>
-        </button>
+        </div>
         <AppMenu
+          onTemplates={() => setShowTemplatesDialog(true)}
+          onLowPoly={onLowPoly}
           onSettings={() => setShowSettingsDialog(true)}
           onShortcuts={toggleShortcutsPanel}
           onSize={() => setShowSizeDialog(true)}
@@ -329,20 +325,6 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
           <Aperture size={14} />
           <span className="hidden xl:inline">Render</span>
         </button>
-        <button
-          type="button"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-medium transition-all"
-          style={{
-            borderColor: 'var(--color-accent)',
-            color:       'var(--color-accent)',
-            background:  'color-mix(in srgb, var(--color-accent) 12%, transparent)',
-          }}
-          onClick={onLowPoly}
-          title="Convert to a smooth low poly model"
-        >
-          <Triangle size={14} />
-          <span className="hidden xl:inline">Low Poly</span>
-        </button>
       </div>
     </div>
     </>
@@ -535,10 +517,10 @@ function ToolMenuButton({ heading, options, value, active, title, onActivate, on
 }
 
 /**
- * Settings, keyboard shortcuts and the Model Lab behind one menu button.
+ * Templates, Low Poly Studio, settings and keyboard shortcuts behind one menu button.
  * On narrow screens it also holds the project actions that don't fit in the toolbar.
  */
-function AppMenu({ onSettings, onShortcuts, onSize, onImport, onSave, onLoad }) {
+function AppMenu({ onTemplates, onLowPoly, onSettings, onShortcuts, onSize, onImport, onSave, onLoad }) {
   const [open, setOpen] = useState(false)
   const buttonRef = useRef(null)
   const menuRef   = useRef(null)
@@ -578,14 +560,11 @@ function AppMenu({ onSettings, onShortcuts, onSize, onImport, onSave, onLoad }) 
             <MenuItem Icon={Frame}      label="Canvas size"   onClick={run(onSize)} />
             <div className="my-1 border-t border-border/40" />
           </div>
+          <MenuItem Icon={Sparkles}   label="Templates Library"   onClick={run(onTemplates)} />
+          <MenuItem Icon={Triangle}   label="Low Poly Studio"     onClick={run(onLowPoly)} />
+          <div className="my-1 border-t border-border/40" />
           <MenuItem Icon={Settings2}  label="Settings"            onClick={run(onSettings)} />
           <MenuItem Icon={HelpCircle} label="Keyboard shortcuts" hint="?" onClick={run(onShortcuts)} />
-          <div className="my-1 border-t border-border/40" />
-          <MenuItem
-            Icon={FlaskConical}
-            label="Model Lab"
-            href="./index.html?page=experiment"
-          />
         </MenuPanel>
       )}
     </div>

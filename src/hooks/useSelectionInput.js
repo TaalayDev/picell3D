@@ -91,6 +91,18 @@ export function useSelectionInput(containerRef) {
       }
     }
 
+    // 4. Inside selection / floating paste
+    const s = useStore.getState()
+    const { pixelSize, selection, floatingPaste } = s
+    const col = Math.floor(px / pixelSize)
+    const row = Math.floor(py / pixelSize)
+    if (floatingPaste) {
+      const insidePaste = col >= floatingPaste.col && col < floatingPaste.col + floatingPaste.w && row >= floatingPaste.row && row < floatingPaste.row + floatingPaste.h
+      if (insidePaste) return { type: 'inside', handles }
+    } else if (isPointInSelection(col, row, selection)) {
+      return { type: 'inside', handles }
+    }
+
     return null
   }, [getHandles])
 
@@ -180,24 +192,25 @@ export function useSelectionInput(containerRef) {
       return
     }
 
-    // C. Click inside existing selection → lift & drag
+    // C. Click inside existing selection → lift & drag, or drag selection marquee
     if (isPointInSelection(col, row, selection)) {
       const sel = selection
-      const anchorCol = sel.x1
-      const anchorRow = sel.y1
-      if (!s.liftSelectionToFloating()) return
+      const lifted = s.liftSelectionToFloating()
       const fp = useStore.getState().floatingPaste
-      if (fp) {
-        const relCol = col - anchorCol
-        const relRow = row - anchorRow
-        useStore.getState().moveFloatingPaste(col - relCol, row - relRow)
+      if (lifted && fp) {
         phase.current = 'dragging'
         dragOrig.current = {
           col, row,
-          fpCol: col - relCol,
-          fpRow: row - relRow,
+          fpCol: fp.col,
+          fpRow: fp.row,
         }
         return
+      }
+      // If lifting didn't happen (empty selection or no voxels at this depth), drag marquee
+      phase.current = 'dragging-selection'
+      dragOrig.current = {
+        col, row,
+        sel: { ...sel, polygon: sel.polygon ? sel.polygon.map(p => ({ ...p })) : null },
       }
       return
     }
@@ -282,6 +295,22 @@ export function useSelectionInput(containerRef) {
     if (phase.current === 'dragging' && dragOrig.current) {
       const { col: origCol, row: origRow, fpCol, fpRow } = dragOrig.current
       s.moveFloatingPaste(fpCol + (col - origCol), fpRow + (row - origRow))
+      return
+    }
+
+    // 4b. Dragging selection marquee without floating paste
+    if (phase.current === 'dragging-selection' && dragOrig.current) {
+      const { col: origCol, row: origRow, sel } = dragOrig.current
+      const dcol = col - origCol
+      const drow = row - origRow
+      s.setSelection({
+        ...sel,
+        x1: sel.x1 + dcol,
+        y1: sel.y1 + drow,
+        x2: sel.x2 + dcol,
+        y2: sel.y2 + drow,
+        polygon: sel.polygon ? sel.polygon.map(p => ({ col: p.col + dcol, row: p.row + drow })) : null,
+      })
       return
     }
 

@@ -444,14 +444,16 @@ export default function PixelCanvas() {
           ctx.fillRect((fc + dcol) * pixelSize, (fr + drow) * pixelSize, pixelSize, pixelSize)
         }
       }
-      // Blue dashed border around floating paste
-      ctx.save()
-      ctx.strokeStyle = 'rgba(100,200,255,0.9)'
-      ctx.lineWidth   = 1.5
-      ctx.setLineDash([4, 3])
-      ctx.strokeRect(fc * pixelSize + 0.5, fr * pixelSize + 0.5, fw * pixelSize - 1, fh * pixelSize - 1)
-      ctx.setLineDash([])
-      ctx.restore()
+      // Blue dashed border around floating paste if no selection marquee active
+      if (!selection) {
+        ctx.save()
+        ctx.strokeStyle = 'rgba(100,200,255,0.9)'
+        ctx.lineWidth   = 1.5
+        ctx.setLineDash([4, 3])
+        ctx.strokeRect(fc * pixelSize + 0.5, fr * pixelSize + 0.5, fw * pixelSize - 1, fh * pixelSize - 1)
+        ctx.setLineDash([])
+        ctx.restore()
+      }
     }
 
     // Selection transform handles (Scale corners, Rotate handle & stem, Moveable Anchor)
@@ -815,6 +817,7 @@ function getCursor(tool, isLineEditing, floatingPaste, isSpaceHeld, hoverHandle,
     if (hoverHandle === 'rotate') return 'grab'
     if (hoverHandle === 'scale-nw' || hoverHandle === 'scale-se') return 'nwse-resize'
     if (hoverHandle === 'scale-ne' || hoverHandle === 'scale-sw') return 'nesw-resize'
+    if (hoverHandle === 'inside') return 'move'
     return floatingPaste ? 'move' : 'crosshair'
   }
   switch (tool) {

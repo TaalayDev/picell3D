@@ -277,6 +277,18 @@ export default function LowPolyPage({ onClose }) {
         </button>
       </div>
 
+      <div
+        role="status"
+        className="px-4 py-1.5 border-b text-xs text-center flex-shrink-0"
+        style={{
+          borderColor: 'color-mix(in srgb, var(--color-accent) 35%, var(--color-border))',
+          color: 'var(--color-accent)',
+          background: 'color-mix(in srgb, var(--color-accent) 10%, var(--color-surface))',
+        }}
+      >
+        Experimental feature — Low Poly Studio is still in development, so results and controls may change.
+      </div>
+
       {/* ── Body ────────────────────────────────────────────────────── */}
       <div className="flex flex-1 min-h-0">
         <div

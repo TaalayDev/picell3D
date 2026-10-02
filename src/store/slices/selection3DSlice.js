@@ -35,6 +35,9 @@ export function createSelection3DSlice(set, get) {
       const state = get()
       const layer = state.layers.find(item => item.id === state.activeLayerId)
       set({
+        selection: null,
+        floatingPaste: null,
+        selectionAnchor: null,
         selection3D: createSelection3D(
           layer, state.activeLayerId, start, end, activeBounds(state),
         ),
@@ -47,6 +50,9 @@ export function createSelection3DSlice(set, get) {
       const bounds = state.editBounds
       set({
         activeTool: 'select',
+        selection: null,
+        floatingPaste: null,
+        selectionAnchor: null,
         selection3D: createSelection3D(
           layer,
           state.activeLayerId,

@@ -76,6 +76,12 @@ test('2D and 3D selections resolve to a shared 3D volume', () => {
     view: 'front',
     ...dimensions,
   }), { minX: 1, maxX: 3, minY: 0, maxY: 2, minZ: 2, maxZ: 4 })
+
+  assert.deepEqual(getSelectionVolumeBounds({
+    selection: { x1: 1, y1: 0, x2: 2, y2: 1, depthStart: 2, depthEnd: 3, direction: 'inward' },
+    view: 'front',
+    ...dimensions,
+  }), { minX: 1, maxX: 2, minY: 0, maxY: 1, minZ: 2, maxZ: 3 })
 })
 
 test('clipboard retains full voxel depth in every orthographic view', () => {

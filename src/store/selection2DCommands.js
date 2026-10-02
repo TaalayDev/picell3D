@@ -11,9 +11,17 @@ const materialKey = ({ x, y, z }) => `${y},${x},${z}`
 
 export function normalizeSelection(selection) {
   if (!selection) return null
-  const { x1, y1, x2, y2, type = 'rect', mask = null, polygon = null } = selection
+  const {
+    x1, y1, x2, y2,
+    type = 'rect', mask = null, polygon = null,
+    depthStart = null, depthEnd = null, direction = null, range = null,
+    view = null,
+  } = selection
   if (![x1, y1, x2, y2].every(Number.isFinite)) return null
-  return {
+  const resolvedRange = range || (depthStart !== null && depthEnd !== null
+    ? { start: depthStart, end: depthEnd, direction: direction || 'inward' }
+    : null)
+  const result = {
     x1: Math.min(x1, x2),
     y1: Math.min(y1, y2),
     x2: Math.max(x1, x2),
@@ -22,6 +30,12 @@ export function normalizeSelection(selection) {
     mask,
     polygon,
   }
+  if (depthStart !== null) result.depthStart = depthStart
+  if (depthEnd !== null) result.depthEnd = depthEnd
+  if (direction !== null) result.direction = direction
+  if (resolvedRange !== null) result.range = resolvedRange
+  if (view !== null) result.view = view
+  return result
 }
 
 export function getSelectionVolumeBounds({
@@ -49,9 +63,14 @@ export function getSelectionVolumeBounds({
   const source = floatingPaste || selection
   if (!source) return null
   const bounds = editBoundsEnabled && editBounds ? editBounds : null
+  const effectiveRange = range || selection?.range || (selection?.depthStart != null && selection?.depthEnd != null ? {
+    start: selection.depthStart,
+    end: selection.depthEnd,
+    direction: selection.direction || 'inward',
+  } : null)
   const targets = floatingPaste
     ? collectPasteTargets({ floatingPaste, view, width, height, depth, bounds })
-    : collectSelectionTargets({ selection, view, width, height, depth, bounds, range })
+    : collectSelectionTargets({ selection, view, width, height, depth, bounds, range: effectiveRange })
   if (!targets.length) return null
   return {
     minX: Math.min(...targets.map(voxel => voxel.x)),
@@ -93,6 +112,11 @@ export function createSelectionClipboard({
 }) {
   const normalized = normalizeSelection(selection)
   if (!normalized) return null
+  const effectiveRange = range || normalized.range || (normalized.depthStart != null && normalized.depthEnd != null ? {
+    start: normalized.depthStart,
+    end: normalized.depthEnd,
+    direction: normalized.direction || 'inward',
+  } : null)
   const clipboardWidth = normalized.x2 - normalized.x1 + 1
   const clipboardHeight = normalized.y2 - normalized.y1 + 1
   const sourceVoxels = sourceLayerId
@@ -106,7 +130,7 @@ export function createSelectionClipboard({
   const voxelList = []
   for (const cell of selectedCells(normalized, viewWidth, viewHeight)) {
     const fullRay = getViewRayCoords(cell.col, cell.row, view, width, height, depth)
-    const ray = selectionRay(cell.col, cell.row, view, width, height, depth, bounds, range)
+    const ray = selectionRay(cell.col, cell.row, view, width, height, depth, bounds, effectiveRange)
     for (const voxel of ray) {
       const color = sourceVoxels[voxel.y]?.[voxel.x]?.[voxel.z]
       if (color && color !== 'transparent') {
@@ -127,10 +151,15 @@ export function createSelectionClipboard({
 export function collectSelectionTargets({ selection, view, width, height, depth, bounds = null, range = null }) {
   const normalized = normalizeSelection(selection)
   if (!normalized) return []
+  const effectiveRange = range || normalized.range || (normalized.depthStart != null && normalized.depthEnd != null ? {
+    start: normalized.depthStart,
+    end: normalized.depthEnd,
+    direction: normalized.direction || 'inward',
+  } : null)
   const { w: viewWidth, h: viewHeight } = getViewSize(view, width, height, depth)
   const targets = new Map()
   for (const cell of selectedCells(normalized, viewWidth, viewHeight)) {
-    for (const voxel of selectionRay(cell.col, cell.row, view, width, height, depth, bounds, range)) {
+    for (const voxel of selectionRay(cell.col, cell.row, view, width, height, depth, bounds, effectiveRange)) {
       targets.set(voxelKey(voxel), voxel)
     }
   }

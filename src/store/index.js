@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { rotateBox, scaleBox, getDefaultAnchor, getPresetAnchor } from '../lib/selectionTransform.js'
 import { clampBrushSize } from '../lib/brushFootprint.js'
+import { isPointInSelection } from '../lib/selectionRasterizer.js'
 import {
   OPPOSITE_VIEW,
   applyEditBoundsAxisLocks,
@@ -247,16 +248,18 @@ export const useStore = create((set, get) => ({
       operationLayerScope, throughMode,
       symmetryX, symmetryY, symmetryOpposite,
       editBoundsEnabled, editBounds,
+      selection, selection3D,
     } = get()
     const layerIdx = layers.findIndex(l => l.id === activeLayerId)
     if (layerIdx < 0) return
     const layerVoxels = layers[layerIdx].voxels
     const effectiveMode = sideDrawModeOverride ?? sideDrawMode
     const { w, h } = getViewSize(activeView, W, H, D)
+    const isSelectionActive = Boolean(selection && (!selection.view || selection.view === activeView))
     const depthCount = fullDepthErase ? D : paintDepth
     const depthRange = fullDepthErase
       ? { start: 1, end: D, direction: 'both' }
-      : { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection }
+      : (isSelectionActive && selection.range ? selection.range : { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection })
     const activeBounds = editBoundsEnabled ? editBounds : null
     const rayMode = operationMode ?? (color === 'transparent' ? eraserMode : pencilMode)
 
@@ -287,6 +290,7 @@ export const useStore = create((set, get) => ({
     const seenPos = new Set()
     const addPos = (c, r) => {
       if (c < 0 || c >= w || r < 0 || r >= h) return
+      if (isSelectionActive && !isPointInSelection(c, r, selection)) return
       const k = `${c},${r}`
       if (seenPos.has(k)) return
       seenPos.add(k)
@@ -302,6 +306,7 @@ export const useStore = create((set, get) => ({
     const seenVox = new Set()
     const addTarget = (t) => {
       if (editBoundsEnabled && !isVoxelInsideEditBounds(t.x, t.y, t.z, editBounds)) return
+      if (selection3D?.voxels?.length && !selection3D.voxels.some(v => v.x === t.x && v.y === t.y && v.z === t.z)) return
       const k = `${t.x},${t.y},${t.z}`
       if (!seenVox.has(k)) { seenVox.add(k); allTargets.push(t) }
     }
@@ -332,7 +337,10 @@ export const useStore = create((set, get) => ({
       symmetryX, symmetryY, symmetryOpposite,
       editBoundsEnabled, editBounds,
       operationLayerScope,
+      selection,
     } = get()
+    const isSelectionActive = Boolean(selection && (!selection.view || selection.view === activeView))
+    if (isSelectionActive && !isPointInSelection(col, row, selection)) return
     const layerIdx = layers.findIndex(l => l.id === activeLayerId)
     if (layerIdx < 0) return
     const layerVoxels = layers[layerIdx].voxels
@@ -354,6 +362,7 @@ export const useStore = create((set, get) => ({
     while (stack.length) {
       const [c, r] = stack.pop()
       if (c < 0 || r < 0 || c >= w || r >= h) continue
+      if (isSelectionActive && !isPointInSelection(c, r, selection)) continue
       if (projectedBounds && (c < projectedBounds.x1 || c > projectedBounds.x2 || r < projectedBounds.y1 || r > projectedBounds.y2)) continue
       const key = `${c},${r}`
       if (visited.has(key)) continue
@@ -366,7 +375,9 @@ export const useStore = create((set, get) => ({
     let _composited = null
     const getComposited = () => _composited ?? (_composited = getCompositedVoxels(layers, W, H, D))
     const activeBounds = editBoundsEnabled ? editBounds : null
-    const depthRange = { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection }
+    const depthRange = isSelectionActive && selection.range
+      ? selection.range
+      : { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection }
 
     const getTargets = (c, r, view, forceDrawMode = false) => {
       if (view === 'front') return getVoxelTargets(c, r, view, paintDepth, W, H, D, activeBounds, depthRange)
@@ -421,12 +432,18 @@ export const useStore = create((set, get) => ({
       recentColors: [color, ...s.recentColors.filter(c => c !== color)].slice(0, 10),
     }))
   },
-  setActiveTool:   (tool)  => set(s => ({
-    activeTool: tool,
-    flyMode: ['select', 'bounds', 'rect', 'circle', 'ellipse', 'line', 'box3d', 'sphere3d', 'cylinder3d'].includes(tool)
-      ? false
-      : s.flyMode,
-  })),
+  setActiveTool:   (tool)  => {
+    const { floatingPaste } = get()
+    if (floatingPaste && tool !== 'select') {
+      get().commitPaste()
+    }
+    set(s => ({
+      activeTool: tool,
+      flyMode: ['select', 'bounds', 'rect', 'circle', 'ellipse', 'line', 'box3d', 'sphere3d', 'cylinder3d'].includes(tool)
+        ? false
+        : s.flyMode,
+    }))
+  },
   setPixelSize:    (size)  => set({ pixelSize: Math.max(4, Math.min(32, size)) }),
   toggleGrid:      ()      => set(s => ({ showGrid: !s.showGrid })),
 
@@ -628,15 +645,52 @@ export const useStore = create((set, get) => ({
   setPaintDepthStart: (value) => set(s => {
     const maxDepth = getViewDepthSize(s.activeView, s.canvasWidth, s.canvasHeight, s.depthDimension)
     const start = Math.max(1, Math.min(maxDepth, Math.round(value)))
-    return { paintDepthStart: start, paintDepthEnd: Math.max(start, s.paintDepthEnd) }
+    const end = Math.max(start, s.paintDepthEnd)
+    const nextSelection = s.selection ? {
+      ...s.selection,
+      depthStart: start,
+      depthEnd: end,
+      range: { start, end, direction: s.selection.direction || s.paintDirection },
+    } : null
+    return {
+      paintDepthStart: start,
+      paintDepthEnd: end,
+      ...(nextSelection ? { selection: nextSelection } : {}),
+    }
   }),
   setPaintDepthEnd: (value) => set(s => {
     const maxDepth = getViewDepthSize(s.activeView, s.canvasWidth, s.canvasHeight, s.depthDimension)
     const end = Math.max(1, Math.min(maxDepth, Math.round(value)))
-    return { paintDepthEnd: end, paintDepthStart: Math.min(end, s.paintDepthStart), paintDepth: end }
+    const start = Math.min(end, s.paintDepthStart)
+    const nextSelection = s.selection ? {
+      ...s.selection,
+      depthStart: start,
+      depthEnd: end,
+      paintDepth: end,
+      range: { start, end, direction: s.selection.direction || s.paintDirection },
+    } : null
+    return {
+      paintDepthEnd: end,
+      paintDepthStart: start,
+      paintDepth: end,
+      ...(nextSelection ? { selection: nextSelection } : {}),
+    }
   }),
-  setPaintDirection:  (dir)  => set({
-    paintDirection: ['inward', 'outward', 'both'].includes(dir) ? dir : 'inward',
+  setPaintDirection:  (dir)  => set(s => {
+    const nextDir = ['inward', 'outward', 'both'].includes(dir) ? dir : 'inward'
+    const nextSelection = s.selection ? {
+      ...s.selection,
+      direction: nextDir,
+      range: {
+        start: s.selection.depthStart ?? s.paintDepthStart,
+        end: s.selection.depthEnd ?? s.paintDepthEnd,
+        direction: nextDir,
+      },
+    } : null
+    return {
+      paintDirection: nextDir,
+      ...(nextSelection ? { selection: nextSelection } : {}),
+    }
   }),
   setSideDrawMode:    (mode) => set({ sideDrawMode: mode }),
   setPencilMode:      (mode) => set({ pencilMode: ['surface', 'visible', 'through'].includes(mode) ? mode : 'surface' }),
@@ -682,14 +736,19 @@ export const useStore = create((set, get) => ({
     const {
       layers, activeLayerId, canvasWidth: W, canvasHeight: H, depthDimension: D,
       activeView, paintDepth, paintDepthStart, paintDepthEnd, paintDirection,
-      activeMaterial, editBoundsEnabled, editBounds,
+      activeMaterial, editBoundsEnabled, editBounds, selection,
     } = get()
+    const isSelectionActive = Boolean(selection && (!selection.view || selection.view === activeView))
+    if (isSelectionActive && !isPointInSelection(col, row, selection)) return
     const layerIdx = layers.findIndex(l => l.id === activeLayerId)
     if (layerIdx < 0) return
+    const depthRange = isSelectionActive && selection.range
+      ? selection.range
+      : { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection }
     const targets = getVoxelTargets(
       col, row, activeView, paintDepth, W, H, D,
       editBoundsEnabled ? editBounds : null,
-      { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection },
+      depthRange,
     )
     get().paintMaterialsDirect(targets)
   },
@@ -805,11 +864,18 @@ export const useStore = create((set, get) => ({
 
   setSelection(sel) {
     if (!sel) { set({ selection: null, lassoPreview: null, selectionAnchor: null }); return }
-    const normalized = normalizeSelection(sel)
+    const { paintDepthStart, paintDepthEnd, paintDirection, activeView } = get()
+    const depthStart = sel.depthStart ?? paintDepthStart
+    const depthEnd = sel.depthEnd ?? paintDepthEnd
+    const direction = sel.direction ?? paintDirection
+    const range = sel.range ?? { start: depthStart, end: depthEnd, direction }
+    const view = sel.view ?? activeView
+    const normalized = normalizeSelection({ ...sel, depthStart, depthEnd, direction, range, view })
     if (!normalized) return
     const defaultAnchor = getDefaultAnchor(normalized)
     set({
       selection: normalized,
+      selection3D: null,
       selectionAnchor: defaultAnchor,
       lassoPreview: null,
     })
@@ -846,15 +912,17 @@ export const useStore = create((set, get) => ({
 
   liftSelectionToFloating() {
     const { selection, floatingPaste } = get()
-    if (floatingPaste || !selection) return
+    if (floatingPaste || !selection) return false
     const { x1, y1 } = selection
     const savedAnchor = get().selectionAnchor || getDefaultAnchor(selection)
+    const savedSelection = { ...selection }
     if (!get().cutSelection()) return false
     get().pasteFromClipboard()
     const fp = get().floatingPaste
     if (fp) {
       set({
         floatingPaste: { ...fp, col: x1, row: y1 },
+        selection: savedSelection,
         selectionAnchor: savedAnchor,
       })
       return true
@@ -871,7 +939,21 @@ export const useStore = create((set, get) => ({
     if (!fp) return
     const anchor = get().selectionAnchor || { x: fp.col + fp.w / 2, y: fp.row + fp.h / 2 }
     const rotated = rotateBox(fp, angleRad, anchor.x, anchor.y)
-    set({ floatingPaste: rotated })
+    const sel = get().selection
+    set({
+      floatingPaste: rotated,
+      ...(sel ? {
+        selection: {
+          ...sel,
+          x1: rotated.col,
+          y1: rotated.row,
+          x2: rotated.col + rotated.w - 1,
+          y2: rotated.row + rotated.h - 1,
+          mask: null,
+          polygon: null,
+        },
+      } : {}),
+    })
   },
 
   scaleSelection(scaleX, scaleY) {
@@ -883,7 +965,21 @@ export const useStore = create((set, get) => ({
     if (!fp) return
     const anchor = get().selectionAnchor || { x: fp.col + fp.w / 2, y: fp.row + fp.h / 2 }
     const scaled = scaleBox(fp, scaleX, scaleY, anchor.x, anchor.y)
-    set({ floatingPaste: scaled })
+    const sel = get().selection
+    set({
+      floatingPaste: scaled,
+      ...(sel ? {
+        selection: {
+          ...sel,
+          x1: scaled.col,
+          y1: scaled.row,
+          x2: scaled.col + scaled.w - 1,
+          y2: scaled.row + scaled.h - 1,
+          mask: null,
+          polygon: null,
+        },
+      } : {}),
+    })
   },
 
   shiftSelectionDepth(delta) {
@@ -926,11 +1022,13 @@ export const useStore = create((set, get) => ({
       canvasWidth: W, canvasHeight: H, depthDimension: D, activeView,
       editBoundsEnabled, editBounds, paintDepthStart, paintDepthEnd, paintDirection,
     } = get()
+    const bounds = editBoundsEnabled ? editBounds : null
+    const range = selection?.range || { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection }
     const clipboard = createSelectionClipboard({
       selection, layers, sourceLayerId: activeLayerId,
       width: W, height: H, depth: D, view: activeView,
-      bounds: editBoundsEnabled ? editBounds : null,
-      range: { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection },
+      bounds,
+      range,
     })
     if (clipboard) set({ clipboard })
   },
@@ -943,9 +1041,10 @@ export const useStore = create((set, get) => ({
     } = get()
     if (!selection) return false
     const bounds = editBoundsEnabled ? editBounds : null
+    const range = selection.range || { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection }
     const targets = collectSelectionTargets({
       selection, view: activeView, width: W, height: H, depth: D, bounds,
-      range: { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection },
+      range,
     })
     const result = eraseSelectionTargets(layers, activeLayerId, targets)
     if (!result) return false
@@ -957,7 +1056,7 @@ export const useStore = create((set, get) => ({
     const clipboard = createSelectionClipboard({
       selection, layers, sourceLayerId: activeLayerId,
       width: W, height: H, depth: D, view: activeView, bounds,
-      range: { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection },
+      range,
     })
     get().pushUndo()
     set({ layers: result.layers, clipboard, selection: null })
@@ -975,12 +1074,23 @@ export const useStore = create((set, get) => ({
   },
 
   moveFloatingPaste(col, row) {
-    const { floatingPaste, selectionAnchor } = get()
+    const { floatingPaste, selectionAnchor, selection } = get()
     if (!floatingPaste) return
+    const dcol = col - floatingPaste.col
+    const drow = row - floatingPaste.row
     const moved = moveSelectionPaste(floatingPaste, selectionAnchor, col, row)
+    const nextSelection = selection ? {
+      ...selection,
+      x1: selection.x1 + dcol,
+      y1: selection.y1 + drow,
+      x2: selection.x2 + dcol,
+      y2: selection.y2 + drow,
+      polygon: selection.polygon ? selection.polygon.map(p => ({ col: p.col + dcol, row: p.row + drow })) : null,
+    } : null
     set({
       floatingPaste: moved.floatingPaste,
       selectionAnchor: moved.anchor,
+      ...(nextSelection ? { selection: nextSelection } : {}),
     })
   },
 
@@ -1029,10 +1139,11 @@ export const useStore = create((set, get) => ({
       editBoundsEnabled, editBounds, paintDepthStart, paintDepthEnd, paintDirection,
     } = get()
     if (!selection) return
+    const range = selection.range || { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection }
     const targets = collectSelectionTargets({
       selection, view: activeView, width: W, height: H, depth: D,
       bounds: editBoundsEnabled ? editBounds : null,
-      range: { start: paintDepthStart, end: paintDepthEnd, direction: paintDirection },
+      range,
     })
     const result = eraseSelectionTargets(layers, activeLayerId, targets)
     if (!result) return
