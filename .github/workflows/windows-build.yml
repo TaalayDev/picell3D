@@ -1,0 +1,76 @@
+name: Windows build
+
+# Builds Windows installers (.msi and .exe) on a Windows runner.
+# On version tags, the installers are attached directly to that tag's
+# GitHub Release. No Actions artifact is created.
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write   # needed to create GitHub Releases
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      # Vite reads these values while `tauri build` runs its frontend build.
+      # Keep this generated so a Windows release always targets production.
+      - name: Configure production online mode
+        shell: pwsh
+        run: |
+          @'
+          VITE_DEBUG=false
+          VITE_ENABLE_PLAYTEST_TOOLS=false
+          '@ | Set-Content -Path .env -NoNewline
+
+      # Produces MSI and NSIS (.exe) bundles.
+      # WebView2 is preinstalled on windows-latest.
+      # Self-updater signing is disabled for now (no signing keypair set up —
+      # see RELEASE.md), so this doesn't need TAURI_SIGNING_PRIVATE_KEY. To
+      # re-enable: add plugins.updater + bundle.createUpdaterArtifacts back to
+      # a src-tauri/tauri.windows.conf.json override and restore the env vars
+      # here (see git history for the previous version of this step).
+      - run: npm run tauri build
+
+      # On version tags: create the release if needed and attach the installers
+      # directly to it. Re-running the workflow replaces same-named files.
+      - name: Upload installers to tag release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Rules of the House ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          overwrite_files: true
+          files: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Self-updater signing is disabled for now, so there's no .sig to publish
+      # here automatically. Publishing a build to the in-app self-updater is a
+      # manual step for now — download the .exe from the GitHub Release above
+      # and upload it via the admin panel's Updates page
+      # (Settings → Updates → Upload build), which accepts an unsigned build.
+      # See server/src/updates and RELEASE.md.
