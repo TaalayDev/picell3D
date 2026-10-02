@@ -4,9 +4,16 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "test": "node --test",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate-templates": "node scripts/generateTemplates.js",
+    "generate-voxel-templates": "node scripts/generateVoxelTemplates.js",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "cargo:check": "cargo check --manifest-path src-tauri/Cargo.toml"
   },
   "dependencies": {
     "lucide-react": "^0.577.0",
@@ -18,6 +25,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "@tauri-apps/cli": "^2.0.0",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",

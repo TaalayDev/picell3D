@@ -1,0 +1,2495 @@
+{
+  "version": 1,
+  "canvasWidth": 16,
+  "canvasHeight": 16,
+  "depthDimension": 6,
+  "activeLayerId": "layer-1",
+  "palette": [
+    "#000000",
+    "#1a1a1a",
+    "#333333",
+    "#555555",
+    "#888888",
+    "#aaaaaa",
+    "#cccccc",
+    "#e8e8e8",
+    "#ffffff",
+    "#ff0000",
+    "#cc0000",
+    "#880000",
+    "#ff4444",
+    "#ff8888",
+    "#ffcccc",
+    "#ff8800",
+    "#cc6600",
+    "#884400",
+    "#ffaa44",
+    "#ffcc88",
+    "#ffe4c0",
+    "#ffff00",
+    "#cccc00",
+    "#888800",
+    "#ffff66",
+    "#ffff99",
+    "#ffffcc",
+    "#00ff00",
+    "#00cc00",
+    "#008800",
+    "#44ff44",
+    "#88ff88",
+    "#ccffcc",
+    "#00ffcc",
+    "#00ccaa",
+    "#008866",
+    "#00ffff",
+    "#00cccc",
+    "#008888",
+    "#0000ff",
+    "#0000cc",
+    "#000088",
+    "#4444ff",
+    "#8888ff",
+    "#ccccff",
+    "#8800ff",
+    "#6600cc",
+    "#440088",
+    "#ff00ff",
+    "#cc00cc",
+    "#880088",
+    "#662200",
+    "#8b4513",
+    "#a0522d",
+    "#c68642",
+    "#d2a679",
+    "#f5deb3"
+  ],
+  "activeTheme": "synthwave",
+  "layers": [
+    {
+      "id": "layer-1",
+      "name": "Potion",
+      "visible": true,
+      "opacity": 1,
+      "voxels": [
+        [
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ]
+        ],
+        [
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "#c68642",
+            "#c68642",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "#c68642",
+            "#c68642",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ]
+        ],
+        [
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "#8b4513",
+            "#8b4513",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "#8b4513",
+            "#8b4513",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ]
+        ],
+        [
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "#cccccc",
+            "#cccccc",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "#e8e8e8",
+            "#e8e8e8",
+            "#e8e8e8",
+            "#e8e8e8",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "#e8e8e8",
+            "#e8e8e8",
+            "#e8e8e8",
+            "#e8e8e8",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "#cccccc",
+            "#cccccc",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ]
+        ],
+        [
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "#e8e8e8",
+            "#e8e8e8",
+            "#e8e8e8",
+            "#e8e8e8",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "#e8e8e8",
+            "#e8e8e8",
+            "#e8e8e8",
+            "#e8e8e8",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ]
+        ],
+        [
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ]
+        ],
+        [
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "#00ffff",
+            "#ffffff",
+            "#ffffff",
+            "#00ffff",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "#00ffff",
+            "transparent",
+            "transparent",
+            "#00ffff",
+            "transparent"
+          ],
+          [
+            "#00ffff",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "#00ffff"
+          ],
+          [
+            "transparent",
+            "#00ffff",
+            "transparent",
+            "transparent",
+            "#00ffff",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "#00ffff",
+            "#00ffff",
+            "#00ffff",
+            "#00ffff",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ]
+        ],
+        [
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "#00ffff",
+            "#ffffff",
+            "#ffffff",
+            "#00ffff",
+            "transparent"
+          ],
+          [
+            "#00ffff",
+            "#88ffcc",
+            "#88ffcc",
+            "#88ffcc",
+            "#88ffcc",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#88ffcc",
+            "#88ffcc",
+            "#88ffcc",
+            "#88ffcc",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#88ffcc",
+            "#88ffcc",
+            "#88ffcc",
+            "#88ffcc",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#88ffcc",
+            "#88ffcc",
+            "#88ffcc",
+            "#88ffcc",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#88ffcc",
+            "#88ffcc",
+            "#88ffcc",
+            "#88ffcc",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#88ffcc",
+            "#88ffcc",
+            "#88ffcc",
+            "#88ffcc",
+            "#00ffff"
+          ],
+          [
+            "transparent",
+            "#00ffff",
+            "#00ffff",
+            "#00ffff",
+            "#00ffff",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ]
+        ],
+        [
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff",
+            "transparent"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#ffffff",
+            "#ffffff",
+            "#ffffff",
+            "#ffffff",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "transparent",
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ]
+        ],
+        [
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ]
+        ],
+        [
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#ffffff",
+            "#ffffff",
+            "#ffffff",
+            "#ffffff",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ]
+        ],
+        [
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff",
+            "transparent"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff"
+          ],
+          [
+            "transparent",
+            "#00ffff",
+            "#00ff88",
+            "#00ff88",
+            "#00ffff",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ]
+        ],
+        [
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "#00ffff",
+            "#00ffff",
+            "#00ffff",
+            "#00ffff",
+            "transparent"
+          ],
+          [
+            "#00ffff",
+            "#008844",
+            "#008844",
+            "#008844",
+            "#008844",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#008844",
+            "#008844",
+            "#008844",
+            "#008844",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#008844",
+            "#008844",
+            "#008844",
+            "#008844",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#008844",
+            "#008844",
+            "#008844",
+            "#008844",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#008844",
+            "#008844",
+            "#008844",
+            "#008844",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#008844",
+            "#008844",
+            "#008844",
+            "#008844",
+            "#00ffff"
+          ],
+          [
+            "transparent",
+            "#00ffff",
+            "#00ffff",
+            "#00ffff",
+            "#00ffff",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ]
+        ],
+        [
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "#00ffff",
+            "#00ffff",
+            "#00ffff",
+            "#00ffff",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "#00ffff",
+            "#008844",
+            "#008844",
+            "#00ffff",
+            "transparent"
+          ],
+          [
+            "#00ffff",
+            "#008844",
+            "#008844",
+            "#008844",
+            "#008844",
+            "#00ffff"
+          ],
+          [
+            "#00ffff",
+            "#008844",
+            "#008844",
+            "#008844",
+            "#008844",
+            "#00ffff"
+          ],
+          [
+            "transparent",
+            "#00ffff",
+            "#008844",
+            "#008844",
+            "#00ffff",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "#00ffff",
+            "#00ffff",
+            "#00ffff",
+            "#00ffff",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ]
+        ],
+        [
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ]
+        ],
+        [
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ],
+          [
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent",
+            "transparent"
+          ]
+        ]
+      ],
+      "voxelMaterials": {
+        "3,7,1": "glass",
+        "3,7,2": "glass",
+        "3,7,3": "glass",
+        "3,7,4": "glass",
+        "3,8,1": "glass",
+        "3,8,2": "glass",
+        "3,8,3": "glass",
+        "3,8,4": "glass",
+        "4,7,1": "glass",
+        "4,7,2": "glass",
+        "4,7,3": "glass",
+        "4,7,4": "glass",
+        "4,8,1": "glass",
+        "4,8,2": "glass",
+        "4,8,3": "glass",
+        "4,8,4": "glass",
+        "3,6,2": "glass",
+        "3,6,3": "glass",
+        "3,9,2": "glass",
+        "3,9,3": "glass",
+        "6,5,1": "glass",
+        "6,5,2": "glass",
+        "6,5,3": "glass",
+        "6,5,4": "glass",
+        "6,6,1": "glass",
+        "6,6,4": "glass",
+        "6,7,0": "glass",
+        "6,7,5": "glass",
+        "6,8,0": "glass",
+        "6,8,5": "glass",
+        "6,9,1": "glass",
+        "6,9,4": "glass",
+        "6,10,1": "glass",
+        "6,10,2": "glass",
+        "6,10,3": "glass",
+        "6,10,4": "glass",
+        "7,4,1": "glass",
+        "7,4,2": "glass",
+        "7,4,3": "glass",
+        "7,4,4": "glass",
+        "7,5,0": "glass",
+        "7,5,1": "neon",
+        "7,5,2": "neon",
+        "7,5,3": "neon",
+        "7,5,4": "neon",
+        "7,5,5": "glass",
+        "7,6,0": "glass",
+        "7,6,1": "neon",
+        "7,6,2": "neon",
+        "7,6,3": "neon",
+        "7,6,4": "neon",
+        "7,6,5": "glass",
+        "7,7,0": "glass",
+        "7,7,1": "neon",
+        "7,7,2": "neon",
+        "7,7,3": "neon",
+        "7,7,4": "neon",
+        "7,7,5": "glass",
+        "7,8,0": "glass",
+        "7,8,1": "neon",
+        "7,8,2": "neon",
+        "7,8,3": "neon",
+        "7,8,4": "neon",
+        "7,8,5": "glass",
+        "7,9,0": "glass",
+        "7,9,1": "neon",
+        "7,9,2": "neon",
+        "7,9,3": "neon",
+        "7,9,4": "neon",
+        "7,9,5": "glass",
+        "7,10,0": "glass",
+        "7,10,1": "neon",
+        "7,10,2": "neon",
+        "7,10,3": "neon",
+        "7,10,4": "neon",
+        "7,10,5": "glass",
+        "7,11,1": "glass",
+        "7,11,2": "glass",
+        "7,11,3": "glass",
+        "7,11,4": "glass",
+        "8,4,1": "glass",
+        "8,4,2": "neon",
+        "8,4,3": "neon",
+        "8,4,4": "glass",
+        "8,5,0": "glass",
+        "8,5,1": "neon",
+        "8,5,2": "neon",
+        "8,5,3": "neon",
+        "8,5,4": "neon",
+        "8,5,5": "glass",
+        "8,6,0": "glass",
+        "8,6,1": "neon",
+        "8,6,2": "neon",
+        "8,6,3": "neon",
+        "8,6,4": "neon",
+        "8,6,5": "glass",
+        "8,7,0": "glass",
+        "8,7,1": "neon",
+        "8,7,2": "neon",
+        "8,7,3": "neon",
+        "8,7,4": "neon",
+        "8,7,5": "glass",
+        "8,8,0": "glass",
+        "8,8,1": "neon",
+        "8,8,2": "neon",
+        "8,8,3": "neon",
+        "8,8,4": "neon",
+        "8,8,5": "glass",
+        "8,9,0": "glass",
+        "8,9,1": "neon",
+        "8,9,2": "neon",
+        "8,9,3": "neon",
+        "8,9,4": "neon",
+        "8,9,5": "glass",
+        "8,10,0": "glass",
+        "8,10,1": "neon",
+        "8,10,2": "neon",
+        "8,10,3": "neon",
+        "8,10,4": "neon",
+        "8,10,5": "glass",
+        "8,11,1": "glass",
+        "8,11,2": "neon",
+        "8,11,3": "neon",
+        "8,11,4": "glass",
+        "9,4,0": "glass",
+        "9,4,1": "neon",
+        "9,4,2": "neon",
+        "9,4,3": "neon",
+        "9,4,4": "neon",
+        "9,4,5": "glass",
+        "9,5,0": "glass",
+        "9,5,1": "neon",
+        "9,5,2": "neon",
+        "9,5,3": "neon",
+        "9,5,4": "neon",
+        "9,5,5": "glass",
+        "9,6,0": "glass",
+        "9,6,1": "neon",
+        "9,6,2": "neon",
+        "9,6,3": "neon",
+        "9,6,4": "neon",
+        "9,6,5": "glass",
+        "9,7,0": "glass",
+        "9,7,1": "neon",
+        "9,7,2": "neon",
+        "9,7,3": "neon",
+        "9,7,4": "neon",
+        "9,7,5": "glass",
+        "9,8,0": "glass",
+        "9,8,1": "neon",
+        "9,8,2": "neon",
+        "9,8,3": "neon",
+        "9,8,4": "neon",
+        "9,8,5": "glass",
+        "9,9,0": "glass",
+        "9,9,1": "neon",
+        "9,9,2": "neon",
+        "9,9,3": "neon",
+        "9,9,4": "neon",
+        "9,9,5": "glass",
+        "9,10,0": "glass",
+        "9,10,1": "neon",
+        "9,10,2": "neon",
+        "9,10,3": "neon",
+        "9,10,4": "neon",
+        "9,10,5": "glass",
+        "9,11,0": "glass",
+        "9,11,1": "neon",
+        "9,11,2": "neon",
+        "9,11,3": "neon",
+        "9,11,4": "neon",
+        "9,11,5": "glass",
+        "10,4,0": "glass",
+        "10,4,1": "neon",
+        "10,4,2": "neon",
+        "10,4,3": "neon",
+        "10,4,4": "neon",
+        "10,4,5": "glass",
+        "10,5,0": "glass",
+        "10,5,1": "neon",
+        "10,5,2": "neon",
+        "10,5,3": "neon",
+        "10,5,4": "neon",
+        "10,5,5": "glass",
+        "10,6,0": "glass",
+        "10,6,1": "neon",
+        "10,6,2": "neon",
+        "10,6,3": "neon",
+        "10,6,4": "neon",
+        "10,6,5": "glass",
+        "10,7,0": "glass",
+        "10,7,1": "neon",
+        "10,7,2": "neon",
+        "10,7,3": "neon",
+        "10,7,4": "neon",
+        "10,7,5": "glass",
+        "10,8,0": "glass",
+        "10,8,1": "neon",
+        "10,8,2": "neon",
+        "10,8,3": "neon",
+        "10,8,4": "neon",
+        "10,8,5": "glass",
+        "10,9,0": "glass",
+        "10,9,1": "neon",
+        "10,9,2": "neon",
+        "10,9,3": "neon",
+        "10,9,4": "neon",
+        "10,9,5": "glass",
+        "10,10,0": "glass",
+        "10,10,1": "neon",
+        "10,10,2": "neon",
+        "10,10,3": "neon",
+        "10,10,4": "neon",
+        "10,10,5": "glass",
+        "10,11,0": "glass",
+        "10,11,1": "neon",
+        "10,11,2": "neon",
+        "10,11,3": "neon",
+        "10,11,4": "neon",
+        "10,11,5": "glass",
+        "11,4,1": "glass",
+        "11,4,2": "neon",
+        "11,4,3": "neon",
+        "11,4,4": "glass",
+        "11,5,0": "glass",
+        "11,5,1": "neon",
+        "11,5,2": "neon",
+        "11,5,3": "neon",
+        "11,5,4": "neon",
+        "11,5,5": "glass",
+        "11,6,0": "glass",
+        "11,6,1": "neon",
+        "11,6,2": "neon",
+        "11,6,3": "neon",
+        "11,6,4": "neon",
+        "11,6,5": "glass",
+        "11,7,0": "glass",
+        "11,7,1": "neon",
+        "11,7,2": "neon",
+        "11,7,3": "neon",
+        "11,7,4": "neon",
+        "11,7,5": "glass",
+        "11,8,0": "glass",
+        "11,8,1": "neon",
+        "11,8,2": "neon",
+        "11,8,3": "neon",
+        "11,8,4": "neon",
+        "11,8,5": "glass",
+        "11,9,0": "glass",
+        "11,9,1": "neon",
+        "11,9,2": "neon",
+        "11,9,3": "neon",
+        "11,9,4": "neon",
+        "11,9,5": "glass",
+        "11,10,0": "glass",
+        "11,10,1": "neon",
+        "11,10,2": "neon",
+        "11,10,3": "neon",
+        "11,10,4": "neon",
+        "11,10,5": "glass",
+        "11,11,1": "glass",
+        "11,11,2": "neon",
+        "11,11,3": "neon",
+        "11,11,4": "glass",
+        "12,4,1": "glass",
+        "12,4,2": "glass",
+        "12,4,3": "glass",
+        "12,4,4": "glass",
+        "12,5,0": "glass",
+        "12,5,1": "neon",
+        "12,5,2": "neon",
+        "12,5,3": "neon",
+        "12,5,4": "neon",
+        "12,5,5": "glass",
+        "12,6,0": "glass",
+        "12,6,1": "neon",
+        "12,6,2": "neon",
+        "12,6,3": "neon",
+        "12,6,4": "neon",
+        "12,6,5": "glass",
+        "12,7,0": "glass",
+        "12,7,1": "neon",
+        "12,7,2": "neon",
+        "12,7,3": "neon",
+        "12,7,4": "neon",
+        "12,7,5": "glass",
+        "12,8,0": "glass",
+        "12,8,1": "neon",
+        "12,8,2": "neon",
+        "12,8,3": "neon",
+        "12,8,4": "neon",
+        "12,8,5": "glass",
+        "12,9,0": "glass",
+        "12,9,1": "neon",
+        "12,9,2": "neon",
+        "12,9,3": "neon",
+        "12,9,4": "neon",
+        "12,9,5": "glass",
+        "12,10,0": "glass",
+        "12,10,1": "neon",
+        "12,10,2": "neon",
+        "12,10,3": "neon",
+        "12,10,4": "neon",
+        "12,10,5": "glass",
+        "12,11,1": "glass",
+        "12,11,2": "glass",
+        "12,11,3": "glass",
+        "12,11,4": "glass",
+        "13,5,1": "glass",
+        "13,5,2": "glass",
+        "13,5,3": "glass",
+        "13,5,4": "glass",
+        "13,6,1": "glass",
+        "13,6,2": "neon",
+        "13,6,3": "neon",
+        "13,6,4": "glass",
+        "13,7,0": "glass",
+        "13,7,1": "neon",
+        "13,7,2": "neon",
+        "13,7,3": "neon",
+        "13,7,4": "neon",
+        "13,7,5": "glass",
+        "13,8,0": "glass",
+        "13,8,1": "neon",
+        "13,8,2": "neon",
+        "13,8,3": "neon",
+        "13,8,4": "neon",
+        "13,8,5": "glass",
+        "13,9,1": "glass",
+        "13,9,2": "neon",
+        "13,9,3": "neon",
+        "13,9,4": "glass",
+        "13,10,1": "glass",
+        "13,10,2": "glass",
+        "13,10,3": "glass",
+        "13,10,4": "glass"
+      }
+    }
+  ]
+}

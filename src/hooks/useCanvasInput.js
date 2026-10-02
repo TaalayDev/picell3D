@@ -1,5 +1,6 @@
-import { useRef, useCallback } from 'react'
-import { useStore, getViewSize } from '../store/index.js'
+import { useRef, useCallback, useEffect } from 'react'
+import { useStore, getViewSize, getCompositedVoxels, renderView2D } from '../store/index.js'
+import { getBrushOffsets } from '../lib/brushFootprint.js'
 
 /** Bresenham's line — returns all integer coords between (x0,y0) and (x1,y1) */
 function bresenham(x0, y0, x1, y1) {
@@ -17,9 +18,47 @@ function bresenham(x0, y0, x1, y1) {
   return points
 }
 
+/** Linearly interpolate between two hex colors */
+function lerpColor(c1, c2, t) {
+  if (!c1 || c1 === 'transparent') return c2
+  if (!c2 || c2 === 'transparent') return c1
+  const p = (hex, pos) => parseInt(hex.slice(pos, pos + 2), 16)
+  const r  = Math.round(p(c1, 1) + (p(c2, 1) - p(c1, 1)) * t)
+  const g  = Math.round(p(c1, 3) + (p(c2, 3) - p(c1, 3)) * t)
+  const b  = Math.round(p(c1, 5) + (p(c2, 5) - p(c1, 5)) * t)
+  return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')
+}
+
 export function useCanvasInput(containerRef) {
-  const isDrawing = useRef(false)
-  const lastPixel = useRef(null)
+  const isDrawing      = useRef(false)
+  const lastPixel      = useRef(null)
+  const blendDragStart = useRef(null) // {col, row} where blend stroke started
+  const undoTransaction = useRef(null)
+  const pendingAltPick = useRef(null)
+  // Track Alt key for temporary draw-mode override on non-front views
+  const isAltHeld   = useRef(false)
+  // Track Shift key for full-depth erase
+  const isShiftHeld = useRef(false)
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === 'Alt')   {
+        if (document.activeElement === containerRef.current) e.preventDefault()
+        isAltHeld.current = true
+      }
+      if (e.key === 'Shift') { isShiftHeld.current = true }
+    }
+    const onKeyUp = (e) => {
+      if (e.key === 'Alt')   isAltHeld.current   = false
+      if (e.key === 'Shift') isShiftHeld.current = false
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup',   onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup',   onKeyUp)
+    }
+  }, [containerRef])
 
   const getPixelCoords = useCallback((e) => {
     const { pixelSize } = useStore.getState()
@@ -29,48 +68,127 @@ export function useCanvasInput(containerRef) {
     return { col, row }
   }, [])
 
+  /** Pick the visible color at canvas position and set as currentColor */
+  const pickColor = useCallback(({ col, row }) => {
+    const s = useStore.getState()
+    const { layers, canvasWidth: W, canvasHeight: H, depthDimension: D, activeView } = s
+    const composited = getCompositedVoxels(layers, W, H, D)
+    const view2d     = renderView2D(composited, activeView, W, H, D)
+    const color      = view2d[row]?.[col]
+    if (color && color !== 'transparent') s.setCurrentColor(color)
+  }, [])
+
   const applyTool = useCallback(({ col, row }) => {
     const s = useStore.getState()
-    const { activeTool, currentColor, activeView, canvasWidth: W, canvasHeight: H, depthDimension: D } = s
+    const {
+      activeTool, currentColor, blendEndColor, activeView,
+      canvasWidth: W, canvasHeight: H, depthDimension: D, sideDrawMode, brushSize,
+      pencilMode, eraserMode,
+    } = s
     const { w, h } = getViewSize(activeView, W, H, D)
     if (col < 0 || row < 0 || col >= w || row >= h) return
 
-    switch (activeTool) {
-      case 'pencil':
-        s.paintAt(col, row, currentColor)
-        break
-      case 'eraser':
-        s.paintAt(col, row, 'transparent')
-        break
+    // Alt held → temporarily flip the side draw mode
+    const sideDrawModeOverride = (isAltHeld.current && activeView !== 'front')
+      ? (sideDrawMode === 'edit' ? 'draw' : 'edit')
+      : null
+    const pencilModeOverride = isAltHeld.current && pencilMode !== 'through'
+      ? (pencilMode === 'surface' ? 'visible' : 'surface')
+      : pencilMode
+    const eraseModeOverride = isAltHeld.current
+      ? (eraserMode === 'through' ? 'visible' : 'through')
+      : isShiftHeld.current ? 'through' : eraserMode
+
+    const brushPoints = getBrushOffsets(brushSize)
+      .map(({ u, v }) => ({ col: col + u, row: row + v }))
+      .filter(point => point.col >= 0 && point.row >= 0 && point.col < w && point.row < h)
+
+    for (const point of brushPoints) {
+      switch (activeTool) {
+        case 'pencil':
+          s.paintAt(point.col, point.row, currentColor, {
+            sideDrawModeOverride,
+            operationMode: pencilModeOverride,
+          })
+          break
+        case 'eraser':
+          s.paintAt(point.col, point.row, 'transparent', {
+            sideDrawModeOverride,
+            fullDepthErase: isShiftHeld.current,
+            operationMode: eraseModeOverride,
+          })
+          break
+        case 'material':
+          s.paintMaterialAt(point.col, point.row)
+          break
+        case 'blend': {
+          const origin = blendDragStart.current ?? { col, row }
+          const dist   = Math.sqrt((col - origin.col) ** 2 + (row - origin.row) ** 2)
+          const maxDist = Math.max(W, H)
+          const t       = Math.min(dist / maxDist, 1)
+          s.paintAt(point.col, point.row, lerpColor(currentColor, blendEndColor, t), {
+            sideDrawModeOverride,
+            operationMode: pencilModeOverride,
+          })
+          break
+        }
+      }
     }
   }, [])
 
   const onPointerDown = useCallback((e) => {
+    // Right-click → eyedropper
+    if (e.button === 2) {
+      e.preventDefault()
+      pickColor(getPixelCoords(e))
+      return
+    }
     if (e.button !== 0) return
     try { containerRef.current?.setPointerCapture(e.pointerId) } catch {}
 
-    const s = useStore.getState()
+    const s      = useStore.getState()
     const coords = getPixelCoords(e)
+
+    if (s.activeTool === 'eyedropper') {
+      pickColor(coords)
+      return
+    }
+
+    if (s.activeTool === 'pencil' && (e.altKey || isAltHeld.current)) {
+      pendingAltPick.current = { coords, clientX: e.clientX, clientY: e.clientY }
+      isDrawing.current = true
+      lastPixel.current = coords
+      return
+    }
 
     if (s.activeTool === 'fill') {
       s.floodFillVoxel(coords.col, coords.row, s.currentColor)
       return
     }
 
-    isDrawing.current = true
-    lastPixel.current = coords
+    isDrawing.current  = true
+    lastPixel.current  = coords
+    if (s.activeTool === 'blend') blendDragStart.current = coords
 
-    if (s.activeTool === 'pencil' || s.activeTool === 'eraser') {
-      s.pushUndo()
+    if (['pencil', 'eraser', 'material', 'blend'].includes(s.activeTool)) {
+      undoTransaction.current = s.beginUndoTransaction()
     }
 
     applyTool(coords)
-  }, [getPixelCoords, applyTool])
+  }, [getPixelCoords, applyTool, pickColor])
 
   const onPointerMove = useCallback((e) => {
     if (!isDrawing.current) return
     const coords = getPixelCoords(e)
-    const prev = lastPixel.current
+    if (pendingAltPick.current) {
+      const pending = pendingAltPick.current
+      if (Math.hypot(e.clientX - pending.clientX, e.clientY - pending.clientY) < 4) return
+      const s = useStore.getState()
+      undoTransaction.current = s.beginUndoTransaction()
+      applyTool(pending.coords)
+      pendingAltPick.current = null
+    }
+    const prev   = lastPixel.current
     if (!prev || (coords.col === prev.col && coords.row === prev.row)) return
 
     const points = bresenham(prev.col, prev.row, coords.col, coords.row)
@@ -79,9 +197,25 @@ export function useCanvasInput(containerRef) {
   }, [getPixelCoords, applyTool])
 
   const onPointerUp = useCallback(() => {
-    isDrawing.current = false
-    lastPixel.current = null
-  }, [])
+    if (pendingAltPick.current) {
+      pickColor(pendingAltPick.current.coords)
+      pendingAltPick.current = null
+      isDrawing.current = false
+      lastPixel.current = null
+      blendDragStart.current = null
+      return
+    }
+    if (undoTransaction.current) {
+      useStore.getState().finishUndoTransaction(undoTransaction.current)
+      undoTransaction.current = null
+    }
+    isDrawing.current      = false
+    lastPixel.current      = null
+    blendDragStart.current = null
+  }, [pickColor])
 
-  return { onPointerDown, onPointerMove, onPointerUp }
+  // Prevent context menu on right-click
+  const onContextMenu = useCallback((e) => e.preventDefault(), [])
+
+  return { onPointerDown, onPointerMove, onPointerUp, onContextMenu }
 }

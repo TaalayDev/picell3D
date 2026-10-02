@@ -1,0 +1,74 @@
+name: Linux build
+
+# Manually builds Linux packages, creates a unique tag, and attaches the
+# packages directly to that tag's GitHub Release. No Actions artifact is
+# created.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # needed to create and update GitHub Releases
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libxdo-dev \
+            patchelf \
+            rpm
+
+      - run: npm ci
+
+      # Vite reads these values while `tauri build` runs its frontend build.
+      - name: Configure production online mode
+        run: |
+          printf '%s\n' \
+            'VITE_DEBUG=false' \
+            'VITE_ENABLE_PLAYTEST_TOOLS=false' \
+            > .env
+
+      # Produces Debian, RPM, and AppImage bundles because the Tauri bundle
+      # configuration targets all formats supported by the Linux runner.
+      - name: Build Linux packages
+        run: npm run tauri build
+
+      - name: Upload packages to tag release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: linux-build-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: Linux Build #${{ github.run_number }}
+          draft: false
+          prerelease: true
+          body: Automated Linux build from commit ${{ github.sha }}
+          fail_on_unmatched_files: true
+          overwrite_files: true
+          files: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/bundle/appimage/*.AppImage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,164 @@
+import { useRef } from 'react'
+import { useStore } from '../../store/index.js'
+import { useModalAccessibility } from '../../hooks/useModalAccessibility.js'
+
+const SECTIONS = [
+  {
+    title: 'Tools',
+    rows: [
+      ['P', 'Pencil'],
+      ['E', 'Eraser'],
+      ['Shift+E', 'Toggle visible / whole-ray erase'],
+      ['F', 'Fill'],
+      ['B', 'Blend gradient'],
+      ['M', 'Material'],
+      ['I', 'Pipette: pick canvas color'],
+      ['S', 'Select (Rect / Lasso)'],
+      ['Shift+S', 'Switch Rect / Lasso'],
+      ['Q', 'Edit bounds'],
+      ['R', 'Rectangle'],
+      ['C', 'Circle'],
+      ['L', 'Line'],
+      ['G', 'Toggle grid'],
+      ['A', 'Pencil: add on top'],
+      ['V', 'Pencil: replace visible'],
+      ['Shift+V', 'Pencil: replace through'],
+      ['1 / 2 / 3', 'Pencil: Add / Visible / Through'],
+      ['1 / 2', 'Eraser: Visible / Whole ray'],
+    ],
+  },
+  {
+    title: 'Edit',
+    rows: [
+      ['Ctrl+Z', 'Undo'],
+      ['Ctrl+Y', 'Redo'],
+      ['Ctrl+C', 'Copy selection'],
+      ['Ctrl+X', 'Cut selection'],
+      ['Ctrl+V', 'Paste'],
+      ['Del / Backspace', 'Clear / Delete selection'],
+      ['[ / ]', 'Shift selection depth'],
+      ['Enter', 'Commit paste'],
+      ['Esc', 'Cancel / clear'],
+    ],
+  },
+  {
+    title: 'Canvas',
+    rows: [
+      ['Ctrl+Tab', 'Next view while canvas is focused'],
+      ['[', 'Decrease end depth'],
+      [']', 'Increase end depth'],
+      ['Ctrl+0', 'Zoom to fit'],
+      ['Space+drag', 'Pan canvas'],
+      ['Right-click', 'Eyedropper'],
+      ['Alt/Option+click', 'Pencil: pick canvas color'],
+      ['Bounds: Alt+drag', 'Resize from center'],
+      ['Bounds: Shift+drag', 'Preserve aspect ratio'],
+      ['Alt+drag', 'Temporary alternate Pencil / Eraser mode'],
+      ['Shift+Erase stroke', 'Temporarily erase whole ray'],
+    ],
+  },
+  {
+    title: 'File',
+    rows: [
+      ['Ctrl+S', 'Save project'],
+      ['Ctrl+Shift+C', 'Copy view as PNG'],
+      ['?', 'Toggle this panel'],
+    ],
+  },
+  {
+    title: '3D Free Fly (Minecraft)',
+    rows: [
+      ['X', 'Toggle Free Fly Mode'],
+      ['W / A / S / D', 'Fly forward / left / back / right'],
+      ['↑ / ← / ↓ / →', 'Fly forward / left / back / right'],
+      ['Space', 'Fly Up (Ascend)'],
+      ['Shift / C', 'Fly Down (Descend)'],
+      ['Ctrl / Alt', 'Sprint / Boost speed'],
+      ['Left Click', 'Draw / place voxel'],
+      ['Right Click', 'Erase voxel (or inverse)'],
+      ['Click Viewport', 'Lock mouse look'],
+      ['Esc', 'Unlock mouse cursor'],
+      ['1 - 6', 'Hotbar tools (Pencil, Eraser, Fill...)'],
+    ],
+  },
+]
+
+export default function ShortcutsPanel() {
+  const dialogRef = useRef(null)
+  const toggleShortcutsPanel = useStore(s => s.toggleShortcutsPanel)
+  useModalAccessibility(dialogRef, toggleShortcutsPanel)
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+      onClick={toggleShortcutsPanel}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="keyboard-shortcuts-title"
+        tabIndex={-1}
+        className="relative rounded-xl overflow-hidden p-6 max-w-2xl w-full mx-4 max-h-[85vh] overflow-y-auto"
+        style={{
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          boxShadow: '0 0 40px rgba(0,0,0,0.8)',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h2 id="keyboard-shortcuts-title" className="text-sm font-semibold uppercase tracking-widest" style={{ color: 'var(--color-accent)' }}>
+            Keyboard Shortcuts
+          </h2>
+          <button
+            type="button"
+            data-autofocus
+            onClick={toggleShortcutsPanel}
+            className="text-xs text-text-muted hover:text-text transition-colors"
+          >
+            Close ✕
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6">
+          {SECTIONS.map(section => (
+            <div key={section.title}>
+              <div className="text-xs uppercase tracking-widest mb-2" style={{ color: 'var(--color-textMuted)' }}>
+                {section.title}
+              </div>
+              <table className="w-full">
+                <tbody>
+                  {section.rows.map(([key, desc]) => (
+                    <tr key={key} className="border-b" style={{ borderColor: 'color-mix(in srgb, var(--color-border) 40%, transparent)' }}>
+                      <td className="py-1 pr-3 text-right" style={{ width: '45%' }}>
+                        <kbd
+                          className="text-xs font-mono px-1.5 py-0.5 rounded"
+                          style={{
+                            background: 'color-mix(in srgb, var(--color-accent) 10%, var(--color-surfaceAlt))',
+                            border: '1px solid var(--color-border)',
+                            color: 'var(--color-accent)',
+                          }}
+                        >
+                          {key}
+                        </kbd>
+                      </td>
+                      <td className="py-1 text-xs" style={{ color: 'var(--color-text)' }}>
+                        {desc}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 text-center text-xs" style={{ color: 'var(--color-textMuted)' }}>
+          Press <kbd className="font-mono px-1 py-0.5 rounded text-xs" style={{ background: 'var(--color-surfaceAlt)', border: '1px solid var(--color-border)' }}>?</kbd> or click anywhere outside to close
+        </div>
+      </div>
+    </div>
+  )
+}

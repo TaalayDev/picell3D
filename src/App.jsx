@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Monitor, RotateCw, PanelLeft, PanelRight, PanelTop, PanelBottom, X } from 'lucide-react'
+import { Monitor, RotateCw, PanelLeft, PanelRight, PanelTop, PanelBottom, X, Gamepad2 } from 'lucide-react'
 import { useStore } from './store/index.js'
 import { getTheme, applyTheme } from './themes/index.js'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js'
@@ -9,9 +9,17 @@ import StatusBar        from './components/layout/StatusBar.jsx'
 import PixelCanvas      from './components/canvas/PixelCanvas.jsx'
 import Preview3D        from './components/preview/Preview3D.jsx'
 import ColorPalette     from './components/panels/ColorPalette.jsx'
+import MaterialPanel   from './components/panels/MaterialPanel.jsx'
 import VoxelOptionsPanel from './components/panels/VoxelOptionsPanel.jsx'
 import LayersPanel       from './components/panels/LayersPanel.jsx'
 import RenderPage        from './components/render/RenderPage.jsx'
+import LowPolyPage       from './components/render/LowPolyPage.jsx'
+import StartOverlay      from './components/onboarding/StartOverlay.jsx'
+import ShortcutsPanel    from './components/layout/ShortcutsPanel.jsx'
+
+const AUTOSAVE_KEY  = 'picell3d_autosave'
+const ONBOARDING_KEY = 'picell3d_onboarding_done'
+const SETTINGS_KEY  = 'picell3d_settings'
 
 const VIEWS = [
   { id: 'front',  Icon: Monitor,     label: 'Front'  },
@@ -26,14 +34,140 @@ export default function App() {
   const activeTheme = useStore(s => s.activeTheme)
   const viewMode    = useStore(s => s.viewMode)
   const setViewMode = useStore(s => s.setViewMode)
+  const flyMode     = useStore(s => s.flyMode)
+  const toggleFlyMode = useStore(s => s.toggleFlyMode)
+  const activeTool  = useStore(s => s.activeTool)
+  const showShortcutsPanel = useStore(s => s.showShortcutsPanel)
   const exportFn    = useRef(null)
   const [renderOpen, setRenderOpen] = useState(false)
+  const [lowPolyOpen, setLowPolyOpen] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(
+    () => !localStorage.getItem(ONBOARDING_KEY)
+  )
 
   useKeyboardShortcuts()
+
+  // ── Persist UI preferences (separate from project data) ─────────────────────
+  useEffect(() => {
+    // Load on mount
+    try {
+      const saved = localStorage.getItem(SETTINGS_KEY)
+      if (saved) {
+        const p = JSON.parse(saved)
+        const api = useStore.getState()
+        if (p.activeTheme)                          api.setActiveTheme(p.activeTheme)
+        if (p.viewMode)                             api.setViewMode(p.viewMode)
+        if (typeof p.showGrid === 'boolean' && p.showGrid !== api.showGrid) api.toggleGrid()
+        if (typeof p.showDepthText === 'boolean')   api.setShowDepthText(p.showDepthText)
+        if (typeof p.pixelSize === 'number')        api.setPixelSize(p.pixelSize)
+        if (typeof p.paintDepthStart === 'number') api.setPaintDepthStart(p.paintDepthStart)
+        if (typeof p.paintDepthEnd === 'number') api.setPaintDepthEnd(p.paintDepthEnd)
+        else if (typeof p.paintDepth === 'number') api.setPaintDepth(p.paintDepth)
+        if (p.paintDirection) {
+          const direction = p.paintDirection === 'front' ? 'outward'
+            : p.paintDirection === 'back' ? 'inward' : p.paintDirection
+          api.setPaintDirection(direction)
+        }
+        if (p.sideDrawMode)                         api.setSideDrawMode(p.sideDrawMode)
+        if (p.pencilMode)                           api.setPencilMode(p.pencilMode)
+        if (p.eraserMode)                           api.setEraserMode(p.eraserMode)
+        if (p.throughMode)                          api.setThroughMode(p.throughMode)
+        if (p.operationLayerScope)                  api.setOperationLayerScope(p.operationLayerScope)
+        if (p.editBoundsAxisLocks) {
+          for (const axis of ['x', 'y', 'z']) api.setEditBoundsAxisLock(axis, p.editBoundsAxisLocks[axis])
+        }
+        if (typeof p.confirmLargeOperations === 'boolean') api.setConfirmLargeOperations(p.confirmLargeOperations)
+        if (typeof p.largeOperationThreshold === 'number') api.setLargeOperationThreshold(p.largeOperationThreshold)
+        if (typeof p.symmetryX === 'boolean')       api.setSymmetryX(p.symmetryX)
+        if (typeof p.symmetryY === 'boolean')       api.setSymmetryY(p.symmetryY)
+        if (typeof p.symmetryOpposite === 'boolean') api.setSymmetryOpposite(p.symmetryOpposite)
+        if (p.blendEndColor)                        api.setBlendEndColor(p.blendEndColor)
+      }
+    } catch { /* ignore */ }
+
+    // Auto-save preferences on any store change (debounced)
+    let timer = null
+    const unsub = useStore.subscribe((state) => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        try {
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+            activeTheme:      state.activeTheme,
+            showGrid:         state.showGrid,
+            showDepthText:    state.showDepthText,
+            viewMode:         state.viewMode,
+            pixelSize:        state.pixelSize,
+            paintDepth:       state.paintDepth,
+            paintDepthStart:  state.paintDepthStart,
+            paintDepthEnd:    state.paintDepthEnd,
+            paintDirection:   state.paintDirection,
+            sideDrawMode:     state.sideDrawMode,
+            pencilMode:       state.pencilMode,
+            eraserMode:       state.eraserMode,
+            throughMode:      state.throughMode,
+            operationLayerScope: state.operationLayerScope,
+            editBoundsAxisLocks: state.editBoundsAxisLocks,
+            confirmLargeOperations: state.confirmLargeOperations,
+            largeOperationThreshold: state.largeOperationThreshold,
+            symmetryX:        state.symmetryX,
+            symmetryY:        state.symmetryY,
+            symmetryOpposite: state.symmetryOpposite,
+            blendEndColor:    state.blendEndColor,
+          }))
+        } catch { /* ignore quota errors */ }
+      }, 500)
+    })
+    return () => { unsub(); clearTimeout(timer) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Restore autosave on first load ──────────────────────────────────────────
+  useEffect(() => {
+    if (showOnboarding) return // don't restore if onboarding will show (user picks template)
+    try {
+      const saved = localStorage.getItem(AUTOSAVE_KEY)
+      if (saved) {
+        const data = JSON.parse(saved)
+        useStore.getState().loadProjectData(data)
+      }
+    } catch { /* ignore corrupt data */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Autosave to localStorage every 30 s ─────────────────────────────────────
+  useEffect(() => {
+    const id = setInterval(() => {
+      try {
+        const data = useStore.getState().getProjectData()
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data))
+      } catch { /* ignore quota errors */ }
+    }, 30_000)
+    return () => clearInterval(id)
+  }, [])
+
+  // ── Warn before unload ───────────────────────────────────────────────────────
+  useEffect(() => {
+    const onBeforeUnload = (e) => {
+      e.preventDefault()
+      e.returnValue = '' // required for Chrome
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [])
 
   useEffect(() => {
     applyTheme(getTheme(activeTheme))
   }, [activeTheme])
+
+  function handleOnboardingDone() {
+    localStorage.setItem(ONBOARDING_KEY, '1')
+    setShowOnboarding(false)
+    // Save fresh state
+    try {
+      const data = useStore.getState().getProjectData()
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data))
+    } catch { /* ignore */ }
+  }
 
   const theme     = getTheme(activeTheme)
   const PainterBg = theme.PainterBackground
@@ -57,18 +191,37 @@ export default function App() {
 
       <div className="relative flex flex-col w-full h-full" style={{ zIndex: 10 }}>
 
-        <Toolbar onExport={() => exportFn.current?.()} onRender={() => setRenderOpen(true)} />
+        <Toolbar
+          onExport={() => exportFn.current?.()}
+          onRender={() => setRenderOpen(true)}
+          onLowPoly={() => setLowPolyOpen(true)}
+        />
 
         <div className="flex flex-1 min-h-0">
 
           {/* Left sidebar — color palette */}
           {showPalette && (
-            <div className="flex flex-col w-28 border-r border-border flex-shrink-0 overflow-y-auto"
-              style={{ background: 'color-mix(in srgb, var(--color-surface) 90%, transparent)' }}>
-              <div className="px-2 pt-2 pb-1 text-xs uppercase tracking-wide text-text-muted border-b border-border">
-                Palette
-              </div>
-              <ColorPalette />
+            <div className="flex flex-col border-r border-border flex-shrink-0 overflow-y-auto"
+              style={{
+                width: activeTool === 'material' ? '12.5rem' : '7rem',
+                background: 'color-mix(in srgb, var(--color-surface) 90%, transparent)',
+                transition: 'width 0.15s ease',
+              }}>
+              {activeTool === 'material' ? (
+                <>
+                  <div className="px-2 pt-2 pb-1 text-xs uppercase tracking-wide text-text-muted border-b border-border">
+                    Materials
+                  </div>
+                  <MaterialPanel />
+                </>
+              ) : (
+                <>
+                  <div className="px-2 pt-2 pb-1 text-xs uppercase tracking-wide text-text-muted border-b border-border">
+                    Palette
+                  </div>
+                  <ColorPalette />
+                </>
+              )}
             </div>
           )}
 
@@ -90,8 +243,26 @@ export default function App() {
               style={{ background: 'color-mix(in srgb, var(--color-background) 95%, transparent)' }}>
               <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-border flex-shrink-0"
                 style={{ background: 'color-mix(in srgb, var(--color-surfaceAlt) 95%, transparent)', minHeight: 32 }}>
-                <div className="text-xs text-text-muted opacity-60 uppercase tracking-widest">
-                  {is3DEditMode ? '3D Edit Mode' : '3D Preview'}
+                <div className="flex items-center gap-2">
+                  <div className="text-xs text-text-muted opacity-60 uppercase tracking-widest">
+                    {is3DEditMode ? '3D Edit Mode' : '3D Preview'}
+                  </div>
+                  <button
+                    onClick={e => {
+                      e.currentTarget.blur()
+                      toggleFlyMode()
+                    }}
+                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium transition-all cursor-pointer ${
+                      flyMode
+                        ? 'bg-accent text-background font-semibold shadow-sm'
+                        : 'text-text-muted hover:text-text hover:bg-surface border border-border/60'
+                    }`}
+                    title="Toggle Minecraft-style Free Flying Mode (X)"
+                  >
+                    <Gamepad2 size={13} className={flyMode ? 'animate-pulse' : ''} />
+                    <span>Fly Mode {flyMode ? 'ON' : ''}</span>
+                    <kbd className="text-[10px] opacity-70 ml-0.5 px-1 py-0.2 rounded bg-black/20 font-mono">X</kbd>
+                  </button>
                 </div>
                 {showCanvas && (
                   <ClosePaneButton label="Close 3D preview" onClick={closePreview} />
@@ -117,6 +288,48 @@ export default function App() {
       </div>
 
       {renderOpen && <RenderPage onClose={() => setRenderOpen(false)} />}
+      {lowPolyOpen && <LowPolyPage onClose={() => setLowPolyOpen(false)} />}
+      {showOnboarding && <StartOverlay onDone={handleOnboardingDone} />}
+      {!showOnboarding && <FirstVoxelHint />}
+      {showShortcutsPanel && <ShortcutsPanel />}
+    </div>
+  )
+}
+
+// ── First-voxel hint ──────────────────────────────────────────────────────────
+
+const HINT_KEY = 'picell3d_first_voxel_shown'
+
+function FirstVoxelHint() {
+  const layers = useStore(s => s.layers)
+  const [visible, setVisible] = useState(false)
+  const shownRef = useRef(false)
+
+  useEffect(() => {
+    if (shownRef.current || localStorage.getItem(HINT_KEY)) return
+    const hasVoxel = layers.some(l =>
+      l.voxels.some(plane => plane.some(row => row.some(c => c && c !== 'transparent')))
+    )
+    if (hasVoxel) {
+      shownRef.current = true
+      localStorage.setItem(HINT_KEY, '1')
+      setVisible(true)
+      setTimeout(() => setVisible(false), 5000)
+    }
+  }, [layers])
+
+  if (!visible) return null
+  return (
+    <div
+      className="fixed bottom-8 right-4 z-40 px-4 py-3 rounded-lg text-sm font-medium animate-pulse"
+      style={{
+        background: 'color-mix(in srgb, var(--color-accent) 20%, var(--color-surface))',
+        border:     '1px solid var(--color-accent)',
+        color:      'var(--color-accent)',
+        boxShadow:  '0 0 20px color-mix(in srgb, var(--color-accent) 40%, transparent)',
+      }}
+    >
+      Nice! Now check the 3D preview →
     </div>
   )
 }

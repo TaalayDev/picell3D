@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Download, X } from 'lucide-react'
 import { useStore, getCompositedVoxels, renderView2D, getViewSize } from '../../store/index.js'
+import { useModalAccessibility } from '../../hooks/useModalAccessibility.js'
 
 const ALL_VIEWS = [
   { id: 'front',  label: 'Front'  },
@@ -14,6 +15,7 @@ const ALL_VIEWS = [
 const PIXEL_SCALES = [4, 8, 16, 32]
 
 export default function ExportDialog({ onClose }) {
+  const dialogRef = useRef(null)
   const { layers, canvasWidth: W, canvasHeight: H, depthDimension: D } = useStore()
 
   const [selectedViews, setSelectedViews] = useState(['front'])
@@ -21,6 +23,7 @@ export default function ExportDialog({ onClose }) {
   const [bgType, setBgType]               = useState('transparent')
   const [bgColor, setBgColor]             = useState('#000000')
   const previewRef = useRef(null)
+  useModalAccessibility(dialogRef, onClose)
 
   function toggleView(id) {
     setSelectedViews(prev =>
@@ -99,13 +102,18 @@ export default function ExportDialog({ onClose }) {
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="export-dialog-title"
+        tabIndex={-1}
         className="rounded-lg border border-border shadow-2xl overflow-hidden"
         style={{ background: 'var(--color-surface)', width: 540 }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <span className="text-sm font-theme text-text">Export PNG</span>
-          <button onClick={onClose} className="text-text-muted hover:text-text transition-colors">
+          <span id="export-dialog-title" className="text-sm font-theme text-text">Export PNG</span>
+          <button type="button" aria-label="Close export dialog" onClick={onClose} className="text-text-muted hover:text-text transition-colors">
             <X size={16} />
           </button>
         </div>
@@ -121,6 +129,8 @@ export default function ExportDialog({ onClose }) {
               <div className="grid grid-cols-2 gap-1">
                 {ALL_VIEWS.map(({ id, label }) => (
                   <button
+                    type="button"
+                    aria-pressed={selectedViews.includes(id)}
                     key={id}
                     onClick={() => toggleView(id)}
                     className={`text-xs py-1.5 px-2 rounded border transition-colors text-left ${
@@ -141,6 +151,8 @@ export default function ExportDialog({ onClose }) {
               <div className="grid grid-cols-4 gap-1">
                 {PIXEL_SCALES.map(s => (
                   <button
+                    type="button"
+                    aria-pressed={pixelScale === s}
                     key={s}
                     onClick={() => setPixelScale(s)}
                     className={`text-xs py-1 rounded border transition-colors ${
@@ -164,6 +176,8 @@ export default function ExportDialog({ onClose }) {
                   { id: 'color',       label: 'Color'       },
                 ].map(({ id, label }) => (
                   <button
+                    type="button"
+                    aria-pressed={bgType === id}
                     key={id}
                     onClick={() => setBgType(id)}
                     className={`text-xs py-1.5 px-2 rounded border transition-colors text-left ${
@@ -177,6 +191,7 @@ export default function ExportDialog({ onClose }) {
                 ))}
                 {bgType === 'color' && (
                   <input
+                    aria-label="Export background color"
                     type="color"
                     value={bgColor}
                     onChange={e => setBgColor(e.target.value)}
@@ -207,6 +222,8 @@ export default function ExportDialog({ onClose }) {
               }}
             >
               <canvas
+                role="img"
+                aria-label="Export preview"
                 ref={previewRef}
                 style={{
                   imageRendering: 'pixelated',
@@ -221,12 +238,14 @@ export default function ExportDialog({ onClose }) {
         {/* Footer */}
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-border">
           <button
+            type="button"
             onClick={onClose}
             className="text-xs px-3 py-1.5 rounded border border-border text-text-muted hover:text-text transition-colors"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={handleExport}
             className="btn-brass flex items-center gap-1.5 text-xs px-3 py-1.5"
           >

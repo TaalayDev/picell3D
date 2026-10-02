@@ -1,17 +1,20 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   X, Monitor, LayoutTemplate, Pencil, RotateCcw,
   Grid3X3, Tag, Columns2, Square, Box, SlidersHorizontal,
 } from 'lucide-react'
-import { useStore } from '../../store/index.js'
+import { getViewDepthSize, useStore } from '../../store/index.js'
+import { useModalAccessibility } from '../../hooks/useModalAccessibility.js'
 
 // ── Primitive controls ────────────────────────────────────────────────────────
 
-function Toggle({ value, onChange }) {
+function Toggle({ value, onChange, label }) {
   return (
     <button
+      type="button"
       role="switch"
       aria-checked={value}
+      aria-label={label}
       onClick={() => onChange(!value)}
       style={{
         width: 36, height: 20, borderRadius: 10, padding: 2,
@@ -50,10 +53,11 @@ function Section({ title, children }) {
   )
 }
 
-function NumInput({ value, onChange, min = 1, max = 256, step = 1 }) {
+function NumInput({ value, onChange, label, min = 1, max = 256, step = 1 }) {
   return (
     <input
       type="number" min={min} max={max} step={step} value={value}
+      aria-label={label}
       onChange={e => onChange(Math.max(min, Math.min(max, Number(e.target.value) || min)))}
       className="w-16 text-center text-xs font-mono rounded border border-border text-text bg-transparent outline-none focus:border-accent transition-colors py-1"
     />
@@ -65,6 +69,8 @@ function SegControl({ options, value, onChange }) {
     <div className="flex rounded border border-border overflow-hidden">
       {options.map(({ id, Icon, label }) => (
         <button
+          type="button"
+          aria-pressed={value === id}
           key={id}
           onClick={() => onChange(id)}
           title={label}
@@ -96,10 +102,10 @@ function DisplaySection() {
     <>
       <Section title="Canvas View">
         <Row label="Show grid" hint="Grid lines on the 2D canvas">
-          <Toggle value={showGrid} onChange={toggleGrid} />
+          <Toggle label="Show grid" value={showGrid} onChange={toggleGrid} />
         </Row>
         <Row label="Depth labels" hint="Show depth offset number on each painted pixel">
-          <Toggle value={showDepthText} onChange={setShowDepthText} />
+          <Toggle label="Show depth labels" value={showDepthText} onChange={setShowDepthText} />
         </Row>
       </Section>
 
@@ -118,11 +124,15 @@ function DisplaySection() {
         <Row label="Zoom level" hint={`Current: ${pixelSize}px per cell`}>
           <div className="flex items-center gap-2">
             <button
+              type="button"
+              aria-label="Decrease zoom level"
               onClick={() => setPixelSize(pixelSize - 2)}
               className="w-6 h-6 rounded border border-border text-text-muted hover:text-text hover:border-accent transition-colors text-sm"
             >−</button>
             <span className="text-xs font-mono text-accent w-8 text-center">{pixelSize}</span>
             <button
+              type="button"
+              aria-label="Increase zoom level"
               onClick={() => setPixelSize(pixelSize + 2)}
               className="w-6 h-6 rounded border border-border text-text-muted hover:text-text hover:border-accent transition-colors text-sm"
             >+</button>
@@ -153,10 +163,11 @@ function CanvasSection() {
       <Section title="Canvas Size">
         <Row label="Width × Height" hint="Resize the current canvas (content is preserved)">
           <div className="flex items-center gap-1.5">
-            <NumInput value={w} onChange={setW} min={4} max={256} />
+            <NumInput label="Canvas width" value={w} onChange={setW} min={4} max={256} />
             <span className="text-text-muted text-xs">×</span>
-            <NumInput value={h} onChange={setH} min={4} max={256} />
+            <NumInput label="Canvas height" value={h} onChange={setH} min={4} max={256} />
             <button
+              type="button"
               onClick={applySize}
               className="text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-accent hover:border-accent transition-colors"
             >Apply</button>
@@ -169,6 +180,8 @@ function CanvasSection() {
           <div className="flex items-center gap-1 flex-wrap justify-end">
             {DEPTH_PRESETS.map(d => (
               <button
+                type="button"
+                aria-pressed={depthDimension === d}
                 key={d}
                 onClick={() => setDepthDimension(d)}
                 className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${
@@ -183,6 +196,7 @@ function CanvasSection() {
         <Row label="" hint="">
           <div className="w-full flex flex-col gap-1" style={{ minWidth: 180 }}>
             <input
+              aria-label="Canvas depth dimension"
               type="range" min={4} max={128} value={depthDimension}
               onChange={e => setDepthDimension(parseInt(e.target.value))}
               className="w-full cursor-pointer"
@@ -202,38 +216,62 @@ function CanvasSection() {
 
 function PaintingSection() {
   const {
-    paintDepth, setPaintDepth,
+    paintDepthStart, paintDepthEnd, setPaintDepthStart, setPaintDepthEnd,
     paintDirection, setPaintDirection,
-    depthDimension,
+    activeView, canvasWidth, canvasHeight, depthDimension,
+    confirmLargeOperations, setConfirmLargeOperations,
+    largeOperationThreshold, setLargeOperationThreshold,
   } = useStore()
 
-  const maxDepth = Math.ceil(depthDimension / 2)
+  const maxDepth = getViewDepthSize(activeView, canvasWidth, canvasHeight, depthDimension)
 
   return (
     <>
       <Section title="Brush">
-        <Row label="Paint depth" hint="Number of voxel layers painted per stroke from front/back view">
-          <div className="flex flex-col gap-1" style={{ minWidth: 180 }}>
-            <div className="flex items-center gap-2">
-              <input
-                type="range" min={1} max={maxDepth} value={paintDepth}
-                onChange={e => setPaintDepth(parseInt(e.target.value))}
-                className="flex-1 cursor-pointer"
-                style={{ accentColor: 'var(--color-accent)' }}
-              />
-              <span className="text-xs font-mono text-accent w-5 text-right">{paintDepth}</span>
-            </div>
+        <Row label="Depth range" hint="First and last voxel layer affected along the active view ray">
+          <div className="flex flex-col gap-2" style={{ minWidth: 180 }}>
+            {[
+              ['Start', paintDepthStart, setPaintDepthStart],
+              ['End', paintDepthEnd, setPaintDepthEnd],
+            ].map(([label, value, setter]) => (
+              <label key={label} className="flex items-center gap-2 text-xs text-text-muted">
+                <span className="w-8">{label}</span>
+                <input
+                  type="range" min={1} max={maxDepth} value={value}
+                  onChange={e => setter(parseInt(e.target.value))}
+                  className="flex-1 cursor-pointer"
+                  style={{ accentColor: 'var(--color-accent)' }}
+                />
+                <span className="w-5 text-right font-mono text-accent">{value}</span>
+              </label>
+            ))}
           </div>
         </Row>
-        <Row label="Paint direction" hint="Which direction from center to extend the brush">
+        <Row label="Paint direction" hint="Apply the range from the active face, opposite face, or both">
           <SegControl
             value={paintDirection}
             onChange={setPaintDirection}
             options={[
-              { id: 'front', Icon: SlidersHorizontal, label: '← Front' },
-              { id: 'both',  Icon: SlidersHorizontal, label: '↔ Both'  },
-              { id: 'back',  Icon: SlidersHorizontal, label: 'Back →'  },
+              { id: 'inward',  Icon: SlidersHorizontal, label: 'Inward' },
+              { id: 'outward', Icon: SlidersHorizontal, label: 'Outward' },
+              { id: 'both',    Icon: SlidersHorizontal, label: 'Both' },
             ]}
+          />
+        </Row>
+      </Section>
+      <Section title="Operation safety">
+        <Row label="Confirm large operations" hint="Show the affected voxel count before applying large clears, deletes, pastes, or transforms">
+          <Toggle label="Confirm large operations" value={confirmLargeOperations} onChange={setConfirmLargeOperations} />
+        </Row>
+        <Row label="Large operation threshold" hint="Minimum affected voxel count that triggers confirmation">
+          <input
+            aria-label="Large operation confirmation threshold"
+            type="number"
+            min={1}
+            max={1000000}
+            value={largeOperationThreshold}
+            onChange={e => setLargeOperationThreshold(Number(e.target.value))}
+            className="w-24 rounded border border-border bg-surface-alt px-2 py-1 text-right text-xs font-mono text-text"
           />
         </Row>
       </Section>
@@ -242,7 +280,7 @@ function PaintingSection() {
 }
 
 function ResetSection({ onClose }) {
-  const { clearCanvas, resizeCanvas, setDepthDimension, setPaintDepth, setPaintDirection,
+  const { clearCanvas, resizeCanvas, setDepthDimension, setPaintDepthStart, setPaintDepthEnd, setPaintDirection,
           setViewMode, setPixelSize, toggleGrid, showGrid, setShowDepthText } = useStore()
   const [confirming, setConfirming] = useState(null)
 
@@ -254,8 +292,9 @@ function ResetSection({ onClose }) {
   function resetAll() {
     resizeCanvas(32, 32)
     setDepthDimension(5)
-    setPaintDepth(1)
-    setPaintDirection('both')
+    setPaintDepthStart(1)
+    setPaintDepthEnd(1)
+    setPaintDirection('inward')
     setViewMode('split')
     setPixelSize(14)
     if (!showGrid) toggleGrid()
@@ -270,6 +309,7 @@ function ResetSection({ onClose }) {
         {sublabel && <span className="text-xs text-text-muted opacity-60">{sublabel}</span>}
       </div>
       <button
+        type="button"
         onClick={() => confirm(id, action)}
         className={`text-xs px-3 py-1.5 rounded border transition-colors ${
           confirming === id
@@ -309,7 +349,7 @@ function ResetSection({ onClose }) {
       {confirming && (
         <p className="text-xs text-text-muted opacity-60 mt-1">
           Click the button again to confirm.
-          <button onClick={() => setConfirming(null)} className="ml-2 text-accent hover:underline">Cancel</button>
+          <button type="button" onClick={() => setConfirming(null)} className="ml-2 text-accent hover:underline">Cancel</button>
         </p>
       )}
     </>
@@ -326,8 +366,10 @@ const SECTIONS = [
 ]
 
 export default function SettingsDialog({ onClose }) {
+  const dialogRef = useRef(null)
   const [section, setSection] = useState('display')
   const active = SECTIONS.find(s => s.id === section)
+  useModalAccessibility(dialogRef, onClose)
 
   return (
     <div
@@ -336,6 +378,11 @@ export default function SettingsDialog({ onClose }) {
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-dialog-title"
+        tabIndex={-1}
         className="flex rounded-xl border border-border shadow-2xl overflow-hidden"
         style={{ width: 580, maxHeight: '85vh', background: 'var(--color-surface)' }}
       >
@@ -345,11 +392,13 @@ export default function SettingsDialog({ onClose }) {
           style={{ width: 160, background: 'color-mix(in srgb, var(--color-background) 55%, transparent)', borderRight: '1px solid var(--color-border)' }}
         >
           <div className="px-4 pb-3 pt-1">
-            <span className="text-xs uppercase tracking-widest font-theme"
+            <span id="settings-dialog-title" className="text-xs uppercase tracking-widest font-theme"
               style={{ color: 'var(--color-accent)', opacity: 0.8 }}>Settings</span>
           </div>
           {SECTIONS.map(({ id, label, Icon }) => (
             <button
+              type="button"
+              aria-current={section === id ? 'page' : undefined}
               key={id}
               onClick={() => setSection(id)}
               className="flex items-center gap-2.5 px-4 py-2.5 text-xs transition-colors text-left relative"
@@ -374,7 +423,7 @@ export default function SettingsDialog({ onClose }) {
               {active && <active.Icon size={14} className="text-accent" />}
               <span className="text-sm font-theme text-text">{active?.label}</span>
             </div>
-            <button onClick={onClose} className="text-text-muted hover:text-text transition-colors">
+            <button type="button" aria-label="Close settings" onClick={onClose} className="text-text-muted hover:text-text transition-colors">
               <X size={15} />
             </button>
           </div>
