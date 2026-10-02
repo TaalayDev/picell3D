@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import {
   X, Image, Box, Download, ChevronRight,
-  Sun, Zap, Snowflake, Moon,
+  Sun, Zap, Snowflake, Moon, Coffee,
 } from 'lucide-react'
 import { useStore } from '../../store/index.js'
 import { useRenderScene, LIGHT_PRESETS, BG_PRESETS } from './useRenderScene.js'
@@ -131,6 +131,19 @@ export default function RenderPage({ onClose }) {
             {W} × {H} × {D} · {voxelCount.toLocaleString()} voxels
           </span>
         </div>
+        <a
+          href="https://ko-fi.com/mirazh"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold transition-all hover:brightness-110 active:scale-95"
+          style={{
+            color: 'var(--color-background)',
+            background: 'var(--color-accent)',
+            boxShadow: '0 0 18px color-mix(in srgb, var(--color-accent) 35%, transparent)',
+          }}
+        >
+          <Coffee size={14} /> Buy me a coffee
+        </a>
         <button
           type="button"
           data-autofocus

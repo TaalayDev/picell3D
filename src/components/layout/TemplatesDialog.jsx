@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
-import { X, Sparkles, Plus, Search } from 'lucide-react'
+import { X, Sparkles, Plus, Search, Coffee } from 'lucide-react'
 import { useStore } from '../../store/index.js'
 import { useModalAccessibility } from '../../hooks/useModalAccessibility.js'
 
@@ -101,15 +101,30 @@ export default function TemplatesDialog({ onClose }) {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            aria-label="Close templates library"
-            onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center border border-transparent text-text-muted hover:text-text hover:border-border hover:bg-surface-alt transition-colors"
-            title="Close (Esc)"
-          >
-            <X size={15} />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <a
+              href="https://ko-fi.com/mirazh"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all hover:brightness-110 active:scale-95"
+              style={{
+                color: 'var(--color-background)',
+                background: 'var(--color-accent)',
+                boxShadow: '0 0 18px color-mix(in srgb, var(--color-accent) 35%, transparent)',
+              }}
+            >
+              <Coffee size={15} /> Buy me a coffee
+            </a>
+            <button
+              type="button"
+              aria-label="Close templates library"
+              onClick={onClose}
+              className="w-7 h-7 rounded-lg flex items-center justify-center border border-transparent text-text-muted hover:text-text hover:border-border hover:bg-surface-alt transition-colors"
+              title="Close (Esc)"
+            >
+              <X size={15} />
+            </button>
+          </div>
         </div>
 
         {/* Controls: Search & Category Pills */}
