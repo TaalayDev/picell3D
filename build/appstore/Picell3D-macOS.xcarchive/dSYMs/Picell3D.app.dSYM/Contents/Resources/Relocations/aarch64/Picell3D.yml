@@ -1,0 +1,5 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/admin/dev/web/picell3D/build/appstore/Picell3D-macOS.xcarchive/Products/Applications/Picell3D.app/Contents/MacOS/Picell3D'
+relocations:     []
+...
