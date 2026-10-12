@@ -1,3 +1,5 @@
+import { PerspectiveCamera } from 'three'
+import { saveDataUrl } from './saveFile.js'
 /**
  * Render the Three.js scene to a PNG from an isometric angle.
  */
@@ -17,15 +19,11 @@ export function exportIsometricPng(renderer, scene, canvasWidth, canvasHeight) {
   // Restore
   renderer.setSize(prevW, prevH)
 
-  // Trigger download
-  const link = document.createElement('a')
-  link.download = 'picell3d-export.png'
-  link.href = dataUrl
-  link.click()
+  // Save the rendered image.
+  return saveDataUrl(dataUrl, 'picell3d-export.png')
 }
 
 function createIsoCamera(w, h) {
-  const { PerspectiveCamera } = await import('three')
   const camera = new PerspectiveCamera(45, 1, 0.01, 100)
   const dist = Math.max(w, h) * 0.1 * 2.5
   // Isometric: 45° azimuth, ~35.26° elevation

@@ -1,3 +1,4 @@
+import { saveFile } from '../../lib/saveFile.js'
 import { useState, useRef, useEffect } from 'react'
 import {
   Pencil, Eraser, PaintBucket, Sparkles,
@@ -76,14 +77,7 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
 
   function handleSaveProject() {
     const data = getProjectData()
-    const json = JSON.stringify(data)
-    const blob = new Blob([json], { type: 'application/json' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href     = url
-    a.download = 'project.picell3d'
-    a.click()
-    URL.revokeObjectURL(url)
+    return saveFile(JSON.stringify(data), 'project.picell3d', 'application/json')
   }
 
   function handleLoadProject(e) {
@@ -275,7 +269,7 @@ export default function Toolbar({ onExport, onRender, onLowPoly }) {
           aria-label="Save project"
           className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-border text-text-muted hover:text-text hover:border-accent transition-colors"
           onClick={handleSaveProject}
-          title="Save project (Ctrl+S)"
+          title="Save project to a file (Ctrl+S). Automatic recovery is temporary; save a file to keep your work."
         >
           <Save size={12} />
           <span className="hidden 2xl:inline">Save</span>

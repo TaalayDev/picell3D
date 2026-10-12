@@ -1,3 +1,4 @@
+import { saveDataUrl } from '../../lib/saveFile.js'
 import { useState, useRef, useEffect } from 'react'
 import { Download, X } from 'lucide-react'
 import { useStore, getCompositedVoxels, renderView2D, getViewSize } from '../../store/index.js'
@@ -82,16 +83,14 @@ export default function ExportDialog({ onClose }) {
     buildSpritesheet(previewRef.current)
   }) // run every render — deps tracked implicitly via closure
 
-  function handleExport() {
+  async function handleExport() {
     const canvas = document.createElement('canvas')
     buildSpritesheet(canvas)
     const url = canvas.toDataURL('image/png')
-    const a = document.createElement('a')
-    a.href = url
-    a.download = selectedViews.length === 1
+    const filename = selectedViews.length === 1
       ? `picell3d-${selectedViews[0]}.png`
       : 'picell3d-spritesheet.png'
-    a.click()
+    if (!await saveDataUrl(url, filename)) return
     onClose()
   }
 

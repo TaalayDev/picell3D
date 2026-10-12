@@ -1,3 +1,4 @@
+import { saveFile, saveDataUrl } from '../../lib/saveFile.js'
 import { useEffect, useRef, useCallback } from 'react'
 import * as THREE from 'three'
 import { OrbitControls }   from 'three/addons/controls/OrbitControls.js'
@@ -234,10 +235,7 @@ export function useRenderScene(containerRef, { autoBuild = true } = {}) {
     composer.render()
 
     const dataUrl = renderer.domElement.toDataURL('image/png')
-    const link    = document.createElement('a')
-    link.download = `render_${size}px.png`
-    link.href = dataUrl
-    link.click()
+    saveDataUrl(dataUrl, `render_${size}px.png`)
 
     // Restore
     rp.camera = prevCam
@@ -259,10 +257,7 @@ export function useRenderScene(containerRef, { autoBuild = true } = {}) {
     const exporter = new GLTFExporter()
     exporter.parse(group, (result) => {
       const blob = new Blob([result], { type: 'application/octet-stream' })
-      const url  = URL.createObjectURL(blob)
-      const a    = document.createElement('a')
-      a.href = url; a.download = 'model.glb'; a.click()
-      URL.revokeObjectURL(url)
+      saveFile(blob, 'model.glb')
       dispose()
     }, (err) => console.error('GLB export error:', err), { binary: true })
   }, [])

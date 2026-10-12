@@ -1,3 +1,4 @@
+import { saveFile } from './saveFile.js'
 import { getCompositedVoxels } from '../store/index.js'
 
 /**
@@ -88,9 +89,5 @@ export function buildVoxBuffer(layers, W, H, D) {
 
 export function downloadVox(layers, W, H, D, filename = 'model.vox') {
   const buf  = buildVoxBuffer(layers, W, H, D)
-  const blob = new Blob([buf], { type: 'application/octet-stream' })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href = url; a.download = filename; a.click()
-  URL.revokeObjectURL(url)
+  return saveFile(buf, filename)
 }

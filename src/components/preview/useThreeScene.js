@@ -1,3 +1,4 @@
+import { saveDataUrl } from '../../lib/saveFile.js'
 import { useEffect, useRef, useCallback, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -1604,10 +1605,7 @@ export function useThreeScene(containerRef) {
       cameraRef.current.updateProjectionMatrix()
     }
 
-    const link = document.createElement('a')
-    link.download = 'picell3d-export.png'
-    link.href = dataUrl
-    link.click()
+    saveDataUrl(dataUrl, 'picell3d-export.png')
   }, [])
 
   return { exportPng, isShapeEditing, confirmShape, cancelShape, isPointerLocked, requestPointerLock, exitPointerLock }

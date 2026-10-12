@@ -1,3 +1,4 @@
+import { saveFile } from './saveFile.js'
 import { getCompositedVoxels } from '../store/index.js'
 
 const UNIT = 0.1
@@ -119,13 +120,6 @@ export function buildObjMtl(layers, W, H, D) {
   return { obj: objLines.join('\n'), mtl: mtlLines.join('\n') }
 }
 
-function triggerDownload(content, filename, mime) {
-  const blob = new Blob([content], { type: mime })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href = url; a.download = filename; a.click()
-  URL.revokeObjectURL(url)
-}
 
 /**
  * Export a triangle mesh group (e.g. the low poly model) to OBJ + MTL.
@@ -175,15 +169,14 @@ export function buildObjMtlFromGroup(group, stem = 'model') {
   return { obj: objLines.join('\n'), mtl: mtlLines.join('\n') }
 }
 
-export function downloadGroupObjMtl(group, stem = 'model') {
+export async function downloadGroupObjMtl(group, stem = 'model') {
   const { obj, mtl } = buildObjMtlFromGroup(group, stem)
-  triggerDownload(obj, `${stem}.obj`, 'text/plain')
-  setTimeout(() => triggerDownload(mtl, `${stem}.mtl`, 'text/plain'), 150)
+  if (!await saveFile(obj, `${stem}.obj`, 'text/plain')) return
+  return saveFile(mtl, `${stem}.mtl`, 'text/plain')
 }
 
-export function downloadObjMtl(layers, W, H, D, stem = 'model') {
+export async function downloadObjMtl(layers, W, H, D, stem = 'model') {
   const { obj, mtl } = buildObjMtl(layers, W, H, D)
-  triggerDownload(obj, `${stem}.obj`, 'text/plain')
-  // slight delay so both dialogs appear
-  setTimeout(() => triggerDownload(mtl, `${stem}.mtl`, 'text/plain'), 150)
+  if (!await saveFile(obj, `${stem}.obj`, 'text/plain')) return
+  return saveFile(mtl, `${stem}.mtl`, 'text/plain')
 }

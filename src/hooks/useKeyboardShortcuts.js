@@ -1,3 +1,4 @@
+import { saveFile } from '../lib/saveFile.js'
 import { useEffect } from 'react'
 import { useStore } from '../store/index.js'
 
@@ -5,13 +6,7 @@ const VIEWS = ['front', 'back', 'left', 'right', 'top', 'bottom']
 
 function triggerProjectSave() {
   const data = useStore.getState().getProjectData()
-  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href     = url
-  a.download = 'project.picell3d'
-  a.click()
-  URL.revokeObjectURL(url)
+  return saveFile(JSON.stringify(data), 'project.picell3d', 'application/json')
 }
 
 async function copyCanvasAsPNG() {

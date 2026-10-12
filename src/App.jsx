@@ -121,7 +121,7 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── Restore autosave on first load ──────────────────────────────────────────
+  // ── Restore recovery cache on first load ──────────────────────────────────────────
   useEffect(() => {
     if (showOnboarding) return // don't restore if onboarding will show (user picks template)
     try {
@@ -134,7 +134,7 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── Autosave to localStorage every 30 s ─────────────────────────────────────
+  // ── Recovery cache every 30 s; user documents are saved through Save ─────────────────────────────────────
   useEffect(() => {
     const id = setInterval(() => {
       try {
@@ -162,7 +162,7 @@ export default function App() {
   function handleOnboardingDone() {
     localStorage.setItem(ONBOARDING_KEY, '1')
     setShowOnboarding(false)
-    // Save fresh state
+    // Cache fresh state for recovery
     try {
       const data = useStore.getState().getProjectData()
       localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data))

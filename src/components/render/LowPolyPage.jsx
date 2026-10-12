@@ -1,3 +1,4 @@
+import { saveFile, saveDataUrl } from '../../lib/saveFile.js'
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { X, Image, Box, Download, ChevronRight, Triangle, Eye, Grid3X3, Loader2 } from 'lucide-react'
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js'
@@ -217,10 +218,7 @@ export default function LowPolyPage({ onClose }) {
     const built = exportGroup()
     if (!built) return
     new GLTFExporter().parse(built.group, (glb) => {
-      const url = URL.createObjectURL(new Blob([glb], { type: 'application/octet-stream' }))
-      const a = document.createElement('a')
-      a.href = url; a.download = 'model_lowpoly.glb'; a.click()
-      URL.revokeObjectURL(url)
+      saveFile(glb, 'model_lowpoly.glb')
       built.dispose()
     }, (err) => { console.error('GLB export error:', err); built.dispose() }, { binary: true })
   }
