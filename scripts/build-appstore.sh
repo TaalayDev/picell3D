@@ -169,29 +169,41 @@ build_macos() {
       && ok "ITSAppUsesNonExemptEncryption = false" || true
   fi
 
-  # The Mac App Store requires the App Sandbox entitlement to be present in the
-  # binary's signature. `--no-sign` leaves the app with none, so Xcode's
-  # distribution re-sign has nothing to preserve and validation fails with
-  # "App sandbox not enabled". Ad-hoc-sign the app with just the sandbox
-  # entitlements now (no cert, no provisioning profile) — the real distribution
-  # identity is applied later by Organizer / the signing service, which keeps
-  # these code entitlements.
+  # Preserve the configured sandbox permissions when the unsigned bundle is
+  # ad-hoc signed. Organizer uses this signature as the input to distribution
+  # signing, so dropping user-selected file access here breaks native Save.
   local ents="$OUT_DIR/macos-sandbox.entitlements"
-  cat > "$ents" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>com.apple.security.app-sandbox</key><true/>
-  <key>com.apple.security.network.client</key><true/>
-</dict>
-</plist>
-PLIST
-  log "Ad-hoc signing with App Sandbox entitlements …"
+  local configured_ents
+  configured_ents="$(node --input-type=module -e '
+    import fs from "node:fs";
+    import path from "node:path";
+    const config = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    const entitlements = config.bundle?.macOS?.entitlements;
+    if (!entitlements) process.exit(1);
+    console.log(path.resolve(path.dirname(process.argv[1]), entitlements));
+  ' "$CONF")" || err "missing configured macOS entitlements"
+  [ -f "$configured_ents" ] || err "macOS entitlements not found: $configured_ents"
+  plutil -lint "$configured_ents" >/dev/null || err "invalid macOS entitlements"
+  cp "$configured_ents" "$ents"
+  # Ad-hoc signing has no provisioning identity. Distribution signing adds
+  # these identity fields back using the selected team and profile.
+  "$PB" -c 'Delete :com.apple.application-identifier' "$ents" 2>/dev/null || true
+  "$PB" -c 'Delete :com.apple.developer.team-identifier' "$ents" 2>/dev/null || true
+  for permission in com.apple.security.app-sandbox com.apple.security.files.user-selected.read-write; do
+    [ "$("$PB" -c "Print :$permission" "$ents" 2>/dev/null)" = "true" ] \
+      || err "required entitlement missing: $permission"
+  done
+  log "Ad-hoc signing with configured App Sandbox entitlements …"
   codesign --force --sign - --entitlements "$ents" --timestamp=none "$app_path"
-  codesign --display --entitlements - "$app_path" 2>/dev/null | grep -q 'app-sandbox' \
-    && ok "App Sandbox entitlement embedded" \
-    || warn "could not confirm app-sandbox entitlement — validation may still fail"
+  local signed_ents="$OUT_DIR/macos-signed.entitlements"
+  codesign --display --entitlements :- "$app_path" > "$signed_ents" 2>/dev/null \
+    || err "could not read signed app entitlements"
+  plutil -lint "$signed_ents" >/dev/null || err "invalid signed app entitlements"
+  for permission in com.apple.security.app-sandbox com.apple.security.files.user-selected.read-write; do
+    [ "$("$PB" -c "Print :$permission" "$signed_ents" 2>/dev/null)" = "true" ] \
+      || err "signed app is missing required entitlement: $permission"
+  done
+  ok "App Sandbox and user-selected file access entitlements embedded"
 
   # --- assemble the .xcarchive -------------------------------------------
   local archive="$OUT_DIR/$SAFE_NAME-macOS.xcarchive"

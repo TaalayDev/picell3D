@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>ArchiveVersion</key><integer>2</integer>
-  <key>CreationDate</key><date>2026-10-12T03:17:18Z</date>
+  <key>CreationDate</key><date>2026-10-12T03:39:21Z</date>
   <key>Name</key><string>Picell3D</string>
   <key>SchemeName</key><string>Picell3D</string>
   <key>ApplicationProperties</key>
@@ -12,7 +12,7 @@
     <key>Architectures</key><array><string>arm64</string><string>x86_64</string></array>
     <key>CFBundleIdentifier</key><string>io.github.taalaydev.picell3d</string>
     <key>CFBundleShortVersionString</key><string>0.1.0</string>
-    <key>CFBundleVersion</key><string>3</string>
+    <key>CFBundleVersion</key><string>4</string>
   </dict>
 </dict>
 </plist>
